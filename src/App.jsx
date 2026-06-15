@@ -1,0 +1,156 @@
+/* App — 1:1 React replica of karya-vaani_v3.html.
+   Styling: src/styles/app.css (verbatim copy of the original <style> block).
+   Behaviour: public/legacy/app.js (verbatim copy of the original <script>),
+   loaded after mount via useLegacyApp(). */
+import { useLegacyApp } from './legacy/useLegacyApp.js';
+import TopBar from './components/TopBar.jsx';
+import NavBar from './components/NavBar.jsx';
+import EmailModal from './components/EmailModal.jsx';
+import Toast from './components/Toast.jsx';
+import SecDashboard from './sections/SecDashboard.jsx';
+import SecDiagnostic from './sections/SecDiagnostic.jsx';
+import SecArchitecture from './sections/SecArchitecture.jsx';
+import SecKaryaNirnay from './sections/SecKaryaNirnay.jsx';
+import SecRecruitment from './sections/SecRecruitment.jsx';
+import SecOnboarding from './sections/SecOnboarding.jsx';
+import SecInduction from './sections/SecInduction.jsx';
+import SecVendor from './sections/SecVendor.jsx';
+import SecOhs from './sections/SecOhs.jsx';
+import SecCompliance from './sections/SecCompliance.jsx';
+import SecVaaniBroadcast from './sections/SecVaaniBroadcast.jsx';
+import SecChatAnalytics from './sections/SecChatAnalytics.jsx';
+import SecChat from './sections/SecChat.jsx';
+import SecEmpHome from './sections/SecEmpHome.jsx';
+import SecCtHome from './sections/SecCtHome.jsx';
+import SecTransport from './sections/SecTransport.jsx';
+import SecLms from './sections/SecLms.jsx';
+import SecRules from './sections/SecRules.jsx';
+import SecLocale from './sections/SecLocale.jsx';
+import SecAudit from './sections/SecAudit.jsx';
+import SecHandoff from './sections/SecHandoff.jsx';
+import SecDirectory from './sections/SecDirectory.jsx';
+import SecCtdirectory from './sections/SecCtdirectory.jsx';
+
+export default function App() {
+  useLegacyApp();
+  return (
+    <>
+      {/*  ════ TOP BAR ════  */}
+      <TopBar />
+      {/*  ════ TOP NAV BAR ════  */}
+      <NavBar />
+      <div className="shell">
+        <main className="main">
+          {/*  ─────────────────────────────────────────────────────────────────
+     1 · EXECUTIVE DASHBOARD
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecDashboard />
+          {/*  ─────────────────────────────────────────────────────────────────
+     2 · LABOUR CODE READINESS SURVEY  (replaces Continuous Compliance Engine)
+     9-question pulse survey → scored sector benchmark + gap report
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecDiagnostic />
+          {/*  ─────────────────────────────────────────────────────────────────
+     3 · ARCHITECTURAL BLUEPRINT
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecArchitecture />
+          {/*  ─────────────────────────────────────────────────────────────────
+     KARYA NIRṆAY · WORKFORCE DECISION BUILDER
+     First pillar — guided 4-step workforce-structure decision engine
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecKaryaNirnay />
+          {/*  ─────────────────────────────────────────────────────────────────
+     4 · TALENT ACQUISITION & PROGRESSION
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecRecruitment />
+          {/*  ─────────────────────────────────────────────────────────────────
+     5 · ONBOARDING
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecOnboarding />
+          {/*  ─────────────────────────────────────────────────────────────────
+     6 · INDUCTION TRAINING · MODULE 3
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecInduction />
+          {/*  ─────────────────────────────────────────────────────────────────
+     7 · VENDOR / CONTRACTOR COMPLIANCE
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecVendor />
+          {/*  ─────────────────────────────────────────────────────────────────
+     7 · WORKPLACE SAFETY & OHS ANALYTICS
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecOhs />
+          {/*  ─────────────────────────────────────────────────────────────────
+     8 · COMPLIANCE ASSESSMENT (UMBRELLA)
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecCompliance />
+          {/*  ─────────────────────────────────────────────────────────────────
+     9 · VAANI TRANSLATION & BROADCASTING  (merged)
+     Compose → translate into two Indian languages → broadcast to a
+     small named group, with a live delivery + acknowledgement demo.
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecVaaniBroadcast />
+          {/*  ─────────────────────────────────────────────────────────────────
+     KARYA VAANI CHAT · WhatsApp look-alike chatbot
+     Shows multilingual messages flowing from the Vaani Localisation
+     engine to workers. The bot appears as a contact.
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecChatAnalytics />
+          <SecChat />
+          {/*  ─────────────────────────────────────────────────────────────────
+     10c · EMPLOYEE HOME — the worker-facing surface
+     A single page that pulls everything Karya Vaani knows about a
+     worker into one place: their identity, today's alerts, messages
+     pending acknowledgement, personal compliance score, and the
+     time-to-read trends across recent broadcasts.
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecEmpHome />
+          {/*  ─────────────────────────────────────────────────────────────────
+     10d · CONTRACTOR HOME — the firm-facing surface
+     A single page that pulls everything Karya Vaani knows about a
+     contractor firm: their compliance score, deployed workforce,
+     statutory state (CLRA / ESIC / PF), liability exposure, and the
+     chat thread with Plant HR / compliance.
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecCtHome />
+          {/*  ─────────────────────────────────────────────────────────────────
+     10b · TRANSPORT SCHEDULE  — weekly plan · 2 shifts · 5 buses
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecTransport />
+          {/*  ─────────────────────────────────────────────────────────────────
+     11 · KNOWLEDGE CENTER
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecLms />
+          {/*  ─────────────────────────────────────────────────────────────────
+     13 · RULE LIBRARY
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecRules />
+          {/*  ─────────────────────────────────────────────────────────────────
+     14 · GLOBAL LOCALIZATION ENGINE
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecLocale />
+          {/*  ─────────────────────────────────────────────────────────────────
+     15 · AUDIT TRAIL
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecAudit />
+          {/*  ─────────────────────────────────────────────────────────────────
+     16 · API HANDOFF
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecHandoff />
+          {/*  ─────────────────────────────────────────────────────────────────
+     WORKFORCE DIRECTORY · searchable grid · direct + contract
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecDirectory />
+          {/*  ─────────────────────────────────────────────────────────────────
+     CONTRACTOR DIRECTORY · searchable grid · compliance drill-down
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecCtdirectory />
+        </main>
+      </div>
+      {/*  /shell  */}
+      {/*  ════ EMAIL COMPOSE MODAL ════  */}
+      <EmailModal />
+      {/*  ════ TOAST ════  */}
+      <Toast />
+    </>
+  );
+}

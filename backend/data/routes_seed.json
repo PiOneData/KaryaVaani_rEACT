@@ -1,0 +1,478 @@
+[
+ {
+  "bus": "B1",
+  "code": "B1",
+  "colour": "var(--indigo)",
+  "route": "Route 1 · Tada",
+  "zone": "Compressor Line",
+  "morning": {
+   "board": "05:40",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:40",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Tada Bus Stand",
+    "t": "05:40"
+   },
+   {
+    "name": "Tada Junction",
+    "t": "05:53"
+   },
+   {
+    "name": "Tada Cross",
+    "t": "06:06"
+   },
+   {
+    "name": "Plant Gate 1",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B2",
+  "code": "B2",
+  "colour": "var(--green)",
+  "route": "Route 2 · Sullurpet",
+  "zone": "Paint Shop",
+  "morning": {
+   "board": "05:45",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:45",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Sullurpet Bus Stand",
+    "t": "05:45"
+   },
+   {
+    "name": "Sullurpet Junction",
+    "t": "05:58"
+   },
+   {
+    "name": "Sullurpet Cross",
+    "t": "06:11"
+   },
+   {
+    "name": "Plant Gate 2",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B3",
+  "code": "B3",
+  "colour": "var(--amber)",
+  "route": "Route 3 · Naidupet",
+  "zone": "Warehouse",
+  "morning": {
+   "board": "05:50",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:50",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Naidupet Bus Stand",
+    "t": "05:50"
+   },
+   {
+    "name": "Naidupet Junction",
+    "t": "06:03"
+   },
+   {
+    "name": "Naidupet Cross",
+    "t": "06:16"
+   },
+   {
+    "name": "Plant Gate 3",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B4",
+  "code": "B4",
+  "colour": "var(--blue)",
+  "route": "Route 4 · Varadaihpalem",
+  "zone": "Quality & QC",
+  "morning": {
+   "board": "05:55",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:55",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Varadaihpalem Bus Stand",
+    "t": "05:55"
+   },
+   {
+    "name": "Varadaihpalem Junction",
+    "t": "06:08"
+   },
+   {
+    "name": "Varadaihpalem Cross",
+    "t": "06:21"
+   },
+   {
+    "name": "Plant Gate 1",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B5",
+  "code": "B5",
+  "colour": "#7A5BA8",
+  "route": "Route 5 · BN Kandriga",
+  "zone": "Logistics & dispatch",
+  "morning": {
+   "board": "06:00",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "08:00",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "BN Kandriga Bus Stand",
+    "t": "06:00"
+   },
+   {
+    "name": "BN Kandriga Junction",
+    "t": "06:13"
+   },
+   {
+    "name": "BN Kandriga Cross",
+    "t": "06:26"
+   },
+   {
+    "name": "Plant Gate 2",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B6",
+  "code": "B6",
+  "colour": "#3F8C7A",
+  "route": "Route 6 · Chembedu",
+  "zone": "Assembly Line",
+  "morning": {
+   "board": "06:05",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "08:05",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Chembedu Bus Stand",
+    "t": "06:05"
+   },
+   {
+    "name": "Chembedu Junction",
+    "t": "06:18"
+   },
+   {
+    "name": "Chembedu Cross",
+    "t": "06:31"
+   },
+   {
+    "name": "Plant Gate 3",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B7",
+  "code": "B7",
+  "colour": "#8C6D3F",
+  "route": "Route 7 · Kothagunta",
+  "zone": "Press Shop",
+  "morning": {
+   "board": "05:40",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:40",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Kothagunta Bus Stand",
+    "t": "05:40"
+   },
+   {
+    "name": "Kothagunta Junction",
+    "t": "05:53"
+   },
+   {
+    "name": "Kothagunta Cross",
+    "t": "06:06"
+   },
+   {
+    "name": "Plant Gate 1",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B8",
+  "code": "B8",
+  "colour": "#B4476B",
+  "route": "Route 8 · Madharpakkam",
+  "zone": "Utilities",
+  "morning": {
+   "board": "05:45",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:45",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Madharpakkam Bus Stand",
+    "t": "05:45"
+   },
+   {
+    "name": "Madharpakkam Junction",
+    "t": "05:58"
+   },
+   {
+    "name": "Madharpakkam Cross",
+    "t": "06:11"
+   },
+   {
+    "name": "Plant Gate 2",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B9",
+  "code": "B9",
+  "colour": "#4F8C3F",
+  "route": "Route 9 · Gummidipoondi",
+  "zone": "Tool Room",
+  "morning": {
+   "board": "05:50",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:50",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Gummidipoondi Bus Stand",
+    "t": "05:50"
+   },
+   {
+    "name": "Gummidipoondi Junction",
+    "t": "06:03"
+   },
+   {
+    "name": "Gummidipoondi Cross",
+    "t": "06:16"
+   },
+   {
+    "name": "Plant Gate 3",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B10",
+  "code": "B10",
+  "colour": "#3F6D8C",
+  "route": "Route 10 · Uthukottai",
+  "zone": "Dispatch Bay",
+  "morning": {
+   "board": "05:55",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:55",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Uthukottai Bus Stand",
+    "t": "05:55"
+   },
+   {
+    "name": "Uthukottai Junction",
+    "t": "06:08"
+   },
+   {
+    "name": "Uthukottai Cross",
+    "t": "06:21"
+   },
+   {
+    "name": "Plant Gate 1",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B11",
+  "code": "B11",
+  "colour": "#8C3F6B",
+  "route": "Route 11 · Guindy",
+  "zone": "Receiving Dock",
+  "morning": {
+   "board": "06:00",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "08:00",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Guindy Bus Stand",
+    "t": "06:00"
+   },
+   {
+    "name": "Guindy Junction",
+    "t": "06:13"
+   },
+   {
+    "name": "Guindy Cross",
+    "t": "06:26"
+   },
+   {
+    "name": "Plant Gate 2",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B12",
+  "code": "B12",
+  "colour": "#6B8C3F",
+  "route": "Route 12 · Tambaram",
+  "zone": "Sub-assembly",
+  "morning": {
+   "board": "06:05",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "08:05",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Tambaram Bus Stand",
+    "t": "06:05"
+   },
+   {
+    "name": "Tambaram Junction",
+    "t": "06:18"
+   },
+   {
+    "name": "Tambaram Cross",
+    "t": "06:31"
+   },
+   {
+    "name": "Plant Gate 3",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B13",
+  "code": "B13",
+  "colour": "#8C5B3F",
+  "route": "Route 13 · Tiruvallur",
+  "zone": "Maintenance",
+  "morning": {
+   "board": "05:40",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:40",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Tiruvallur Bus Stand",
+    "t": "05:40"
+   },
+   {
+    "name": "Tiruvallur Junction",
+    "t": "05:53"
+   },
+   {
+    "name": "Tiruvallur Cross",
+    "t": "06:06"
+   },
+   {
+    "name": "Plant Gate 1",
+    "t": "06:45"
+   }
+  ]
+ },
+ {
+  "bus": "B14",
+  "code": "B14",
+  "colour": "#5B3F8C",
+  "route": "Route 14 · Redhills",
+  "zone": "General Admin",
+  "morning": {
+   "board": "05:45",
+   "plant": "06:45"
+  },
+  "general": {
+   "board": "07:45",
+   "plant": "08:45"
+  },
+  "drop": "15:45",
+  "stops": [
+   {
+    "name": "Redhills Bus Stand",
+    "t": "05:45"
+   },
+   {
+    "name": "Redhills Junction",
+    "t": "05:58"
+   },
+   {
+    "name": "Redhills Cross",
+    "t": "06:11"
+   },
+   {
+    "name": "Plant Gate 2",
+    "t": "06:45"
+   }
+  ]
+ }
+]

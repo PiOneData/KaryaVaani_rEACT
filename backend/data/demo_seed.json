@@ -1,0 +1,3105 @@
+{
+ "requisitions": [
+  {
+   "id": "POS-2026-0142",
+   "role": "Quality Engineer",
+   "fn": "Engineering",
+   "hm": "Kenji Tanaka",
+   "approved": "20 Apr",
+   "target": "6 Jun",
+   "stage": 4,
+   "brkAt": 3,
+   "days": 32,
+   "sla": "breach",
+   "notes": [
+    "18 Apr · 2d",
+    "20 Apr · 1d",
+    "21 Apr · JP+EN",
+    "SLA breached · agency-heavy",
+    "3 shortlisted",
+    "2 rounds",
+    "",
+    ""
+   ],
+   "recco": "Sourcing has breached SLA for 11 days against a 7-day target. Agency dependence at 84% (target 50%). Consider campus channel reactivation and a Japanese-speaker referral programme — Global Localization Engine will route the JD through expert review.",
+   "knRef": "KN-2026-031",
+   "approval": "approved",
+   "contractors": [
+    "Sri Lakshmi Engg"
+   ]
+  },
+  {
+   "id": "POS-2026-0148",
+   "role": "Compressor line operator",
+   "fn": "Plant floor",
+   "hm": "Suresh Pillai",
+   "approved": "12 Apr",
+   "target": "24 May",
+   "stage": 5,
+   "days": 21,
+   "sla": "ok",
+   "notes": [
+    "10 Apr · 1d",
+    "12 Apr · 2d",
+    "14 Apr · TE+EN+HI",
+    "17 Apr · 3 channels",
+    "22 Apr · 11 shortlisted",
+    "2 rounds · in progress",
+    "",
+    ""
+   ],
+   "recco": "On track. Two interview rounds completed with 6 candidates; offer panel next week. Telugu and Hindi induction packs already staged.",
+   "knRef": "KN-2026-027",
+   "approval": "approved",
+   "contractors": [
+    "Sri Lakshmi Engg",
+    "Bharat Contractors"
+   ]
+  },
+  {
+   "id": "POS-2026-0151",
+   "role": "EHS Officer",
+   "fn": "Safety",
+   "hm": "Priya Menon",
+   "approved": "17 Apr",
+   "target": "12 Jun",
+   "stage": 2,
+   "days": 9,
+   "sla": "ok",
+   "notes": [
+    "15 Apr · 2d",
+    "17 Apr · 1d",
+    "21 Apr · EN",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "recco": "JD published 4 days ago. Sourcing window opens once campus and referral channels acknowledge — typical 5-day window for safety roles.",
+   "knRef": "KN-2026-034",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0152",
+   "role": "Plant Manager · Section 2",
+   "fn": "Management",
+   "hm": "Hiroshi Ito",
+   "approved": "5 Mar",
+   "target": "1 May",
+   "stage": 6,
+   "days": 56,
+   "sla": "watch",
+   "notes": [
+    "3 Mar · 2d",
+    "5 Mar · 1d",
+    "6 Mar · JP+EN",
+    "10 Mar · executive search",
+    "28 Mar · 4 shortlisted",
+    "5 rounds · panel + Tokyo HQ",
+    "offer extended · Jp candidate",
+    ""
+   ],
+   "recco": "Offer extended to a Japanese-speaker candidate; awaiting acceptance. Watch state due to extended timeline — typical for senior roles requiring HQ alignment. Global Localization Engine has cleared offer letter JP translation.",
+   "knRef": "KN-2026-019",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0156",
+   "role": "Maintenance technician",
+   "fn": "Plant floor",
+   "hm": "Suresh Pillai",
+   "approved": "21 Apr",
+   "target": "18 May",
+   "stage": 3,
+   "days": 4,
+   "sla": "ok",
+   "notes": [
+    "19 Apr · 2d",
+    "21 Apr · 1d",
+    "22 Apr · TE+EN",
+    "23 Apr · ITI + walk-in",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "recco": "Active sourcing through ITI tie-ups and weekly walk-in events. Plant-floor pipeline healthy; expect first shortlist in 5–7 days.",
+   "knRef": "KN-2026-036",
+   "approval": "approved",
+   "contractors": [
+    "Pavan Manpower"
+   ]
+  },
+  {
+   "id": "POS-2026-0159",
+   "role": "HR Business Partner",
+   "fn": "HR",
+   "hm": "Priya Menon",
+   "approved": "8 Apr",
+   "target": "30 May",
+   "stage": 5,
+   "days": 28,
+   "sla": "ok",
+   "notes": [
+    "6 Apr · 2d",
+    "8 Apr · 1d",
+    "9 Apr · EN",
+    "11 Apr · 2 agencies",
+    "20 Apr · 5 shortlisted",
+    "3 rounds · in progress",
+    "",
+    ""
+   ],
+   "recco": "Final-round interviews scheduled this week. Offer expected within 5 working days. Hindi + Telugu fluency confirmed for all final candidates.",
+   "knRef": "KN-2026-029",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0161",
+   "role": "Payroll Analyst",
+   "fn": "Finance",
+   "hm": "Aditi Rao",
+   "approved": "15 Apr",
+   "target": "15 Jun",
+   "stage": 4,
+   "days": 14,
+   "sla": "ok",
+   "notes": [
+    "13 Apr · 2d",
+    "15 Apr · 1d",
+    "16 Apr · EN",
+    "18 Apr · LinkedIn + 1 agency",
+    "24 Apr · 4 shortlisted",
+    "",
+    "",
+    ""
+   ],
+   "recco": "Screening underway. Wages-Code transition expertise weighted heavily; 2 of 4 shortlisted candidates have direct experience.",
+   "knRef": "KN-2026-033",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0162",
+   "role": "Welding supervisor",
+   "fn": "Plant floor",
+   "hm": "Suresh Pillai",
+   "approved": "22 Apr",
+   "target": "5 Jun",
+   "stage": 1,
+   "days": 3,
+   "sla": "ok",
+   "notes": [
+    "20 Apr · 2d",
+    "22 Apr · 1d",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "recco": "Just approved. JD drafting in progress; Telugu translation queued with VAANI for plant-floor reach.",
+   "knRef": "KN-2026-039",
+   "approval": "pending",
+   "contractors": [
+    "Sri Lakshmi Engg"
+   ]
+  },
+  {
+   "id": "POS-2026-0164",
+   "role": "ERP analyst · SAP HCM",
+   "fn": "IT",
+   "hm": "Ravi Verma",
+   "approved": "2 Apr",
+   "target": "20 May",
+   "stage": 5,
+   "days": 35,
+   "sla": "watch",
+   "notes": [
+    "31 Mar · 2d",
+    "2 Apr · 1d",
+    "3 Apr · EN",
+    "5 Apr · 3 specialised agencies",
+    "15 Apr · 6 shortlisted",
+    "2 rounds · technical screening",
+    "",
+    ""
+   ],
+   "recco": "Niche skillset; market thin. Interview pace acceptable but watch state warranted — extend window by 2 weeks if final shortlist drops below 3.",
+   "knRef": "KN-2026-022",
+   "approval": "approved",
+   "contractors": [
+    "Sai Industrial"
+   ]
+  },
+  {
+   "id": "POS-2026-0167",
+   "role": "Toolroom machinist",
+   "fn": "Plant floor",
+   "hm": "Suresh Pillai",
+   "approved": "24 Apr",
+   "target": "10 Jun",
+   "stage": 3,
+   "days": 7,
+   "sla": "ok",
+   "notes": [
+    "22 Apr · 2d",
+    "24 Apr · 1d",
+    "25 Apr · TE+EN",
+    "26 Apr · ITI + diploma colleges",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "recco": "Standard plant-floor sourcing through ITI partner network. Healthy throughput.",
+   "knRef": "KN-2026-037",
+   "approval": "approved",
+   "contractors": [
+    "Pavan Manpower",
+    "Sai Industrial",
+    "Bharat Contractors"
+   ]
+  },
+  {
+   "id": "POS-2026-0170",
+   "role": "Procurement officer",
+   "fn": "Supply chain",
+   "hm": "Aditi Rao",
+   "approved": "11 Apr",
+   "target": "25 May",
+   "stage": 6,
+   "days": 22,
+   "sla": "ok",
+   "notes": [
+    "9 Apr · 2d",
+    "11 Apr · 1d",
+    "12 Apr · EN",
+    "14 Apr · 2 agencies",
+    "18 Apr · 4 shortlisted",
+    "3 rounds · panel complete",
+    "offer drafted",
+    ""
+   ],
+   "recco": "Offer being drafted; acceptance expected by week-end. Onboarding pack pre-staged.",
+   "knRef": "KN-2026-030",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0171",
+   "role": "Production planner",
+   "fn": "Engineering",
+   "hm": "Kenji Tanaka",
+   "approved": "14 Apr",
+   "target": "5 Jun",
+   "stage": 4,
+   "days": 17,
+   "sla": "ok",
+   "notes": [
+    "12 Apr · 2d",
+    "14 Apr · 1d",
+    "15 Apr · JP+EN",
+    "17 Apr · 1 agency + internal post",
+    "25 Apr · 3 shortlisted",
+    "",
+    "",
+    ""
+   ],
+   "recco": "Screening complete; interview panel being scheduled. Internal candidate in the mix.",
+   "knRef": "KN-2026-032",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0174",
+   "role": "Internal auditor",
+   "fn": "Finance",
+   "hm": "Aditi Rao",
+   "approved": "6 Apr",
+   "target": "15 May",
+   "stage": 4,
+   "brkAt": 4,
+   "days": 30,
+   "sla": "breach",
+   "notes": [
+    "4 Apr · 2d",
+    "6 Apr · 1d",
+    "7 Apr · EN",
+    "9 Apr · 2 agencies",
+    "SLA breached · only 1 shortlist",
+    "",
+    "",
+    ""
+   ],
+   "recco": "Screening has breached SLA — only 1 candidate shortlisted against a target of 4 in 21 days. CA-with-manufacturing experience pool thin. Widen criteria to include ICWA + 3-year manufacturing, and authorise +1 agency.",
+   "knRef": "KN-2026-024",
+   "approval": "approved",
+   "contractors": []
+  },
+  {
+   "id": "POS-2026-0177",
+   "role": "Boiler operator",
+   "fn": "Plant floor",
+   "hm": "Suresh Pillai",
+   "approved": "25 Apr",
+   "target": "15 May",
+   "stage": 0,
+   "days": 2,
+   "sla": "ok",
+   "notes": [
+    "25 Apr · raised today",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "recco": "New requisition. Awaiting hiring-manager approval and Factories Act competency cert verification.",
+   "knRef": "KN-2026-041",
+   "approval": "pending",
+   "contractors": [
+    "Coastal Logistics"
+   ]
+  }
+ ],
+ "workers": [
+  {
+   "id": "WK-001",
+   "name": "Arjun Reddy",
+   "posId": "POS-2026-0148",
+   "role": "Operator",
+   "stage": "docs-pending",
+   "uan": "portable",
+   "induction": "—",
+   "days": 2,
+   "docs": [
+    {
+     "id": "aadhaar",
+     "label": "Aadhaar eKYC",
+     "type": "digital",
+     "status": "done",
+     "source": "UIDAI eKYC API · OTP consent",
+     "ts": "23 Apr 2026 · 11:04:22 IST",
+     "hash": "a3f7c8e2…d290b41f",
+     "payload": {
+      "type": "aadhaar.ekyc.v2",
+      "txn_id": "PV-EKYC-87412",
+      "consent_artefact": "DEPA-CON-9821",
+      "match_score": 0.987,
+      "verified_fields": [
+       "name",
+       "dob",
+       "gender",
+       "address_district"
+      ],
+      "shared_token": "tok_…7f3a"
+     },
+     "subject": "Aadhaar: XXXX XXXX 4216 · DOB match 98.7%"
+    },
+    {
+     "id": "pan",
+     "label": "PAN verification",
+     "type": "digital",
+     "status": "done",
+     "source": "NSDL / Income-Tax PAN-Aadhaar link API",
+     "ts": "23 Apr 2026 · 11:07:08 IST",
+     "hash": "7c129e44…8e44a7b1",
+     "payload": {
+      "type": "pan.aadhaar.link.v1",
+      "pan_last4": "XXXX9X",
+      "linked": true,
+      "name_match": "exact"
+     },
+     "subject": "PAN ABXXX7891X · linked to Aadhaar · status: ACTIVE"
+    },
+    {
+     "id": "bank",
+     "label": "Bank account · penny-drop",
+     "type": "digital",
+     "status": "pending",
+     "source": "NPCI IMPS penny-drop",
+     "ts": "queued · awaiting NPCI response",
+     "subject": "HDFC ****8821 · Arjun K Reddy · ₹1 credit pending confirmation"
+    },
+    {
+     "id": "uan",
+     "label": "UAN portability check",
+     "type": "digital",
+     "status": "done",
+     "source": "EPFO UAN Member API",
+     "ts": "23 Apr 2026 · 11:12:44 IST",
+     "hash": "5b88…f021",
+     "payload": {
+      "type": "epfo.uan.portability.v1",
+      "uan_last4": "X X4502",
+      "previous_estab": "AP/HYD/22117",
+      "transferred": false,
+      "kyc_seeded": true
+     },
+     "subject": "UAN seeded · KYC verified · transfer pending worker initiation"
+    },
+    {
+     "id": "edu",
+     "label": "Education certificate · Diploma",
+     "type": "self",
+     "status": "done",
+     "uploaded": "22 Apr 2026 · 09:31",
+     "file": "diploma_mech_2018.pdf",
+     "size": "2.1 MB",
+     "subject": "Diploma in Mechanical Engineering · SBTET AP · 2018 · First class",
+     "notes": "HR verified · cross-checked against SBTET roll-number registry · pass."
+    },
+    {
+     "id": "prior",
+     "label": "Prior employment letter",
+     "type": "self",
+     "status": "pending",
+     "uploaded": "—",
+     "file": "—",
+     "subject": "Awaiting upload from worker",
+     "notes": "WA reminder sent in Telugu on 22 Apr 18:30; re-send scheduled 24 Apr 09:00."
+    },
+    {
+     "id": "addr",
+     "label": "Address proof",
+     "type": "self",
+     "status": "rejected",
+     "uploaded": "22 Apr 2026 · 10:15",
+     "file": "utility_bill_dec2025.jpg",
+     "size": "1.4 MB",
+     "subject": "Electricity bill · Sricity address",
+     "notes": "Rejected: bill dated 18 Dec 2025 — older than 90 days. Worker asked to re-upload latest (Mar 2026 or newer).",
+     "rejReason": "Bill date 18-Dec-2025 — exceeds 90-day freshness rule per Direct-employee checklist v2026.05.2."
+    },
+    {
+     "id": "photo",
+     "label": "Passport photo",
+     "type": "self",
+     "status": "done",
+     "uploaded": "22 Apr 2026 · 09:32",
+     "file": "photo.jpg",
+     "size": "420 KB",
+     "subject": "JPEG · 600×800 · neutral background",
+     "notes": "Auto-cropped to ID standard. Approved by HR."
+    }
+   ]
+  },
+  {
+   "id": "WK-002",
+   "name": "Lakshmi N.",
+   "posId": "POS-2026-0151",
+   "role": "Quality inspector",
+   "stage": "induction",
+   "uan": "100823XXXX",
+   "induction": "4/7 modules",
+   "days": 4,
+   "docs": [
+    {
+     "id": "aadhaar",
+     "label": "Aadhaar eKYC",
+     "type": "digital",
+     "status": "done",
+     "source": "UIDAI eKYC API · OTP consent",
+     "ts": "21 Apr 2026 · 14:22:09 IST",
+     "hash": "b821…f4a0",
+     "payload": {
+      "type": "aadhaar.ekyc.v2",
+      "match_score": 0.994
+     },
+     "subject": "Aadhaar: XXXX XXXX 7712 · match 99.4%"
+    },
+    {
+     "id": "pan",
+     "label": "PAN verification",
+     "type": "digital",
+     "status": "done",
+     "source": "NSDL / Income-Tax PAN-Aadhaar link API",
+     "ts": "21 Apr 2026 · 14:24:11 IST",
+     "hash": "9d4e…22f1",
+     "payload": {
+      "linked": true,
+      "name_match": "exact"
+     },
+     "subject": "PAN linked · ACTIVE"
+    },
+    {
+     "id": "bank",
+     "label": "Bank account · penny-drop",
+     "type": "digital",
+     "status": "done",
+     "source": "NPCI IMPS penny-drop",
+     "ts": "21 Apr 2026 · 14:31:48 IST",
+     "hash": "441a…8c10",
+     "payload": {
+      "credit_amount": 1,
+      "reverse_lookup_name": "Lakshmi Narayanan",
+      "name_score": 0.97
+     },
+     "subject": "ICICI ****4421 · ₹1 confirmed · name-match 97%"
+    },
+    {
+     "id": "uan",
+     "label": "UAN portability check",
+     "type": "digital",
+     "status": "done",
+     "source": "EPFO UAN Member API",
+     "ts": "21 Apr 2026 · 14:37:02 IST",
+     "hash": "6f23…0d77",
+     "payload": {
+      "transferred": true,
+      "previous_estab": "KA/BNG/45881"
+     },
+     "subject": "UAN transferred from previous KA estab · seeded"
+    },
+    {
+     "id": "edu",
+     "label": "Education · B.Sc Chemistry",
+     "type": "self",
+     "status": "done",
+     "uploaded": "20 Apr 2026 · 11:00",
+     "file": "bsc_chem_2020.pdf",
+     "size": "3.4 MB",
+     "subject": "Andhra University · 2020 · Distinction",
+     "notes": "Verified against AU degree verification portal."
+    },
+    {
+     "id": "prior",
+     "label": "Prior employment letter",
+     "type": "self",
+     "status": "done",
+     "uploaded": "20 Apr 2026 · 11:02",
+     "file": "reliance_relieving.pdf",
+     "size": "890 KB",
+     "subject": "Reliance Industries · QC Trainee · 2020-2024",
+     "notes": "Relieving + experience letter. Genuine — pre-employment ref check passed."
+    },
+    {
+     "id": "addr",
+     "label": "Address proof",
+     "type": "self",
+     "status": "done",
+     "uploaded": "20 Apr 2026 · 11:04",
+     "file": "aadhaar_addr.pdf",
+     "size": "780 KB",
+     "subject": "Aadhaar address page",
+     "notes": "Within 90 days · matches eKYC payload."
+    },
+    {
+     "id": "photo",
+     "label": "Passport photo",
+     "type": "self",
+     "status": "done",
+     "uploaded": "20 Apr 2026 · 11:05",
+     "file": "photo.jpg",
+     "size": "380 KB",
+     "subject": "JPEG · ID-standard",
+     "notes": "Approved."
+    }
+   ]
+  },
+  {
+   "id": "WK-003",
+   "name": "Hiroshi Sato",
+   "posId": "POS-2026-0152",
+   "role": "Plant Manager · Section 2",
+   "stage": "ready",
+   "uan": "new UAN",
+   "induction": "complete",
+   "days": 6,
+   "docs": [
+    {
+     "id": "aadhaar",
+     "label": "Aadhaar eKYC",
+     "type": "digital",
+     "status": "done",
+     "source": "UIDAI eKYC · OCI category",
+     "ts": "17 Apr 2026 · 09:14 IST",
+     "hash": "cf02…9ac7",
+     "payload": {
+      "match_score": 1,
+      "category": "OCI",
+      "name_jp": "佐藤 浩"
+     },
+     "subject": "Aadhaar: XXXX XXXX 1108 · OCI · match 100%"
+    },
+    {
+     "id": "pan",
+     "label": "PAN verification",
+     "type": "digital",
+     "status": "done",
+     "source": "NSDL",
+     "ts": "17 Apr 2026 · 09:18 IST",
+     "hash": "a7b1…d320",
+     "subject": "PAN linked · ACTIVE",
+     "payload": {
+      "linked": true
+     }
+    },
+    {
+     "id": "visa",
+     "label": "Visa / OCI card",
+     "type": "self",
+     "status": "done",
+     "uploaded": "15 Apr 2026 · 18:20",
+     "file": "oci_card_sato_hiroshi.pdf",
+     "size": "1.8 MB",
+     "subject": "OCI lifelong · issued 2018 · Embassy of India, Tokyo",
+     "notes": "Verified manually by HR. Original sighted on 17 Apr."
+    },
+    {
+     "id": "bank",
+     "label": "Bank account · penny-drop",
+     "type": "digital",
+     "status": "done",
+     "source": "NPCI IMPS",
+     "ts": "17 Apr 2026 · 09:32 IST",
+     "hash": "23da…77b8",
+     "subject": "HDFC ****9920 · ₹1 confirmed · name-match 99%",
+     "payload": {
+      "name_score": 0.99
+     }
+    },
+    {
+     "id": "uan",
+     "label": "UAN allocation (new)",
+     "type": "digital",
+     "status": "done",
+     "source": "EPFO UAN allotment API",
+     "ts": "17 Apr 2026 · 09:41 IST",
+     "hash": "5e11…4f8b",
+     "subject": "New UAN allotted · no prior estab",
+     "payload": {
+      "transferred": false,
+      "kyc_seeded": true
+     }
+    },
+    {
+     "id": "edu",
+     "label": "Education · MS Mech Eng",
+     "type": "self",
+     "status": "done",
+     "uploaded": "15 Apr 2026 · 18:24",
+     "file": "ms_meng_tokyo_2005.pdf",
+     "size": "2.6 MB",
+     "subject": "University of Tokyo · 2005",
+     "notes": "Translated by certified translator. JP→EN both retained."
+    },
+    {
+     "id": "prior",
+     "label": "Prior employment letters",
+     "type": "self",
+     "status": "done",
+     "uploaded": "15 Apr 2026 · 18:28",
+     "file": "daikin_japan_relieving.pdf",
+     "size": "1.2 MB",
+     "subject": "Daikin Industries · Osaka · 2010-2024",
+     "notes": "Internal transfer; group HR confirmed via HQ."
+    },
+    {
+     "id": "photo",
+     "label": "Passport photo",
+     "type": "self",
+     "status": "done",
+     "uploaded": "15 Apr 2026 · 18:30",
+     "file": "photo.jpg",
+     "size": "510 KB",
+     "subject": "JPEG · ID-standard",
+     "notes": "Approved."
+    }
+   ]
+  },
+  {
+   "id": "WK-004",
+   "name": "Padma Vasudevan",
+   "posId": "POS-2026-0171",
+   "role": "Engineer · M&E",
+   "stage": "awaiting-prior",
+   "uan": "100823XXXX",
+   "induction": "2/7 modules",
+   "days": 5,
+   "docs": [
+    {
+     "id": "aadhaar",
+     "label": "Aadhaar eKYC",
+     "type": "digital",
+     "status": "done",
+     "source": "UIDAI eKYC API",
+     "ts": "20 Apr 2026 · 10:01 IST",
+     "hash": "de77…0911",
+     "subject": "Aadhaar: XXXX XXXX 9034 · match 98.9%",
+     "payload": {
+      "match_score": 0.989
+     }
+    },
+    {
+     "id": "pan",
+     "label": "PAN verification",
+     "type": "digital",
+     "status": "done",
+     "source": "NSDL",
+     "ts": "20 Apr 2026 · 10:04 IST",
+     "hash": "f102…aab4",
+     "subject": "PAN linked · ACTIVE",
+     "payload": {
+      "linked": true
+     }
+    },
+    {
+     "id": "bank",
+     "label": "Bank account · penny-drop",
+     "type": "digital",
+     "status": "done",
+     "source": "NPCI IMPS",
+     "ts": "20 Apr 2026 · 10:09 IST",
+     "hash": "70a2…1c33",
+     "subject": "SBI ****1187 · ₹1 confirmed",
+     "payload": {
+      "name_score": 0.96
+     }
+    },
+    {
+     "id": "uan",
+     "label": "UAN portability check",
+     "type": "digital",
+     "status": "done",
+     "source": "EPFO UAN Member API",
+     "ts": "20 Apr 2026 · 10:15 IST",
+     "hash": "882c…5e10",
+     "subject": "UAN seeded · previous estab TN/CHN/91021",
+     "payload": {
+      "transferred": false
+     }
+    },
+    {
+     "id": "edu",
+     "label": "Education · B.Tech Electrical",
+     "type": "self",
+     "status": "done",
+     "uploaded": "19 Apr 2026 · 14:00",
+     "file": "btech_eee_2017.pdf",
+     "size": "2.9 MB",
+     "subject": "NIT Trichy · 2017",
+     "notes": "Verified via NIT-T degree portal."
+    },
+    {
+     "id": "prior",
+     "label": "Prior employment letter",
+     "type": "self",
+     "status": "pending",
+     "uploaded": "—",
+     "file": "—",
+     "subject": "Awaiting upload — relieving letter from previous employer",
+     "notes": "Worker indicated 30-day relieving period; ETA 5 May. Holding induction at module 2."
+    },
+    {
+     "id": "addr",
+     "label": "Address proof",
+     "type": "self",
+     "status": "done",
+     "uploaded": "19 Apr 2026 · 14:05",
+     "file": "rental_agreement.pdf",
+     "size": "1.1 MB",
+     "subject": "Rental agreement · Sricity · valid 2025-2027",
+     "notes": "Notarised. Approved."
+    },
+    {
+     "id": "photo",
+     "label": "Passport photo",
+     "type": "self",
+     "status": "done",
+     "uploaded": "19 Apr 2026 · 14:06",
+     "file": "photo.jpg",
+     "size": "410 KB",
+     "subject": "JPEG · ID-standard",
+     "notes": "Approved."
+    }
+   ]
+  },
+  {
+   "id": "WK-005",
+   "name": "Karan Singh",
+   "posId": "POS-2026-0159",
+   "role": "EHS Officer",
+   "stage": "induction",
+   "uan": "100823XXXX",
+   "induction": "5/7 modules",
+   "days": 3,
+   "docs": [
+    {
+     "id": "aadhaar",
+     "label": "Aadhaar eKYC",
+     "type": "digital",
+     "status": "done",
+     "source": "UIDAI eKYC API",
+     "ts": "22 Apr 2026 · 08:40 IST",
+     "hash": "0c19…b772",
+     "subject": "Aadhaar: XXXX XXXX 5503 · match 99.1%",
+     "payload": {
+      "match_score": 0.991
+     }
+    },
+    {
+     "id": "pan",
+     "label": "PAN verification",
+     "type": "digital",
+     "status": "done",
+     "source": "NSDL",
+     "ts": "22 Apr 2026 · 08:44 IST",
+     "hash": "aa90…dd31",
+     "subject": "PAN linked · ACTIVE",
+     "payload": {
+      "linked": true
+     }
+    },
+    {
+     "id": "bank",
+     "label": "Bank account · penny-drop",
+     "type": "digital",
+     "status": "rejected",
+     "source": "NPCI IMPS",
+     "ts": "22 Apr 2026 · 08:48 IST",
+     "hash": "—",
+     "subject": "Name mismatch · \"Karan S\" on bank vs \"Karan Singh\" on Aadhaar",
+     "rejReason": "NPCI name-match score 0.68 — below 0.85 threshold. Worker asked to update bank record or provide alternate account.",
+     "payload": {
+      "name_score": 0.68,
+      "reverse_lookup": "Karan S"
+     }
+    },
+    {
+     "id": "uan",
+     "label": "UAN portability check",
+     "type": "digital",
+     "status": "done",
+     "source": "EPFO UAN Member API",
+     "ts": "22 Apr 2026 · 08:55 IST",
+     "hash": "4221…9af0",
+     "subject": "UAN seeded · previous estab DL/NDL/33102",
+     "payload": {
+      "transferred": false
+     }
+    },
+    {
+     "id": "edu",
+     "label": "Education · B.E Industrial Safety",
+     "type": "self",
+     "status": "done",
+     "uploaded": "21 Apr 2026 · 16:20",
+     "file": "be_industrial_safety.pdf",
+     "size": "2.4 MB",
+     "subject": "Anna University · 2019",
+     "notes": "Verified."
+    },
+    {
+     "id": "cert",
+     "label": "Cert · Factories Act competency",
+     "type": "self",
+     "status": "done",
+     "uploaded": "21 Apr 2026 · 16:24",
+     "file": "safety_officer_cert.pdf",
+     "size": "1.7 MB",
+     "subject": "Factories Rules · Schedule 21 safety-officer cert",
+     "notes": "Statutorily required for EHS Officer role. Approved."
+    },
+    {
+     "id": "prior",
+     "label": "Prior employment letter",
+     "type": "self",
+     "status": "done",
+     "uploaded": "21 Apr 2026 · 16:30",
+     "file": "previous_relieving.pdf",
+     "size": "950 KB",
+     "subject": "L&T Construction · Safety Officer · 2019-2024",
+     "notes": "Reference check positive."
+    },
+    {
+     "id": "addr",
+     "label": "Address proof",
+     "type": "self",
+     "status": "done",
+     "uploaded": "21 Apr 2026 · 16:32",
+     "file": "aadhaar_addr.pdf",
+     "size": "720 KB",
+     "subject": "Aadhaar address page",
+     "notes": "Within window."
+    }
+   ]
+  }
+ ],
+ "contractWorkers": [
+  {
+   "name": "Ravi Kumar",
+   "contractor": "Sri Lakshmi Engg",
+   "category": "Skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 1 · OK",
+    "cls": "green"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Mohan Das",
+   "contractor": "Pavan Manpower",
+   "category": "Semi-skilled",
+   "esic": {
+    "state": "pending",
+    "label": "Day 2 · pending",
+    "cls": "amber"
+   },
+   "migrant": "OD→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Suresh B.",
+   "contractor": "Sri Lakshmi Engg",
+   "category": "Unskilled",
+   "esic": {
+    "state": "breach",
+    "label": "Day 4 · BREACH",
+    "cls": "red"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "expiring",
+    "label": "Expiring 21d",
+    "cls": "amber"
+   }
+  },
+  {
+   "name": "Anil Kumar",
+   "contractor": "Bharat Contractors",
+   "category": "Highly skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 1 · OK",
+    "cls": "green"
+   },
+   "migrant": "BR→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Praveen N.",
+   "contractor": "Sri Lakshmi Engg",
+   "category": "Semi-skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 2 · OK",
+    "cls": "green"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "expiring",
+    "label": "Expiring 21d",
+    "cls": "amber"
+   }
+  },
+  {
+   "name": "Mahesh G.",
+   "contractor": "Bharat Contractors",
+   "category": "Skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 1 · OK",
+    "cls": "green"
+   },
+   "migrant": "JH→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Lalita Devi",
+   "contractor": "Pavan Manpower",
+   "category": "Unskilled",
+   "esic": {
+    "state": "pending",
+    "label": "Day 3 · pending",
+    "cls": "amber"
+   },
+   "migrant": "CG→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Vinod K.",
+   "contractor": "Sri Lakshmi Engg",
+   "category": "Skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 1 · OK",
+    "cls": "green"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "expiring",
+    "label": "Expiring 21d",
+    "cls": "amber"
+   }
+  },
+  {
+   "name": "Naga Babu",
+   "contractor": "Sai Industrial",
+   "category": "Highly skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 2 · OK",
+    "cls": "green"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Devi Prasad",
+   "contractor": "Pavan Manpower",
+   "category": "Semi-skilled",
+   "esic": {
+    "state": "breach",
+    "label": "Day 5 · BREACH",
+    "cls": "red"
+   },
+   "migrant": "OD→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Sneha R.",
+   "contractor": "Bharat Contractors",
+   "category": "Skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 1 · OK",
+    "cls": "green"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Manoj T.",
+   "contractor": "Sai Industrial",
+   "category": "Unskilled",
+   "esic": {
+    "state": "pending",
+    "label": "Day 2 · pending",
+    "cls": "amber"
+   },
+   "migrant": "UP→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Pradeep R.",
+   "contractor": "Sri Lakshmi Engg",
+   "category": "Semi-skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 2 · OK",
+    "cls": "green"
+   },
+   "migrant": "—",
+   "clra": {
+    "state": "expiring",
+    "label": "Expiring 21d",
+    "cls": "amber"
+   }
+  },
+  {
+   "name": "Karthik V.",
+   "contractor": "Bharat Contractors",
+   "category": "Highly skilled",
+   "esic": {
+    "state": "ok",
+    "label": "Day 1 · OK",
+    "cls": "green"
+   },
+   "migrant": "TN→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  },
+  {
+   "name": "Bharath Singh",
+   "contractor": "Pavan Manpower",
+   "category": "Semi-skilled",
+   "esic": {
+    "state": "pending",
+    "label": "Day 2 · pending",
+    "cls": "amber"
+   },
+   "migrant": "RJ→AP",
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green"
+   }
+  }
+ ],
+ "sharedDocs": [
+  {
+   "type": "Aadhaar reference",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "While active + 7y",
+   "entries": 3142
+  },
+  {
+   "type": "PAN",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "While active + 7y",
+   "entries": 2985
+  },
+  {
+   "type": "ESIC IP card",
+   "scope": "Contract",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Statutory min",
+   "entries": 1240
+  },
+  {
+   "type": "CLRA licence",
+   "scope": "Contractor entity",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 3y",
+   "entries": 47
+  },
+  {
+   "type": "Migrant registration",
+   "scope": "Contract (ISMW)",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Statutory min",
+   "entries": 284
+  },
+  {
+   "type": "Standing-order ack",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 3y",
+   "entries": 2087
+  },
+  {
+   "type": "Offer letter",
+   "scope": "Direct",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 3y",
+   "entries": 847
+  },
+  {
+   "type": "UAN seed record",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "While active + 7y",
+   "entries": 2087
+  },
+  {
+   "type": "Education certificate",
+   "scope": "Direct",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 1y",
+   "entries": 712
+  },
+  {
+   "type": "Prior employment letter",
+   "scope": "Direct",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 1y",
+   "entries": 605
+  },
+  {
+   "type": "Address proof",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active",
+   "entries": 1844
+  },
+  {
+   "type": "Bank penny-drop log",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 1y",
+   "entries": 1812
+  },
+  {
+   "type": "Contractor-induction ack",
+   "scope": "Contract",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 3y",
+   "entries": 1108
+  },
+  {
+   "type": "Code-of-conduct sign-off",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active + 3y",
+   "entries": 2087
+  },
+  {
+   "type": "PPE / uniform issue receipt",
+   "scope": "Both",
+   "enc": "AES-256 · per-tenant",
+   "ret": "Active",
+   "entries": 1842
+  }
+ ],
+ "contractors": [
+  {
+   "id": "CT-001",
+   "name": "Sri Lakshmi Engg",
+   "area": "Compressor Line",
+   "deployed": 142,
+   "score": 58,
+   "clra": {
+    "state": "expiring",
+    "label": "Expires 21d",
+    "cls": "amber",
+    "expiresOn": "11 Jun 2026"
+   },
+   "esic": {
+    "state": "breach",
+    "label": "−4 on May",
+    "cls": "red",
+    "detail": "May challan covers 138 vs deployed 142"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled · ₹3.84 L credited"
+   },
+   "subscores": {
+    "clra": 65,
+    "esic": 32,
+    "pf": 88,
+    "minWage": 70,
+    "migrant": 100,
+    "safety": 76
+   },
+   "registered": "12 Aug 2022",
+   "panCin": "AAFFS3322K",
+   "gst": "37AAFFS3322K1ZQ",
+   "esicCode": "52-AP-2022-117",
+   "bankAck": "HDFC ****1102",
+   "complianceLead": "Rajesh Yadav · rajesh.yadav@srilakshmi-engg.in",
+   "avgPay": "₹16,800/mo",
+   "womenWorkers": 8,
+   "migrantWorkers": 0,
+   "trend": "red,amber,red,red,red,amber",
+   "liability": {
+    "statutoryLow": 4,
+    "statutoryMid": 10,
+    "statutoryHigh": 22,
+    "operationalDays": 1,
+    "operationalPerDay": 5,
+    "customerAudit": 3,
+    "contractValueRisk": 24
+   }
+  },
+  {
+   "id": "CT-002",
+   "name": "Pavan Manpower",
+   "area": "Packaging",
+   "deployed": 218,
+   "score": 71,
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green",
+    "expiresOn": "14 Mar 2027"
+   },
+   "esic": {
+    "state": "pending",
+    "label": "Pending",
+    "cls": "amber",
+    "detail": "3 new joiners on Day 2 of 3-day window"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "subscores": {
+    "clra": 88,
+    "esic": 64,
+    "pf": 90,
+    "minWage": 72,
+    "migrant": 60,
+    "safety": 70
+   },
+   "registered": "03 Apr 2021",
+   "panCin": "AAACP4471L",
+   "gst": "37AAACP4471L1ZR",
+   "esicCode": "52-AP-2021-094",
+   "bankAck": "ICICI ****8821",
+   "complianceLead": "Sandeep Kumar · sandeep@pavanmanpower.in",
+   "avgPay": "₹14,200/mo",
+   "womenWorkers": 24,
+   "migrantWorkers": 6,
+   "trend": "amber,green,amber,amber,green,amber",
+   "liability": {
+    "statutoryLow": 2,
+    "statutoryMid": 5,
+    "statutoryHigh": 12,
+    "operationalDays": 0.5,
+    "operationalPerDay": 4,
+    "customerAudit": 1,
+    "contractValueRisk": 8
+   }
+  },
+  {
+   "id": "CT-003",
+   "name": "Bharat Contractors",
+   "area": "Logistics + warehouse",
+   "deployed": 356,
+   "score": 88,
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green",
+    "expiresOn": "22 Nov 2027"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled · all workers covered"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "subscores": {
+    "clra": 95,
+    "esic": 92,
+    "pf": 94,
+    "minWage": 82,
+    "migrant": 78,
+    "safety": 86
+   },
+   "registered": "16 Jan 2019",
+   "panCin": "AABCB1148G",
+   "gst": "37AABCB1148G1Z2",
+   "esicCode": "52-AP-2019-041",
+   "bankAck": "SBI ****4490",
+   "complianceLead": "Vijay Bhushan · vijay.b@bharatcontractors.co.in",
+   "avgPay": "₹18,400/mo",
+   "womenWorkers": 18,
+   "migrantWorkers": 42,
+   "trend": "green,green,green,green,amber,green",
+   "liability": {
+    "statutoryLow": 0,
+    "statutoryMid": 0,
+    "statutoryHigh": 2,
+    "operationalDays": 0,
+    "operationalPerDay": 6,
+    "customerAudit": 0,
+    "contractValueRisk": 0
+   }
+  },
+  {
+   "id": "CT-004",
+   "name": "Vijaya Services",
+   "area": "Cleaning + maintenance",
+   "deployed": 182,
+   "score": 82,
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green",
+    "expiresOn": "04 Sep 2026"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "pf": {
+    "state": "delayed",
+    "label": "Delayed 3d",
+    "cls": "amber",
+    "detail": "Mar challan filed 03 May (3 days late) · resolved"
+   },
+   "subscores": {
+    "clra": 90,
+    "esic": 86,
+    "pf": 70,
+    "minWage": 88,
+    "migrant": 92,
+    "safety": 80
+   },
+   "registered": "22 Jul 2020",
+   "panCin": "AABCV9912N",
+   "gst": "37AABCV9912N1ZL",
+   "esicCode": "52-AP-2020-178",
+   "bankAck": "Axis ****6622",
+   "complianceLead": "Priya Reddy · priya@vijayaservices.co.in",
+   "avgPay": "₹13,800/mo",
+   "womenWorkers": 84,
+   "migrantWorkers": 12,
+   "trend": "green,green,green,amber,green,green",
+   "liability": {
+    "statutoryLow": 1,
+    "statutoryMid": 2,
+    "statutoryHigh": 4,
+    "operationalDays": 0,
+    "operationalPerDay": 3,
+    "customerAudit": 0,
+    "contractValueRisk": 0
+   }
+  },
+  {
+   "id": "CT-005",
+   "name": "Coastal Logistics",
+   "area": "Inbound transport",
+   "deployed": 342,
+   "score": 68,
+   "clra": {
+    "state": "expiring",
+    "label": "Expires 28d",
+    "cls": "amber",
+    "expiresOn": "18 Jun 2026"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "subscores": {
+    "clra": 60,
+    "esic": 78,
+    "pf": 82,
+    "minWage": 64,
+    "migrant": 65,
+    "safety": 58
+   },
+   "registered": "08 Feb 2023",
+   "panCin": "AAGCC4421H",
+   "gst": "37AAGCC4421H1Z8",
+   "esicCode": "52-AP-2023-022",
+   "bankAck": "Kotak ****7710",
+   "complianceLead": "Murali K. · murali@coastallog.in",
+   "avgPay": "₹15,600/mo",
+   "womenWorkers": 4,
+   "migrantWorkers": 78,
+   "trend": "amber,red,amber,amber,red,amber",
+   "liability": {
+    "statutoryLow": 3,
+    "statutoryMid": 7,
+    "statutoryHigh": 16,
+    "operationalDays": 1,
+    "operationalPerDay": 5,
+    "customerAudit": 2,
+    "contractValueRisk": 14
+   }
+  },
+  {
+   "id": "CT-006",
+   "name": "Sai Industrial",
+   "area": "Tool-room + maintenance",
+   "deployed": 96,
+   "score": 79,
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green",
+    "expiresOn": "15 Dec 2026"
+   },
+   "esic": {
+    "state": "pending",
+    "label": "Pending",
+    "cls": "amber",
+    "detail": "2 new joiners on Day 2"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "subscores": {
+    "clra": 85,
+    "esic": 70,
+    "pf": 86,
+    "minWage": 75,
+    "migrant": 80,
+    "safety": 78
+   },
+   "registered": "11 Oct 2022",
+   "panCin": "AAACS1009F",
+   "gst": "37AAACS1009F1ZK",
+   "esicCode": "52-AP-2022-203",
+   "bankAck": "HDFC ****3340",
+   "complianceLead": "Lakshmi Reddy · lakshmi@saiindustrial.co.in",
+   "avgPay": "₹17,100/mo",
+   "womenWorkers": 6,
+   "migrantWorkers": 4,
+   "trend": "green,amber,green,green,amber,green",
+   "liability": {
+    "statutoryLow": 1,
+    "statutoryMid": 2,
+    "statutoryHigh": 5,
+    "operationalDays": 0,
+    "operationalPerDay": 4,
+    "customerAudit": 0,
+    "contractValueRisk": 0
+   }
+  },
+  {
+   "id": "CT-007",
+   "name": "GreenWipe Hygiene",
+   "area": "Industrial cleaning",
+   "deployed": 64,
+   "score": 74,
+   "clra": {
+    "state": "valid",
+    "label": "Valid",
+    "cls": "green",
+    "expiresOn": "20 Jan 2027"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "May challan reconciled"
+   },
+   "pf": {
+    "state": "pending",
+    "label": "Pending",
+    "cls": "amber",
+    "detail": "May challan due in 3 days"
+   },
+   "subscores": {
+    "clra": 80,
+    "esic": 84,
+    "pf": 60,
+    "minWage": 78,
+    "migrant": 90,
+    "safety": 72
+   },
+   "registered": "24 May 2022",
+   "panCin": "AAGCG7714P",
+   "gst": "37AAGCG7714P1ZN",
+   "esicCode": "52-AP-2022-141",
+   "bankAck": "ICICI ****0288",
+   "complianceLead": "Anita Sharma · anita@greenwipe.in",
+   "avgPay": "₹13,200/mo",
+   "womenWorkers": 38,
+   "migrantWorkers": 8,
+   "trend": "green,green,amber,green,green,amber",
+   "liability": {
+    "statutoryLow": 0,
+    "statutoryMid": 1,
+    "statutoryHigh": 3,
+    "operationalDays": 0,
+    "operationalPerDay": 3,
+    "customerAudit": 0,
+    "contractValueRisk": 0
+   }
+  }
+ ],
+ "ctTasks": [
+  {
+   "id": "TSK-2026-0411",
+   "ctId": "CT-001",
+   "severity": "urgent",
+   "title": "ESIC challan shortfall · May 2026",
+   "desc": "May deployment 142 vs ESIC challan 138 — 4-worker gap. Workers: Suresh B., Raju P., Mahesh L., Ranjan K. Routed to contractor portal.",
+   "sla": 5,
+   "slaUnit": "days",
+   "remaining": "2d 6h",
+   "owner": "Rajesh Yadav · Sri Lakshmi",
+   "ageDays": 3,
+   "statute": "ESI Act 1948 · Reg 31",
+   "linkedLiabRow": "statutoryMid",
+   "actions": [
+    "Open in portal",
+    "Notify vendor"
+   ]
+  },
+  {
+   "id": "TSK-2026-0412",
+   "ctId": "CT-001",
+   "severity": "warning",
+   "title": "CLRA licence renewal · expires 11 Jun",
+   "desc": "Licence CLRA/AP/SRT/2022/L-1117 expires 21 days. Pre-populated renewal form ready. Contractor sign-off required.",
+   "sla": 14,
+   "slaUnit": "days",
+   "remaining": "14d",
+   "owner": "Rajesh Yadav · Sri Lakshmi",
+   "ageDays": 7,
+   "statute": "CLRA Act 1970 · s.12",
+   "linkedLiabRow": "contractValueRisk",
+   "actions": [
+    "Send renewal pack",
+    "Track at Labour Comm."
+   ]
+  },
+  {
+   "id": "TSK-2026-0413",
+   "ctId": "CT-001",
+   "severity": "urgent",
+   "title": "Min-wage gap · 7 workers",
+   "desc": "AP semi-skilled MW for May 2026 is ₹14,260; 7 workers paid ₹13,800. Wage register supplementary entry required by month-end.",
+   "sla": 7,
+   "slaUnit": "days",
+   "remaining": "4d",
+   "owner": "Rajesh Yadav · Sri Lakshmi",
+   "ageDays": 3,
+   "statute": "MW Act 1948 · s.12",
+   "linkedLiabRow": "statutoryMid",
+   "actions": [
+    "View wage register",
+    "Issue arrears"
+   ]
+  },
+  {
+   "id": "TSK-2026-0421",
+   "ctId": "CT-002",
+   "severity": "warning",
+   "title": "ESIC enrolment pending · 3 new joiners",
+   "desc": "Mohan Das, Lalita Devi, Bharath Singh — currently Day 2 of 3-day window. Auto-reminder sent. Karya Vaani will hard-gate at Day 4.",
+   "sla": 1,
+   "slaUnit": "days",
+   "remaining": "23h",
+   "owner": "Sandeep Kumar · Pavan Manpower",
+   "ageDays": 2,
+   "statute": "ESI Act 1948 · Reg 10",
+   "linkedLiabRow": "statutoryMid",
+   "actions": [
+    "View workers",
+    "Notify vendor"
+   ]
+  },
+  {
+   "id": "TSK-2026-0422",
+   "ctId": "CT-002",
+   "severity": "routine",
+   "title": "Equal-wages attestation · women workers",
+   "desc": "24 women workers in deployment. Wages-Code s.3 equal-pay attestation pending self-certification from contractor.",
+   "sla": 30,
+   "slaUnit": "days",
+   "remaining": "22d",
+   "owner": "Sandeep Kumar · Pavan Manpower",
+   "ageDays": 8,
+   "statute": "Wages Code 2019 · s.3",
+   "linkedLiabRow": "statutoryLow",
+   "actions": [
+    "Send attestation form"
+   ]
+  },
+  {
+   "id": "TSK-2026-0441",
+   "ctId": "CT-004",
+   "severity": "closed",
+   "title": "PF March challan delay · resolved",
+   "desc": "Mar challan filed 03 May (3 days late). Late fee ₹4,200 paid by Vijaya Services. Penalty waiver letter on file.",
+   "sla": 0,
+   "slaUnit": "days",
+   "remaining": "—",
+   "owner": "Priya Reddy · Vijaya",
+   "ageDays": 19,
+   "statute": "EPF Act 1952 · para 38",
+   "linkedLiabRow": null,
+   "actions": [
+    "View penalty letter"
+   ]
+  },
+  {
+   "id": "TSK-2026-0451",
+   "ctId": "CT-005",
+   "severity": "warning",
+   "title": "CLRA licence renewal · expires 18 Jun",
+   "desc": "Licence CLRA/AP/SRT/2023/L-0204 expires 28 days. Renewal pack pre-populated.",
+   "sla": 21,
+   "slaUnit": "days",
+   "remaining": "21d",
+   "owner": "Murali K. · Coastal Logistics",
+   "ageDays": 0,
+   "statute": "CLRA Act 1970 · s.12",
+   "linkedLiabRow": "contractValueRisk",
+   "actions": [
+    "Send renewal pack"
+   ]
+  },
+  {
+   "id": "TSK-2026-0452",
+   "ctId": "CT-005",
+   "severity": "urgent",
+   "title": "Migrant worker registration · 78 workers",
+   "desc": "78 inter-state migrants (OD/BR/UP) deployed; ISMW Form-D registration not yet updated for May. ISMW Act 1979 · Rule 21.",
+   "sla": 7,
+   "slaUnit": "days",
+   "remaining": "3d",
+   "owner": "Murali K. · Coastal Logistics",
+   "ageDays": 4,
+   "statute": "ISMW Act 1979 · Rule 21",
+   "linkedLiabRow": "statutoryMid",
+   "actions": [
+    "Open Form-D",
+    "Notify vendor"
+   ]
+  },
+  {
+   "id": "TSK-2026-0461",
+   "ctId": "CT-006",
+   "severity": "warning",
+   "title": "ESIC enrolment pending · 2 new joiners",
+   "desc": "Manoj T. + 1 new joiner on Day 2 of 3-day window. Auto-reminder fired.",
+   "sla": 1,
+   "slaUnit": "days",
+   "remaining": "20h",
+   "owner": "Lakshmi Reddy · Sai Industrial",
+   "ageDays": 2,
+   "statute": "ESI Act 1948 · Reg 10",
+   "linkedLiabRow": "statutoryLow",
+   "actions": [
+    "View workers",
+    "Notify vendor"
+   ]
+  },
+  {
+   "id": "TSK-2026-0471",
+   "ctId": "CT-007",
+   "severity": "routine",
+   "title": "PF May challan · due in 3 days",
+   "desc": "Routine reminder. Challan filing window opens. Pre-populated form available.",
+   "sla": 3,
+   "slaUnit": "days",
+   "remaining": "3d",
+   "owner": "Anita Sharma · GreenWipe",
+   "ageDays": 0,
+   "statute": "EPF Act 1952 · para 38",
+   "linkedLiabRow": null,
+   "actions": [
+    "Open challan"
+   ]
+  }
+ ],
+ "knowledgeCategories": [
+  {
+   "id": "policies",
+   "head": "Policies",
+   "accent": "#3C5577",
+   "glyph": "statutory",
+   "blurb": "Governing documents — conduct, standing orders, leave, grievance, statutory obligations."
+  },
+  {
+   "id": "training",
+   "head": "Training materials",
+   "accent": "#3C7045",
+   "glyph": "training",
+   "blurb": "Induction modules, safety drills, role-competency packs and assessments."
+  },
+  {
+   "id": "notices",
+   "head": "Notices",
+   "accent": "#B8721C",
+   "glyph": "notices",
+   "blurb": "Time-bound communications — statutory notices, wage revisions, safety alerts, schedules."
+  },
+  {
+   "id": "transport",
+   "head": "Transport",
+   "accent": "#3F4F8C",
+   "glyph": "transport",
+   "blurb": "Worker transport — bus routes, pickup points, transport safety, shift schedules."
+  }
+ ],
+ "knowledgeDocs": [
+  {
+   "id": "kc-101",
+   "cat": "policies",
+   "title": "Code of conduct",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Meera Krishnan",
+   "created": "2026-04-02",
+   "langs": [
+    "EN",
+    "TE",
+    "HI",
+    "JP"
+   ],
+   "topic": "Conduct & discipline"
+  },
+  {
+   "id": "kc-102",
+   "cat": "policies",
+   "title": "Standing orders · IESO 1946",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Meera Krishnan",
+   "created": "2025-11-18",
+   "langs": [
+    "EN",
+    "TE"
+   ],
+   "topic": "Conduct & discipline"
+  },
+  {
+   "id": "kc-103",
+   "cat": "policies",
+   "title": "Anti-harassment policy (PoSH)",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Anjali Rao",
+   "created": "2026-01-22",
+   "langs": [
+    "EN",
+    "TE",
+    "HI",
+    "TA"
+   ],
+   "topic": "Workplace rights"
+  },
+  {
+   "id": "kc-104",
+   "cat": "policies",
+   "title": "Grievance redressal policy",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Anjali Rao",
+   "created": "2026-02-09",
+   "langs": [
+    "EN",
+    "TE",
+    "HI"
+   ],
+   "topic": "Workplace rights"
+  },
+  {
+   "id": "kc-105",
+   "cat": "policies",
+   "title": "Leave policy · annual/sick/casual",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Suresh Pillai",
+   "created": "2026-03-15",
+   "langs": [
+    "EN",
+    "TE",
+    "HI"
+   ],
+   "topic": "Employment terms"
+  },
+  {
+   "id": "kc-106",
+   "cat": "policies",
+   "title": "Equal-wages attestation (women)",
+   "ext": "pdf",
+   "dept": "Legal",
+   "owner": "R. Venkatesh",
+   "created": "2026-02-28",
+   "langs": [
+    "EN"
+   ],
+   "topic": "Employment terms"
+  },
+  {
+   "id": "kc-107",
+   "cat": "policies",
+   "title": "Contractor compliance policy",
+   "ext": "pdf",
+   "dept": "Compliance",
+   "owner": "Kavya Nair",
+   "created": "2026-03-30",
+   "langs": [
+    "EN",
+    "TE"
+   ],
+   "topic": "Contractor compliance"
+  },
+  {
+   "id": "kc-108",
+   "cat": "policies",
+   "title": "CLRA principal-employer duties",
+   "ext": "pdf",
+   "dept": "Legal",
+   "owner": "R. Venkatesh",
+   "created": "2025-12-04",
+   "langs": [
+    "EN"
+   ],
+   "topic": "Contractor compliance"
+  },
+  {
+   "id": "kc-109",
+   "cat": "policies",
+   "title": "Whistleblower & ethics policy",
+   "ext": "pdf",
+   "dept": "Legal",
+   "owner": "R. Venkatesh",
+   "created": "2026-01-10",
+   "langs": [
+    "EN",
+    "JP"
+   ],
+   "topic": "Workplace rights"
+  },
+  {
+   "id": "kc-110",
+   "cat": "policies",
+   "title": "Working hours & overtime policy",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Suresh Pillai",
+   "created": "2026-04-11",
+   "langs": [
+    "EN",
+    "TE",
+    "HI"
+   ],
+   "topic": "Employment terms"
+  },
+  {
+   "id": "kc-201",
+   "cat": "training",
+   "title": "General plant induction",
+   "ext": "mp4",
+   "dept": "L&D",
+   "owner": "Priya Sundaram",
+   "created": "2026-03-01",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Induction modules"
+  },
+  {
+   "id": "kc-202",
+   "cat": "training",
+   "title": "Migrant worker welcome · ISMW",
+   "ext": "mp4",
+   "dept": "L&D",
+   "owner": "Priya Sundaram",
+   "created": "2026-03-04",
+   "langs": [
+    "OR",
+    "HI",
+    "EN"
+   ],
+   "topic": "Induction modules"
+  },
+  {
+   "id": "kc-203",
+   "cat": "training",
+   "title": "PPE selection · job role matrix",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-02-14",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Safety drills"
+  },
+  {
+   "id": "kc-204",
+   "cat": "training",
+   "title": "Lockout / Tagout · 6 steps",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-02-20",
+   "langs": [
+    "TE",
+    "HI",
+    "EN",
+    "JP"
+   ],
+   "topic": "Safety drills"
+  },
+  {
+   "id": "kc-205",
+   "cat": "training",
+   "title": "Confined-space entry · Form-23",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-01-30",
+   "langs": [
+    "EN",
+    "TE"
+   ],
+   "topic": "Safety drills"
+  },
+  {
+   "id": "kc-206",
+   "cat": "training",
+   "title": "Compressor assembly · safety",
+   "ext": "mp4",
+   "dept": "Production",
+   "owner": "Hiroshi Sato",
+   "created": "2026-03-22",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Role competency"
+  },
+  {
+   "id": "kc-207",
+   "cat": "training",
+   "title": "Paint Shop hazards · solvents",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-03-18",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Role competency"
+  },
+  {
+   "id": "kc-208",
+   "cat": "training",
+   "title": "Forklift operation · certified",
+   "ext": "mp4",
+   "dept": "Logistics",
+   "owner": "David Raj",
+   "created": "2026-02-25",
+   "langs": [
+    "TE",
+    "HI",
+    "TA",
+    "EN"
+   ],
+   "topic": "Role competency"
+  },
+  {
+   "id": "kc-209",
+   "cat": "training",
+   "title": "Safety quiz bank · per module",
+   "ext": "xls",
+   "dept": "L&D",
+   "owner": "Priya Sundaram",
+   "created": "2026-04-05",
+   "langs": [
+    "EN"
+   ],
+   "topic": "Assessment"
+  },
+  {
+   "id": "kc-210",
+   "cat": "training",
+   "title": "Certification criteria",
+   "ext": "pdf",
+   "dept": "L&D",
+   "owner": "Priya Sundaram",
+   "created": "2026-03-12",
+   "langs": [
+    "EN",
+    "TE"
+   ],
+   "topic": "Assessment"
+  },
+  {
+   "id": "kc-211",
+   "cat": "training",
+   "title": "Heat-stress awareness module",
+   "ext": "mp4",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-04-18",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Safety drills"
+  },
+  {
+   "id": "kc-301",
+   "cat": "notices",
+   "title": "Minimum wage revision · 2026",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Suresh Pillai",
+   "created": "2026-04-01",
+   "langs": [
+    "TE",
+    "EN"
+   ],
+   "topic": "Statutory notices"
+  },
+  {
+   "id": "kc-302",
+   "cat": "notices",
+   "title": "Form-21 (Factories Act) notice",
+   "ext": "pdf",
+   "dept": "Compliance",
+   "owner": "Kavya Nair",
+   "created": "2026-03-09",
+   "langs": [
+    "EN"
+   ],
+   "topic": "Statutory notices"
+  },
+  {
+   "id": "kc-303",
+   "cat": "notices",
+   "title": "Factory licence · display copy",
+   "ext": "pdf",
+   "dept": "Compliance",
+   "owner": "Kavya Nair",
+   "created": "2026-01-05",
+   "langs": [
+    "EN"
+   ],
+   "topic": "Statutory notices"
+  },
+  {
+   "id": "kc-304",
+   "cat": "notices",
+   "title": "Refresher schedule · next 14 days",
+   "ext": "pdf",
+   "dept": "L&D",
+   "owner": "Priya Sundaram",
+   "created": "2026-05-12",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Operational"
+  },
+  {
+   "id": "kc-305",
+   "cat": "notices",
+   "title": "Shift roster change · May",
+   "ext": "pdf",
+   "dept": "Production",
+   "owner": "Hiroshi Sato",
+   "created": "2026-05-02",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Operational"
+  },
+  {
+   "id": "kc-306",
+   "cat": "notices",
+   "title": "Holiday list · 2026",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Meera Krishnan",
+   "created": "2026-01-02",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Operational"
+  },
+  {
+   "id": "kc-307",
+   "cat": "notices",
+   "title": "Paint Shop Zone-3 · safety alert",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-05-15",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Safety alerts"
+  },
+  {
+   "id": "kc-308",
+   "cat": "notices",
+   "title": "Heat advisory · summer shift",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-05-08",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Safety alerts"
+  },
+  {
+   "id": "kc-309",
+   "cat": "notices",
+   "title": "Evacuation drill · notice",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-05-10",
+   "langs": [
+    "TE",
+    "HI",
+    "TA",
+    "EN"
+   ],
+   "topic": "Emergency"
+  },
+  {
+   "id": "kc-310",
+   "cat": "notices",
+   "title": "Emergency contacts · 24x7",
+   "ext": "pdf",
+   "dept": "Admin",
+   "owner": "Lakshmi Iyer",
+   "created": "2026-04-20",
+   "langs": [
+    "TE",
+    "HI",
+    "TA",
+    "EN"
+   ],
+   "topic": "Emergency"
+  },
+  {
+   "id": "kc-401",
+   "cat": "transport",
+   "title": "Route map & timings · all zones",
+   "ext": "pdf",
+   "dept": "Admin",
+   "owner": "Lakshmi Iyer",
+   "created": "2026-05-01",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Bus routes"
+  },
+  {
+   "id": "kc-402",
+   "cat": "transport",
+   "title": "Pickup-point directory",
+   "ext": "pdf",
+   "dept": "Admin",
+   "owner": "Lakshmi Iyer",
+   "created": "2026-04-28",
+   "langs": [
+    "TE",
+    "HI",
+    "OR",
+    "EN"
+   ],
+   "topic": "Bus routes"
+  },
+  {
+   "id": "kc-403",
+   "cat": "transport",
+   "title": "Bus boarding safety",
+   "ext": "pdf",
+   "dept": "EHS",
+   "owner": "Karthik Menon",
+   "created": "2026-03-26",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Transport safety"
+  },
+  {
+   "id": "kc-404",
+   "cat": "transport",
+   "title": "Driver conduct protocol",
+   "ext": "pdf",
+   "dept": "Admin",
+   "owner": "Lakshmi Iyer",
+   "created": "2026-02-16",
+   "langs": [
+    "EN",
+    "TE"
+   ],
+   "topic": "Transport safety"
+  },
+  {
+   "id": "kc-405",
+   "cat": "transport",
+   "title": "Shift transport schedule",
+   "ext": "pdf",
+   "dept": "Admin",
+   "owner": "Lakshmi Iyer",
+   "created": "2026-05-03",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Shift schedules"
+  },
+  {
+   "id": "kc-406",
+   "cat": "transport",
+   "title": "Late-shift drop policy",
+   "ext": "pdf",
+   "dept": "HR",
+   "owner": "Suresh Pillai",
+   "created": "2026-03-08",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Shift schedules"
+  },
+  {
+   "id": "kc-407",
+   "cat": "transport",
+   "title": "Vehicle entry · gate procedure",
+   "ext": "pdf",
+   "dept": "Security",
+   "owner": "Joseph Mathew",
+   "created": "2026-01-19",
+   "langs": [
+    "TE",
+    "HI",
+    "EN"
+   ],
+   "topic": "Site access"
+  },
+  {
+   "id": "kc-408",
+   "cat": "transport",
+   "title": "Parking allocation · by shift",
+   "ext": "pdf",
+   "dept": "Admin",
+   "owner": "Lakshmi Iyer",
+   "created": "2026-02-22",
+   "langs": [
+    "EN"
+   ],
+   "topic": "Site access"
+  }
+ ],
+ "knowledgeSample": [
+  {
+   "who": "user",
+   "lang": "EN",
+   "voice": true,
+   "native": "If there is a fire, where should I go? Which is the assembly point?"
+  },
+  {
+   "who": "assistant",
+   "lang": "EN",
+   "native": "<strong>Go to your zone's assembly point:</strong><br>1. <strong>Compressor Line</strong> → Area-A assembly point (near Gate 2)<br>2. <strong>Paint Shop</strong> → Area-C assembly point (behind the canteen)<br>3. <strong>Warehouse</strong> → Area-B assembly point<br>🚶 Do not use elevators. Report to your supervisor at the assembly point.",
+   "answerText": "Go to your zone's assembly point. Compressor Line → Area-A (near Gate 2); Paint Shop → Area-C (behind the canteen); Warehouse → Area-B. Do not use elevators. Report to your supervisor at the assembly point.",
+   "cites": [
+    {
+     "docId": "kc-309",
+     "label": "Evacuation drill · notice"
+    },
+    {
+     "docId": "kc-310",
+     "label": "Emergency contacts · 24×7"
+    }
+   ]
+  },
+  {
+   "who": "user",
+   "lang": "EN",
+   "voice": false,
+   "native": "What time does the bus reach the Tambaram pickup point?"
+  },
+  {
+   "who": "assistant",
+   "lang": "EN",
+   "native": "<strong>Company transport — Tambaram pickup</strong><br>• <strong>Morning shift:</strong> Route 4 bus departs Tambaram at 06:10, reaches Gate 2 by 07:05.<br>• <strong>General shift:</strong> Route 4 departs 08:00, reaches by 08:55.<br>• <strong>Late-shift drop:</strong> last bus leaves the plant at 23:15.<br>Be at the pickup point 5 minutes early — buses do not wait beyond the scheduled minute.",
+   "answerText": "Company transport Route 4 serves the Tambaram pickup point. Morning shift bus departs 06:10 and reaches Gate 2 by 07:05; general shift departs 08:00, reaching by 08:55. The last late-shift drop leaves the plant at 23:15. Be at the pickup point 5 minutes early — buses do not wait beyond the scheduled minute.",
+   "cites": [
+    {
+     "docId": "kc-401",
+     "label": "Route map & timings · all zones"
+    },
+    {
+     "docId": "kc-402",
+     "label": "Pickup-point directory"
+    }
+   ]
+  }
+ ],
+ "broadcastWorkers": [
+  {
+   "id": "WRK-2207",
+   "name": "Ramesh Naidu",
+   "role": "Compressor operator",
+   "zone": "Compressor Line",
+   "dept": "Production",
+   "sup": "Suresh Pillai",
+   "type": "Direct",
+   "lang": "TE",
+   "phone": "••• ••• 4471"
+  },
+  {
+   "id": "WRK-3318",
+   "name": "Lalita Devi",
+   "role": "Paint-shop helper",
+   "zone": "Paint Shop",
+   "dept": "Production",
+   "sup": "Anitha Rao",
+   "type": "Contract",
+   "contractor": "Pavan Manpower",
+   "lang": "HI",
+   "phone": "••• ••• 8290"
+  },
+  {
+   "id": "WRK-2884",
+   "name": "Suresh Kumar",
+   "role": "Line technician",
+   "zone": "Compressor Line",
+   "dept": "Production",
+   "sup": "Suresh Pillai",
+   "type": "Direct",
+   "lang": "TE",
+   "phone": "••• ••• 1145"
+  },
+  {
+   "id": "WRK-4102",
+   "name": "Bharath Singh",
+   "role": "Warehouse loader",
+   "zone": "Warehouse",
+   "dept": "Logistics",
+   "sup": "Vikram Shah",
+   "type": "Contract",
+   "contractor": "Sri Lakshmi Engg",
+   "lang": "HI",
+   "phone": "••• ••• 6657"
+  },
+  {
+   "id": "WRK-3771",
+   "name": "Anand Mohan",
+   "role": "Quality checker",
+   "zone": "Paint Shop",
+   "dept": "Quality",
+   "sup": "Anitha Rao",
+   "type": "Direct",
+   "lang": "TE",
+   "phone": "••• ••• 9924"
+  }
+ ],
+ "broadcastAudiences": [
+  {
+   "id": "all",
+   "kind": "Location",
+   "name": "Entire location",
+   "sub": "Daikin Sricity · AP",
+   "headcount": 2087,
+   "ids": [
+    "WRK-2207",
+    "WRK-3318",
+    "WRK-2884",
+    "WRK-4102",
+    "WRK-3771"
+   ]
+  },
+  {
+   "id": "production",
+   "kind": "Department",
+   "name": "Production",
+   "sub": "Compressor Line + Paint Shop",
+   "headcount": 1180,
+   "ids": [
+    "WRK-2207",
+    "WRK-3318",
+    "WRK-2884"
+   ]
+  },
+  {
+   "id": "logistics",
+   "kind": "Department",
+   "name": "Logistics",
+   "sub": "Warehouse + dispatch",
+   "headcount": 240,
+   "ids": [
+    "WRK-4102"
+   ]
+  },
+  {
+   "id": "quality",
+   "kind": "Department",
+   "name": "Quality",
+   "sub": "QA + QC",
+   "headcount": 96,
+   "ids": [
+    "WRK-3771"
+   ]
+  },
+  {
+   "id": "compressor",
+   "kind": "Zone",
+   "name": "Compressor Line",
+   "sub": "Shop floor zone",
+   "headcount": 410,
+   "ids": [
+    "WRK-2207",
+    "WRK-2884"
+   ]
+  },
+  {
+   "id": "paintshop",
+   "kind": "Zone",
+   "name": "Paint Shop",
+   "sub": "Shop floor zone",
+   "headcount": 286,
+   "ids": [
+    "WRK-3318",
+    "WRK-3771"
+   ]
+  },
+  {
+   "id": "contract",
+   "kind": "Worker type",
+   "name": "Contract workers",
+   "sub": "All contractors on site",
+   "headcount": 1240,
+   "ids": [
+    "WRK-3318",
+    "WRK-4102"
+   ]
+  },
+  {
+   "id": "supervisors",
+   "kind": "Role",
+   "name": "Supervisors",
+   "sub": "Shift supervisors only",
+   "headcount": 52,
+   "ids": [
+    "WRK-2207",
+    "WRK-3771"
+   ]
+  }
+ ],
+ "chatQueue": [
+  {
+   "preset": "transport",
+   "etaMin": 8,
+   "audience": "All shifts",
+   "scheduledFor": "14:25",
+   "hour": 14.42
+  },
+  {
+   "preset": "fire",
+   "etaMin": 22,
+   "audience": "All zones · drill",
+   "scheduledFor": "14:39",
+   "hour": 14.65
+  },
+  {
+   "preset": "ppe",
+   "etaMin": 50,
+   "audience": "Compressor + Paint",
+   "scheduledFor": "15:07",
+   "hour": 15.12
+  },
+  {
+   "preset": "roster",
+   "etaMin": 95,
+   "audience": "Compressor Line",
+   "scheduledFor": "15:52",
+   "hour": 15.87
+  },
+  {
+   "preset": "heat",
+   "etaMin": 165,
+   "audience": "Outdoor crews",
+   "scheduledFor": "17:02",
+   "hour": 17.03
+  },
+  {
+   "preset": "wage",
+   "etaMin": 240,
+   "audience": "All workers",
+   "scheduledFor": "18:17",
+   "hour": 18.28
+  },
+  {
+   "preset": "holiday",
+   "etaMin": 380,
+   "audience": "All workers",
+   "scheduledFor": "20:37",
+   "hour": 20.62
+  }
+ ],
+ "chatSentToday": [
+  {
+   "preset": "ppe",
+   "subject": "PPE reminder",
+   "hour": 7.55
+  },
+  {
+   "preset": "rain",
+   "subject": "Heavy rain advisory",
+   "hour": 9.05
+  },
+  {
+   "preset": "evac",
+   "subject": "Drill briefing",
+   "hour": 11.3
+  },
+  {
+   "preset": "wage",
+   "subject": "Wage revision · review",
+   "hour": 13.4
+  }
+ ],
+ "ctQuick": [
+  "Acknowledged — actioning today",
+  "Will share by EOD",
+  "Need clarification — calling",
+  "Document uploaded, please verify"
+ ],
+ "dashModules": [
+  {
+   "nav": "karya-nirnay",
+   "name": "Karya Nirṇay decision builder",
+   "group": "Operational Pillars",
+   "status": "Healthy",
+   "tone": "green",
+   "open": 6,
+   "sla": 0,
+   "posture": 88,
+   "sub": "6 hiring scenarios modelled this week",
+   "metrics": [
+    {
+     "eye": "Scenarios run · 30d",
+     "val": "41",
+     "sub": "28 permanent · 13 contract"
+    },
+    {
+     "eye": "Avg compliant options",
+     "val": "3.2",
+     "sub": "per scenario"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "green",
+     "text": "All threshold checks (100 / 300 worker) passing on current scenarios."
+    },
+    {
+     "tone": "amber",
+     "text": "2 scenarios flagged contractor-ratio limits — routed to Vendor compliance."
+    }
+   ]
+  },
+  {
+   "nav": "recruitment",
+   "name": "Talent Acquisition & Progression",
+   "group": "Operational Pillars",
+   "status": "Healthy",
+   "tone": "green",
+   "open": 14,
+   "sla": 2,
+   "posture": 84,
+   "sub": "14 open Position IDs",
+   "metrics": [
+    {
+     "eye": "Positions in flight",
+     "val": "14",
+     "sub": "9 direct · 5 contract"
+    },
+    {
+     "eye": "Avg time-to-offer",
+     "val": "11 days",
+     "sub": "target 14"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "green",
+     "text": "12 of 14 positions on track against their SLA."
+    },
+    {
+     "tone": "amber",
+     "text": "2 SLA breaches — both contract roles awaiting vendor licence check."
+    }
+   ]
+  },
+  {
+   "nav": "onboarding",
+   "name": "Onboarding",
+   "group": "Operational Pillars",
+   "status": "Attention",
+   "tone": "amber",
+   "open": 9,
+   "sla": 3,
+   "posture": 68,
+   "sub": "9 in document verification",
+   "metrics": [
+    {
+     "eye": "In verification",
+     "val": "9",
+     "sub": "6 contract · 3 direct"
+    },
+    {
+     "eye": "Appointment letters",
+     "val": "100%",
+     "sub": "issued before work begins"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "amber",
+     "text": "3 onboardings past the document-verification SLA — Aadhaar/UAN seeding pending."
+    },
+    {
+     "tone": "green",
+     "text": "Universal appointment-letter rule met for all new joiners."
+    }
+   ]
+  },
+  {
+   "nav": "induction",
+   "name": "Induction training",
+   "group": "Operational Pillars",
+   "status": "Healthy",
+   "tone": "green",
+   "open": 3,
+   "sla": 0,
+   "posture": 82,
+   "sub": "3 modules pending sign-off",
+   "metrics": [
+    {
+     "eye": "Inductions · 30d",
+     "val": "142",
+     "sub": "94 contract · 48 direct"
+    },
+    {
+     "eye": "Certificate validity",
+     "val": "100%",
+     "sub": "signed · evidence-grade"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "green",
+     "text": "All mandatory modules localised in TE / HI / EN."
+    },
+    {
+     "tone": "amber",
+     "text": "3 role-competency modules awaiting EHS sign-off."
+    }
+   ]
+  },
+  {
+   "nav": "vendor",
+   "name": "Vendor compliance",
+   "group": "Operational Pillars",
+   "status": "Critical",
+   "tone": "red",
+   "open": 23,
+   "sla": 7,
+   "posture": 42,
+   "sub": "Compressor Line · ESIC mismatch",
+   "metrics": [
+    {
+     "eye": "Open contractor gaps",
+     "val": "23",
+     "sub": "4 critical · 19 advisory"
+    },
+    {
+     "eye": "Licences expiring · 30d",
+     "val": "3",
+     "sub": "CLRA renewals due"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "red",
+     "text": "ESIC challan shortfall on Compressor Line — 138 of 142 deployed workers covered."
+    },
+    {
+     "tone": "red",
+     "text": "Sri Lakshmi Engg CLRA licence expires in 21 days — principal-employer exposure."
+    },
+    {
+     "tone": "amber",
+     "text": "19 advisory gaps queued in the contractor portal for cleanup."
+    }
+   ]
+  },
+  {
+   "nav": "ohs",
+   "name": "Workplace Safety & OHS Analytics",
+   "group": "Operational Pillars",
+   "status": "Watch pattern",
+   "tone": "amber",
+   "open": 2,
+   "sla": 0,
+   "posture": 78,
+   "sub": "2 near-miss in Paint Shop · same shift",
+   "metrics": [
+    {
+     "eye": "Near-misses · 14d",
+     "val": "2",
+     "sub": "both Paint Shop Zone-3"
+    },
+    {
+     "eye": "Refresher triggered",
+     "val": "Yes",
+     "sub": "zone-specific · 38 workers"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "amber",
+     "text": "Repeat near-miss pattern in Paint Shop Zone-3 on the same shift."
+    },
+    {
+     "tone": "green",
+     "text": "Auto-triggered zone refresher dispatched via Knowledge Center."
+    }
+   ]
+  },
+  {
+   "nav": "compliance",
+   "name": "Statutory posture",
+   "group": "Operational Pillars",
+   "status": "On track",
+   "tone": "blue",
+   "open": 8,
+   "sla": 1,
+   "posture": 64,
+   "sub": "AP statutory rollup",
+   "metrics": [
+    {
+     "eye": "Domains tracked",
+     "val": "4",
+     "sub": "wages · OHS · IR · contractor"
+    },
+    {
+     "eye": "Largest exposure",
+     "val": "₹40–90 L",
+     "sub": "s.2(y) wage restructuring"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "blue",
+     "text": "Statutory rollup current against rule bundle v2026.05.2."
+    },
+    {
+     "tone": "amber",
+     "text": "Contractor & CLRA domain weakest at 54 — driven by Vendor compliance gaps."
+    }
+   ]
+  },
+  {
+   "nav": "vaani-broadcast",
+   "name": "VAANI Translation & Broadcasting",
+   "group": "Localisation Engine",
+   "status": "Healthy",
+   "tone": "green",
+   "open": 0,
+   "sla": 0,
+   "posture": 92,
+   "sub": "last broadcast 100% acknowledged",
+   "metrics": [
+    {
+     "eye": "Broadcasts · 30d",
+     "val": "18",
+     "sub": "text + Bulbul v3 voice"
+    },
+    {
+     "eye": "Acknowledgement",
+     "val": "94%",
+     "sub": "within 2h · safety-critical"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "green",
+     "text": "Delivery rate 98.4% across WhatsApp-first channel."
+    },
+    {
+     "tone": "green",
+     "text": "Every broadcast carries translation provenance and a content hash."
+    }
+   ]
+  },
+  {
+   "nav": "transport",
+   "name": "Transport Schedule",
+   "group": "Localisation Engine",
+   "status": "Published",
+   "tone": "green",
+   "open": 0,
+   "sla": 0,
+   "posture": 90,
+   "sub": "5 buses · 2 shifts · weekly plan live",
+   "metrics": [
+    {
+     "eye": "Buses in service",
+     "val": "5",
+     "sub": "one per zone route"
+    },
+    {
+     "eye": "Pickup points",
+     "val": "15",
+     "sub": "across all routes"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "green",
+     "text": "Weekly plan published for the morning and general shifts."
+    },
+    {
+     "tone": "blue",
+     "text": "Saturday runs a reduced plan — Routes 3 and 5 stood down."
+    }
+   ]
+  },
+  {
+   "nav": "lms",
+   "name": "Knowledge Center",
+   "group": "Localisation Engine",
+   "status": "Healthy",
+   "tone": "green",
+   "open": 1,
+   "sla": 0,
+   "posture": 86,
+   "sub": "36 documents · localised on demand",
+   "metrics": [
+    {
+     "eye": "Documents",
+     "val": "36",
+     "sub": "policies · training · notices"
+    },
+    {
+     "eye": "Refreshers · 14d",
+     "val": "3",
+     "sub": "auto-scheduled"
+    }
+   ],
+   "signals": [
+    {
+     "tone": "green",
+     "text": "All worker-facing documents available in TE / HI / EN."
+    },
+    {
+     "tone": "amber",
+     "text": "1 document pending owner re-approval after the rule-bundle update."
+    }
+   ]
+  }
+ ],
+ "capturePositions": [
+  {
+   "id": "POS-2026-0142",
+   "dept": "Production · Compressor Line",
+   "role": "Compressor operator",
+   "category": "Skilled"
+  },
+  {
+   "id": "POS-2026-0148",
+   "dept": "Production · Paint Shop",
+   "role": "Paint-shop helper",
+   "category": "Semi-skilled"
+  },
+  {
+   "id": "POS-2026-0151",
+   "dept": "Quality & QC",
+   "role": "Quality checker",
+   "category": "Skilled"
+  },
+  {
+   "id": "POS-2026-0156",
+   "dept": "Logistics & dispatch",
+   "role": "Warehouse loader",
+   "category": "Unskilled"
+  },
+  {
+   "id": "POS-2026-0160",
+   "dept": "Maintenance",
+   "role": "Maintenance technician",
+   "category": "Highly skilled"
+  }
+ ],
+ "captureWorkorders": [
+  {
+   "id": "WO-2026-211",
+   "contractor": "Sri Lakshmi Engineering",
+   "clra": "CLRA/AP/0231-2026",
+   "category": "Semi-skilled"
+  },
+  {
+   "id": "WO-2026-218",
+   "contractor": "Venkateswara Manpower",
+   "clra": "CLRA/AP/0188-2026",
+   "category": "Unskilled"
+  },
+  {
+   "id": "WO-2026-224",
+   "contractor": "Coastal Facility Services",
+   "clra": "CLRA/AP/0297-2026",
+   "category": "Skilled"
+  },
+  {
+   "id": "WO-2026-229",
+   "contractor": "Annapurna Staffing",
+   "clra": "CLRA/AP/0312-2026",
+   "category": "Semi-skilled"
+  }
+ ]
+}
