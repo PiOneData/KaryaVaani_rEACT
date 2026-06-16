@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: karyavaani-backend
+    ports:
+      - "3241:3241"
+    environment:
+      - PORT=3241
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: karyavaani-frontend
+    ports:
+      - "3240:3240"
+    depends_on:
+      - backend
+    restart: unless-stopped
