@@ -14,18 +14,24 @@ env:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Login to GHCR
-        run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set Image Names
+      - name: Set lowercase owner
         run: |
-          USERNAME=$(echo "${{ secrets.GHCR_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+          USERNAME=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "USERNAME=$USERNAME" >> $GITHUB_ENV
 
       - name: Build Backend Image
