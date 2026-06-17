@@ -1,102 +1,89 @@
 name: Karyavaani CI/CD
 
 on:
-push:
-branches:
-- main
-workflow_dispatch:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 env:
-REGISTRY: ghcr.io
-FRONTEND_IMAGE: karyavaani-ui
-BACKEND_IMAGE: karyavaani-backend
+  REGISTRY: ghcr.io
+  FRONTEND_IMAGE: karyavaani-ui
+  BACKEND_IMAGE: karyavaani-backend
 
 jobs:
-docker-build:
-runs-on: ubuntu-latest
+  docker-build:
+    runs-on: ubuntu-latest
 
-```
-permissions:
-  contents: read
-  packages: write
+    permissions:
+      contents: read
+      packages: write
 
-steps:
-  - name: Checkout Code
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-  - name: Login to GHCR
-    uses: docker/login-action@v3
-    with:
-      registry: ghcr.io
-      username: ${{ github.repository_owner }}
-      password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  - name: Set lowercase owner
-    run: |
-      USERNAME=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-      echo "USERNAME=$USERNAME" >> $GITHUB_ENV
+      - name: Set lowercase owner
+        run: |
+          USERNAME=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "USERNAME=$USERNAME" >> $GITHUB_ENV
 
-  - name: Build Backend Image
-    run: |
-      docker build \
-        -t ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:latest \
-        -t ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
-        ./backend
+      - name: Build Backend Image
+        run: |
+          docker build \
+            -t ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:latest \
+            -t ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
+            ./backend
 
-  - name: Build Frontend Image
-    run: |
-      docker build \
-        -t ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:latest \
-        -t ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
-        .
+      - name: Build Frontend Image
+        run: |
+          docker build \
+            -t ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:latest \
+            -t ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
+            .
 
-  - name: Push Backend Image
-    run: |
-      docker push ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:latest
-      docker push ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+      - name: Push Backend Image
+        run: |
+          docker push ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:latest
+          docker push ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
 
-  - name: Push Frontend Image
-    run: |
-      docker push ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:latest
-      docker push ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-```
+      - name: Push Frontend Image
+        run: |
+          docker push ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:latest
+          docker push ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
 
-deploy:
-runs-on: ubuntu-latest
-needs: docker-build
+  deploy:
+    runs-on: ubuntu-latest
+    needs: docker-build
 
-```
-steps:
-  - name: Debug Secrets
-    run: |
-      echo "SERVER_IP set: ${{ secrets.SERVER_IP != '' }}"
-      echo "SERVER_USER set: ${{ secrets.SERVER_USER != '' }}"
-      echo "SSH_PRIVATE_KEY set: ${{ secrets.SSH_PRIVATE_KEY != '' }}"
-      echo "GHCR_USERNAME set: ${{ secrets.GHCR_USERNAME != '' }}"
-      echo "GHCR_TOKEN set: ${{ secrets.GHCR_TOKEN != '' }}"
+    steps:
+      - name: Debug Secrets
+        run: |
+          echo "SERVER_IP configured"
+          echo "SERVER_USER configured"
+          echo "SSH_PRIVATE_KEY configured"
 
-  - name: Deploy to Server
-    uses: appleboy/ssh-action@v1.0.3
-    with:
-      host: ${{ secrets.SERVER_IP }}
-      username: ${{ secrets.SERVER_USER }}
-      key: ${{ secrets.SSH_PRIVATE_KEY }}
-      script: |
-        set -e
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
 
-        echo "Logging into GHCR..."
-        echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io \
-          -u "${{ secrets.GHCR_USERNAME }}" \
-          --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
 
-        echo "Moving to application directory..."
-        cd /home/${{ secrets.SERVER_USER }}/KaryaVaani_rEACT
+            cd /home/${{ secrets.SERVER_USER }}/KaryaVaani_rEACT
 
-        echo "Pulling latest images..."
-        docker compose pull
+            docker compose pull
+            docker compose up -d
 
-        echo "Restarting containers..."
-        docker compose up -d
-
-        echo "Deployment completed successfully!"
-```
+            echo "Deployment completed"
