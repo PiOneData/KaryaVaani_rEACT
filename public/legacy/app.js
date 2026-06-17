@@ -1679,9 +1679,9 @@ function __kvOnReady(fn) {
           '<div class="dir-dd-row"><span class="dir-dd-k">Deployment area</span><span class="dir-dd-v">' + ct.area + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Workers deployed</span><span class="dir-dd-v">' + ct.deployed + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Registered since</span><span class="dir-dd-v">' + ct.registered + '</span></div>' +
-          '<div class="dir-dd-row"><span class="dir-dd-k">PAN / CIN</span><span class="dir-dd-v">' + ct.panCin + '</span></div>' +
-          '<div class="dir-dd-row"><span class="dir-dd-k">GST</span><span class="dir-dd-v">' + ct.gst + '</span></div>' +
-          '<div class="dir-dd-row"><span class="dir-dd-k">ESIC employer code</span><span class="dir-dd-v">' + ct.esicCode + '</span></div>' +
+          '<div class="dir-dd-row"><span class="dir-dd-k">PAN / CIN</span><span class="dir-dd-v">' + kvIdSpan('PAN / CIN', ct.panCin, ct.id, 'contractor') + '</span></div>' +
+          '<div class="dir-dd-row"><span class="dir-dd-k">GST</span><span class="dir-dd-v">' + kvIdSpan('GST', ct.gst, ct.id, 'contractor') + '</span></div>' +
+          '<div class="dir-dd-row"><span class="dir-dd-k">ESIC employer code</span><span class="dir-dd-v">' + kvIdSpan('ESIC employer code', ct.esicCode, ct.id, 'contractor') + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">CLRA licence</span><span class="dir-dd-v">' + ct.clra.label + ' · ' + ct.clra.expiresOn + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Bank (verified)</span><span class="dir-dd-v">' + ct.bankAck + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Avg worker pay</span><span class="dir-dd-v">' + ct.avgPay + '</span></div>' +
@@ -1930,9 +1930,9 @@ function __kvOnReady(fn) {
         '<div class="dir-dd-row"><span class="dir-dd-k">Deployment area</span><span class="dir-dd-v">' + c.area + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Workers deployed</span><span class="dir-dd-v">' + c.deployed + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Registered since</span><span class="dir-dd-v">' + c.registered + '</span></div>' +
-        '<div class="dir-dd-row"><span class="dir-dd-k">PAN / CIN</span><span class="dir-dd-v">' + c.panCin + '</span></div>' +
-        '<div class="dir-dd-row"><span class="dir-dd-k">GST</span><span class="dir-dd-v">' + c.gst + '</span></div>' +
-        '<div class="dir-dd-row"><span class="dir-dd-k">ESIC employer code</span><span class="dir-dd-v">' + c.esicCode + '</span></div>' +
+        '<div class="dir-dd-row"><span class="dir-dd-k">PAN / CIN</span><span class="dir-dd-v">' + kvIdSpan('PAN / CIN', c.panCin, c.id, 'contractor') + '</span></div>' +
+        '<div class="dir-dd-row"><span class="dir-dd-k">GST</span><span class="dir-dd-v">' + kvIdSpan('GST', c.gst, c.id, 'contractor') + '</span></div>' +
+        '<div class="dir-dd-row"><span class="dir-dd-k">ESIC employer code</span><span class="dir-dd-v">' + kvIdSpan('ESIC employer code', c.esicCode, c.id, 'contractor') + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Bank (verified)</span><span class="dir-dd-v">' + c.bankAck + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Avg worker pay</span><span class="dir-dd-v">' + c.avgPay + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Compliance lead</span><span class="dir-dd-v">' + c.complianceLead + '</span></div>' +
@@ -3052,9 +3052,9 @@ function __kvOnReady(fn) {
     html += '<div class="card-h" style="padding:0;margin-top:18px"><div class="card-h-title" style="font-size:0.85rem">Registered entity details</div></div>';
     html += '<table class="t" style="margin-top:8px"><tbody>' +
       '<tr><td class="t-strong" style="width:30%">Registered</td><td>' + c.registered + '</td></tr>' +
-      '<tr><td class="t-strong">PAN</td><td class="mono">' + c.panCin + '</td></tr>' +
-      '<tr><td class="t-strong">GSTIN</td><td class="mono">' + c.gst + '</td></tr>' +
-      '<tr><td class="t-strong">ESIC code</td><td class="mono">' + c.esicCode + '</td></tr>' +
+      '<tr><td class="t-strong">PAN</td><td class="mono">' + kvIdSpan('PAN / CIN', c.panCin, c.id, 'contractor') + '</td></tr>' +
+      '<tr><td class="t-strong">GSTIN</td><td class="mono">' + kvIdSpan('GST', c.gst, c.id, 'contractor') + '</td></tr>' +
+      '<tr><td class="t-strong">ESIC code</td><td class="mono">' + kvIdSpan('ESIC employer code', c.esicCode, c.id, 'contractor') + '</td></tr>' +
       '<tr><td class="t-strong">Bank ack.</td><td class="mono">' + c.bankAck + '</td></tr>' +
       '<tr><td class="t-strong">Compliance lead</td><td>' + c.complianceLead + '</td></tr>' +
     '</tbody></table>';
@@ -3250,9 +3250,18 @@ function __kvOnReady(fn) {
     html += '<div class="card-h" style="padding:0;margin-bottom:10px">' +
             '<div class="card-h-title" style="font-size:0.85rem">Documents on file (' + baseDocs.length + ')</div>' +
             '<div class="card-h-sub">All documents encrypted at rest · chained to audit trail</div></div>';
+    /* map statutory documents to a clickable, verifiable identification value */
+    const docIdMap = {
+      'ESIC employer code': { type: 'ESIC employer code', value: c.esicCode },
+      'GST certificate':    { type: 'GST', value: c.gst }
+    };
     html += '<table class="t"><thead><tr><th>Document type</th><th>File</th><th>Expiry</th><th>Status</th><th>Audit hash</th></tr></thead><tbody>';
     baseDocs.forEach(d => {
-      html += '<tr><td class="t-strong">' + d.type + '</td>' +
+      const idDoc = docIdMap[d.type];
+      const typeCell = idDoc
+        ? kvIdSpan(idDoc.type, idDoc.value, c.id, 'contractor')
+        : d.type;
+      html += '<tr><td class="t-strong">' + typeCell + '</td>' +
               '<td class="mono tiny">' + d.file + '</td>' +
               '<td>' + d.expiry + '</td>' +
               '<td><span class="pill ' + d.status + '">' + d.statusLabel + '</span></td>' +
@@ -11813,41 +11822,142 @@ function __kvOnReady(fn) {
      ════════════════════════════════════════════════════════════════ */
   let OM_QUERY = '';
   let OM_DEPT  = 'all';
-  function omRender() {
-    const body = document.getElementById('om-grid-body');
-    if (!body) return;
+  let OM_SORT  = { col: 'code', dir: 1 };   /* dir: 1 asc · -1 desc */
+  let OM_PAGE  = 1;
+  const OM_PER_PAGE = 10;
+
+  /* sort accessors per column key (matches data-omcol on the headers) */
+  const OM_COLS = {
+    code:  function (r) { return r.code; },
+    name:  function (r) { return (r.name  || '').toLowerCase(); },
+    desig: function (r) { return (r.desig || '').toLowerCase(); },
+    dept:  function (r) { return (r.dept  || '').toLowerCase(); },
+    mgr:   function (r) { return (r.mgr   || '').toLowerCase(); },
+    uan:   function (r) { return r.uan; },
+    esi:   function (r) { return r.esi; },
+    lang:  function (r) { return (r.lang  || '').toLowerCase(); }
+  };
+
+  /* filter (search + department) then sort the full roster */
+  function omFiltered() {
     const q = OM_QUERY.trim().toLowerCase();
-    const rows = OM_MAPPING.filter(function (r) {
+    let rows = OM_MAPPING.filter(function (r) {
       if (OM_DEPT !== 'all' && r.dept !== OM_DEPT) return false;
       if (!q) return true;
       return (r.code + ' ' + r.name + ' ' + r.desig + ' ' + r.dept + ' ' +
               r.mgr + ' ' + r.mgrCode + ' ' + r.uan + ' ' + r.esi + ' ' + r.lang)
               .toLowerCase().indexOf(q) > -1;
     });
-    body.innerHTML = rows.map(function (r) {
+    const get = OM_COLS[OM_SORT.col];
+    if (get) {
+      rows = rows.slice().sort(function (a, b) {
+        const va = get(a), vb = get(b);
+        if (va < vb) return -OM_SORT.dir;
+        if (va > vb) return  OM_SORT.dir;
+        return 0;
+      });
+    }
+    return rows;
+  }
+
+  /* render a UAN / ESI value as a clickable, verifiable identification cell */
+  function omIdCell(kind, val, r) {
+    if (!val || val === '—') return '<span style="color:var(--ink-3,#8a8f98)">—</span>';
+    const docType = kind === 'UAN' ? 'UAN (EPFO)' : 'ESI (IP number)';
+    return kvIdSpan(docType, val, 'OMW-' + r.code, 'associate');
+  }
+
+  function omRender() {
+    const body = document.getElementById('om-grid-body');
+    if (!body) return;
+    const rows  = omFiltered();
+    const total = rows.length;
+    const pages = Math.max(1, Math.ceil(total / OM_PER_PAGE));
+    if (OM_PAGE > pages) OM_PAGE = pages;
+    if (OM_PAGE < 1)     OM_PAGE = 1;
+    const start    = (OM_PAGE - 1) * OM_PER_PAGE;
+    const pageRows = rows.slice(start, start + OM_PER_PAGE);
+
+    body.innerHTML = pageRows.map(function (r) {
       return '<tr>' +
         '<td class="t-strong">' + r.code + '</td>' +
         '<td>' + r.name + '</td>' +
         '<td>' + r.desig + '</td>' +
         '<td>' + r.dept + '</td>' +
         '<td>' + r.mgr + ' <span style="color:var(--ink-3,#8a8f98)">· ' + r.mgrCode + '</span></td>' +
-        '<td style="font-variant-numeric:tabular-nums">' + r.uan + '</td>' +
-        '<td style="font-variant-numeric:tabular-nums">' + r.esi + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums">' + omIdCell('UAN', r.uan, r) + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums">' + omIdCell('ESI', r.esi, r) + '</td>' +
         '<td><span class="pill outline">' + r.lang + '</span></td>' +
       '</tr>';
     }).join('');
+
     const cnt = document.getElementById('om-count');
-    if (cnt) cnt.textContent = (q || OM_DEPT !== 'all')
-      ? rows.length + ' of ' + OM_MAPPING.length
+    if (cnt) cnt.textContent = (OM_QUERY.trim() || OM_DEPT !== 'all')
+      ? total + ' of ' + OM_MAPPING.length
       : OM_MAPPING.length + ' associates';
     const nr = document.getElementById('om-noresults');
-    if (nr) nr.style.display = rows.length ? 'none' : 'block';
+    if (nr) nr.style.display = total ? 'none' : 'block';
+
+    omRenderSortIndicators();
+    omRenderPagination(total, pages, start, pageRows.length);
   }
+
+  /* reflect the active sort column / direction in the header carets */
+  function omRenderSortIndicators() {
+    const ths = document.querySelectorAll('#om-grid thead th[data-omcol]');
+    ths.forEach(function (th) {
+      const col = th.getAttribute('data-omcol');
+      const car = th.querySelector('.om-caret');
+      th.classList.toggle('sorted', col === OM_SORT.col);
+      if (car) car.textContent = (col === OM_SORT.col) ? (OM_SORT.dir === 1 ? '▲' : '▼') : '⇅';
+    });
+  }
+
+  /* paginate · ‹ Prev · windowed page numbers · Next › */
+  function omRenderPagination(total, pages, start, shown) {
+    const host = document.getElementById('om-pagination');
+    if (!host) return;
+    if (total === 0) { host.innerHTML = ''; return; }
+    const from = start + 1, to = start + shown;
+    let nums = '';
+    let lo = Math.max(1, OM_PAGE - 2), hi = Math.min(pages, OM_PAGE + 2);
+    if (OM_PAGE <= 3)         hi = Math.min(pages, 5);
+    if (OM_PAGE >= pages - 2) lo = Math.max(1, pages - 4);
+    if (lo > 1) {
+      nums += '<button class="om-pg-num" onclick="omGoPage(1)">1</button>';
+      if (lo > 2) nums += '<span class="om-pg-gap">…</span>';
+    }
+    for (let p = lo; p <= hi; p++) {
+      nums += '<button class="om-pg-num' + (p === OM_PAGE ? ' on' : '') + '" onclick="omGoPage(' + p + ')">' + p + '</button>';
+    }
+    if (hi < pages) {
+      if (hi < pages - 1) nums += '<span class="om-pg-gap">…</span>';
+      nums += '<button class="om-pg-num" onclick="omGoPage(' + pages + ')">' + pages + '</button>';
+    }
+    host.innerHTML =
+      '<div class="om-pg-info">Showing ' + from + '–' + to + ' of ' + total + ' · page ' + OM_PAGE + ' of ' + pages + '</div>' +
+      '<div class="om-pg-btns">' +
+        '<button class="om-pg-btn" ' + (OM_PAGE <= 1 ? 'disabled' : '') + ' onclick="omGoPage(' + (OM_PAGE - 1) + ')">‹ Prev</button>' +
+        nums +
+        '<button class="om-pg-btn" ' + (OM_PAGE >= pages ? 'disabled' : '') + ' onclick="omGoPage(' + (OM_PAGE + 1) + ')">Next ›</button>' +
+      '</div>';
+  }
+
+  function omSort(col) {
+    if (!OM_COLS[col]) return;
+    if (OM_SORT.col === col) OM_SORT.dir = -OM_SORT.dir;
+    else { OM_SORT.col = col; OM_SORT.dir = 1; }
+    OM_PAGE = 1;
+    omRender();
+  }
+  function omGoPage(p) { OM_PAGE = p; omRender(); }
+
   function omSearch() {
     const inp = document.getElementById('om-search');
     OM_QUERY = inp ? inp.value : '';
     const clr = document.getElementById('om-search-clear');
     if (clr) clr.style.display = OM_QUERY.length ? 'inline-flex' : 'none';
+    OM_PAGE = 1;
     omRender();
   }
   function omSearchClear() {
@@ -11856,19 +11966,24 @@ function __kvOnReady(fn) {
     OM_QUERY = '';
     const clr = document.getElementById('om-search-clear');
     if (clr) clr.style.display = 'none';
+    OM_PAGE = 1;
     omRender();
   }
   function omFilterDept(dept, btn) {
     OM_DEPT = dept;
     document.querySelectorAll('#om-filter-dept .dir-fbtn').forEach(function (b) { b.classList.remove('on'); });
     if (btn) btn.classList.add('on');
+    OM_PAGE = 1;
     omRender();
   }
   function omComputeKpis() {
     const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('om-kpi-assoc', OM_MAPPING.length);
     set('om-kpi-mgr',   new Set(OM_MAPPING.map(function (r) { return r.mgr; })).size);
-    set('om-kpi-dept',  new Set(OM_MAPPING.map(function (r) { return r.dept; })).size);
+    const depts = Array.from(new Set(OM_MAPPING.map(function (r) { return r.dept; }))).filter(Boolean).sort();
+    set('om-kpi-dept',  depts.length);
+    const dsub = document.getElementById('om-kpi-dept-sub');
+    if (dsub) dsub.textContent = depts.length ? depts.join(' · ') : 'no departments';
     set('om-kpi-lang',  new Set(OM_MAPPING.map(function (r) { return r.lang; })).size);
   }
   /* load the roster from the backend API and map it to the render shape */
@@ -11891,6 +12006,7 @@ function __kvOnReady(fn) {
     });
     omComputeKpis();
     OM_QUERY = ''; OM_DEPT = 'all';
+    OM_SORT = { col: 'code', dir: 1 }; OM_PAGE = 1;
     omRender();
   }
   function initOmMapping() {
@@ -11898,4 +12014,282 @@ function __kvOnReady(fn) {
     omLoad();
   }
   __kvOnReady(initOmMapping);
+
+  /* ════════════════════════════════════════════════════════════════
+     IDENTITY / STATUTORY DOCUMENT VIEWER
+     Click any identification value — PAN / CIN, GST, ESIC employer
+     code, UAN, ESI IP number — to open a modal that shows a mock scan
+     of the underlying document plus parsed details, then APPROVE or
+     REJECT it. Approving a contractor's documents raises that
+     contractor's compliance score; rejecting lowers it. The score
+     change propagates live to the vendor grid, the drill-downs and the
+     directory cards. All state is namespaced KV_DOC_* / KV_BASE_*.
+     ════════════════════════════════════════════════════════════════ */
+  const KV_DOC_DECISIONS = {};   /* 'entityId::docType' -> 'approved' | 'rejected' */
+  const KV_BASE_SCORE    = {};   /* contractor id -> original (pre-verification) score */
+  const KV_DOC_POINTS    = { approved: 4, rejected: -8 };
+  let   KV_DOC_CTX       = null; /* { docType, value, entityId, kind, name } */
+
+  function kvDocKey(entityId, docType) { return entityId + '::' + docType; }
+
+  /* a clickable, verification-aware identification value */
+  function kvIdSpan(docType, value, entityId, kind) {
+    if (value == null || value === '' || value === '—') return value || '—';
+    const dec = KV_DOC_DECISIONS[kvDocKey(entityId, docType)];
+    const badge = dec === 'approved' ? ' <span class="kv-iddot ok" title="Verified">✓</span>'
+                : dec === 'rejected' ? ' <span class="kv-iddot bad" title="Rejected">✕</span>' : '';
+    const safe = String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return '<span class="kv-idlink" title="Click to verify document" ' +
+      'onclick="kvIdDoc(\'' + docType + '\',\'' + safe + '\',\'' + entityId + '\',\'' + (kind || 'contractor') + '\')">' +
+      value + '</span>' + badge;
+  }
+
+  /* resolve the entity (contractor or roster associate) behind a document */
+  function kvDocEntity(entityId, kind) {
+    if (kind === 'associate') {
+      const code = String(entityId).replace(/^OMW-/, '');
+      const r = (OM_MAPPING || []).find(function (x) { return x.code === code; });
+      return { id: entityId, name: r ? r.name : code, kind: 'associate', extra: r || { code: code } };
+    }
+    const list = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS : [];
+    const c = list.find(function (x) { return x.id === entityId; });
+    return { id: entityId, name: c ? c.name : entityId, kind: 'contractor', extra: c || null };
+  }
+
+  /* document metadata + a mock "scan" for each identification type */
+  function kvDocMeta(docType, value, ent) {
+    const name = ent.name;
+    const t = docType.toLowerCase();
+    if (t.indexOf('pan') > -1 || t.indexOf('cin') > -1) {
+      return {
+        accent: '#4f46e5', emblem: '🏛', issuer: 'Income Tax Department · Government of India',
+        title: 'Permanent Account Number',
+        fields: [
+          { k: 'PAN / CIN', v: value },
+          { k: 'Name', v: name },
+          { k: 'Category', v: 'Company / Firm' },
+          { k: 'Date of incorporation', v: '12 Aug 2019' },
+          { k: 'Status', v: 'Active' }
+        ],
+        note: 'Verified against the Income Tax e-filing PAN database (NSDL).'
+      };
+    }
+    if (t.indexOf('gst') > -1) {
+      return {
+        accent: '#067647', emblem: '🧾', issuer: 'Goods & Services Tax · Form GST REG-06',
+        title: 'GST Registration Certificate',
+        fields: [
+          { k: 'GSTIN', v: value },
+          { k: 'Legal name', v: name },
+          { k: 'Constitution', v: 'Private Limited Company' },
+          { k: 'State', v: 'Andhra Pradesh (37)' },
+          { k: 'Valid from', v: '01 Jul 2019' }
+        ],
+        note: 'Verified against the GSTN common portal · registration status Active.'
+      };
+    }
+    if (t.indexOf('esic') > -1 || t.indexOf('esi ') > -1 || t === 'esi (ip number)') {
+      const isEmployer = t.indexOf('employer') > -1 || t.indexOf('code') > -1;
+      return {
+        accent: '#0e7490', emblem: '🩺',
+        issuer: "Employees' State Insurance Corporation · Ministry of Labour",
+        title: isEmployer ? 'ESIC Employer Code Number' : 'ESIC Insured Person (IP) Number',
+        fields: isEmployer
+          ? [
+              { k: 'Employer code', v: value },
+              { k: 'Establishment', v: name },
+              { k: 'Region', v: 'Andhra Pradesh · Sri City sub-office' },
+              { k: 'Coverage from', v: '01 Apr 2019' },
+              { k: 'Status', v: 'Active' }
+            ]
+          : [
+              { k: 'IP number', v: value },
+              { k: 'Insured person', v: name },
+              { k: 'Dispensary', v: 'ESIC Sri City' },
+              { k: 'Employer', v: 'OM Manpower Services' },
+              { k: 'Status', v: 'Active' }
+            ],
+        note: 'Verified against the ESIC employer / IP portal.'
+      };
+    }
+    if (t.indexOf('uan') > -1) {
+      return {
+        accent: '#b54708', emblem: '🏦', issuer: 'EPFO · Universal Account Number',
+        title: 'Universal Account Number (UAN)',
+        fields: [
+          { k: 'UAN', v: value },
+          { k: 'Member name', v: name },
+          { k: 'Establishment', v: 'OM Manpower Services' },
+          { k: 'KYC status', v: 'Aadhaar + PAN seeded' },
+          { k: 'Status', v: 'Active' }
+        ],
+        note: 'Verified against the EPFO member portal · KYC complete.'
+      };
+    }
+    return {
+      accent: '#4f46e5', emblem: '📄', issuer: 'Statutory document',
+      title: docType,
+      fields: [{ k: docType, v: value }, { k: 'Entity', v: name }],
+      note: 'Identification document on file.'
+    };
+  }
+
+  /* the faux scanned document */
+  function kvDocMock(meta, value) {
+    const rows = meta.fields.map(function (f) {
+      return '<div class="iddoc-paper-row"><span class="iddoc-paper-k">' + f.k +
+        '</span><span class="iddoc-paper-v">' + f.v + '</span></div>';
+    }).join('');
+    return '<div class="iddoc-paper" style="--doc-accent:' + meta.accent + '">' +
+      '<div class="iddoc-paper-wm">' + meta.emblem + '</div>' +
+      '<div class="iddoc-paper-h">' +
+        '<span class="iddoc-paper-emblem">' + meta.emblem + '</span>' +
+        '<div><div class="iddoc-paper-issuer">' + meta.issuer + '</div>' +
+        '<div class="iddoc-paper-title">' + meta.title + '</div></div>' +
+      '</div>' +
+      '<div class="iddoc-paper-body">' +
+        '<div class="iddoc-paper-photo">PHOTO</div>' +
+        '<div class="iddoc-paper-fields">' + rows + '</div>' +
+      '</div>' +
+      '<div class="iddoc-paper-foot"><span class="iddoc-paper-sig">Authorised signatory</span>' +
+        '<span class="iddoc-paper-stamp">MOCK · SCANNED COPY</span></div>' +
+    '</div>';
+  }
+
+  function kvDocModalHtml(meta, decision, ent) {
+    const c = (ent.kind === 'contractor') ? ent.extra : null;
+    let impact;
+    if (c) {
+      const base = (KV_BASE_SCORE[ent.id] != null) ? KV_BASE_SCORE[ent.id] : c.score;
+      impact =
+        '<div class="iddoc-impact">' +
+          '<div class="iddoc-impact-h">Compliance impact · ' + ent.name + '</div>' +
+          '<div class="iddoc-impact-row"><span>Current score</span><strong>' + c.score + ' / 100</strong></div>' +
+          '<div class="iddoc-impact-row"><span>If approved</span><strong style="color:var(--green-dk)">+' + KV_DOC_POINTS.approved + ' pts</strong></div>' +
+          '<div class="iddoc-impact-row"><span>If rejected</span><strong style="color:var(--red-dk)">' + KV_DOC_POINTS.rejected + ' pts</strong></div>' +
+          '<div class="iddoc-impact-note">Verified statutory documents raise the contractor compliance score; rejected ones lower it. Base score ' + base + '.</div>' +
+        '</div>';
+    } else {
+      impact =
+        '<div class="iddoc-impact">' +
+          '<div class="iddoc-impact-h">Roster verification · ' + ent.name + '</div>' +
+          '<div class="iddoc-impact-note">Approving this identification document marks the associate record as verified in the OM Manpower roster.</div>' +
+        '</div>';
+    }
+    const statusBanner = decision === 'approved'
+      ? '<div class="iddoc-status ok">✓ This document has been approved</div>'
+      : decision === 'rejected'
+      ? '<div class="iddoc-status bad">✕ This document has been rejected</div>'
+      : '';
+    const fields = meta.fields.map(function (f) {
+      return '<div class="compose-row"><span class="ck">' + f.k + '</span><span class="cv">' + f.v + '</span></div>';
+    }).join('');
+    return '<div class="modal iddoc-modal">' +
+      '<div class="modal-h">' +
+        '<div class="modal-h-left">' +
+          '<span class="modal-h-eye">Document verification</span>' +
+          '<span class="modal-h-title">' + meta.title + '</span>' +
+        '</div>' +
+        '<span class="modal-h-close" onclick="kvDocClose()">Close ✕</span>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        statusBanner +
+        '<div class="iddoc-grid">' +
+          '<div class="iddoc-col-doc">' + kvDocMock(meta, KV_DOC_CTX.value) + '</div>' +
+          '<div class="iddoc-col-info">' +
+            '<div class="compose-meta">' + fields + '</div>' +
+            '<div class="iddoc-verify-note">' + meta.note + '</div>' +
+            impact +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<div class="modal-footer-left"><span class="tiny">Decision is logged to the audit trail and updates the compliance score</span></div>' +
+        '<div class="modal-footer-right">' +
+          '<button class="btn danger" onclick="kvDocDecide(\'rejected\')">Reject</button>' +
+          '<button class="btn primary" onclick="kvDocDecide(\'approved\')">Approve document</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function kvEnsureDocModal() {
+    let el = document.getElementById('kv-iddoc-modal');
+    if (el) return el;
+    el = document.createElement('div');
+    el.className = 'modal-overlay';
+    el.id = 'kv-iddoc-modal';
+    el.addEventListener('click', function (e) { if (e.target === el) kvDocClose(); });
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function kvIdDoc(docType, value, entityId, kind) {
+    const ent  = kvDocEntity(entityId, kind || 'contractor');
+    KV_DOC_CTX = { docType: docType, value: value, entityId: entityId, kind: ent.kind, name: ent.name };
+    const meta = kvDocMeta(docType, value, ent);
+    const dec  = KV_DOC_DECISIONS[kvDocKey(entityId, docType)] || 'pending';
+    const el   = kvEnsureDocModal();
+    el.innerHTML = kvDocModalHtml(meta, dec, ent);
+    el.classList.add('on');
+  }
+
+  function kvDocClose() {
+    const el = document.getElementById('kv-iddoc-modal');
+    if (el) el.classList.remove('on');
+    KV_DOC_CTX = null;
+  }
+
+  /* recompute a contractor's score from its base + all document decisions */
+  function kvRecomputeScore(entityId) {
+    const list = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS : [];
+    const c = list.find(function (x) { return x.id === entityId; });
+    if (!c) return;
+    if (KV_BASE_SCORE[entityId] == null) KV_BASE_SCORE[entityId] = c.score;
+    let delta = 0;
+    Object.keys(KV_DOC_DECISIONS).forEach(function (k) {
+      if (k.indexOf(entityId + '::') === 0) delta += (KV_DOC_POINTS[KV_DOC_DECISIONS[k]] || 0);
+    });
+    c.score = Math.max(0, Math.min(100, KV_BASE_SCORE[entityId] + delta));
+  }
+
+  /* push an updated score / verification badge to every visible surface */
+  function kvDocRefreshSurfaces(entityId) {
+    try { if (typeof renderContractorGrid === 'function') renderContractorGrid(); } catch (e) {}
+    try {
+      const ctDrill = document.getElementById('ct-drill');
+      if (ctDrill && ctDrill.classList.contains('on') &&
+          typeof SELECTED_CT !== 'undefined' && SELECTED_CT === entityId) {
+        const c = CONTRACTORS.find(function (x) { return x.id === entityId; });
+        if (c) {
+          const num = document.getElementById('ct-ring-num');
+          if (num) num.textContent = c.score;
+          const ring = document.getElementById('ct-ring-fg');
+          if (ring) {
+            const circ = 2 * Math.PI * 42;
+            ring.setAttribute('stroke-dashoffset', (circ * (1 - c.score / 100)).toFixed(2));
+            ring.setAttribute('stroke', colorForScore(c.score));
+          }
+          renderCtPaneOverview(c);
+          renderCtPaneDocs(c);
+        }
+      }
+    } catch (e) {}
+    try { if (typeof ctdRender === 'function' && document.getElementById('ctd-grid-body')) ctdRender(); } catch (e) {}
+    try { if (typeof dirRender === 'function' && document.getElementById('dir-grid-body')) dirRender(); } catch (e) {}
+    try { if (document.getElementById('om-grid-body')) omRender(); } catch (e) {}
+  }
+
+  function kvDocDecide(decision) {
+    if (!KV_DOC_CTX) return;
+    KV_DOC_DECISIONS[kvDocKey(KV_DOC_CTX.entityId, KV_DOC_CTX.docType)] = decision;
+    kvRecomputeScore(KV_DOC_CTX.entityId);
+    const ctx = KV_DOC_CTX;
+    kvDocClose();
+    kvDocRefreshSurfaces(ctx.entityId);
+    const ent = kvDocEntity(ctx.entityId, ctx.kind);
+    let msg = ctx.docType + ' ' + (decision === 'approved' ? 'approved' : 'rejected') + ' · ' + ent.name;
+    if (ent.kind === 'contractor' && ent.extra) msg += ' · compliance score ' + ent.extra.score + '/100';
+    toast(msg, decision === 'approved' ? 'green' : 'red');
+  }
 

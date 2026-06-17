@@ -155,7 +155,7 @@ export default function SecDirectory() {
         <div className="kpi">
           <div className="kpi-eye">Departments</div>
           <div className="kpi-val" id="om-kpi-dept">—</div>
-          <div className="kpi-sub">production · warehouse · more</div>
+          <div className="kpi-sub" id="om-kpi-dept-sub">—</div>
         </div>
         {' '}
         <div className="kpi">
@@ -206,14 +206,14 @@ export default function SecDirectory() {
           <table className="t" id="om-grid">
             <thead>
               <tr>
-                <th>Associate code</th>
-                <th>Name</th>
-                <th>Designation</th>
-                <th>Department</th>
-                <th>Reporting manager</th>
-                <th>UAN no</th>
-                <th>ESI no</th>
-                <th>Language</th>
+                <th className="om-th-sort" data-omcol="code" onClick={(event) => { window.omSort('code') }}>Associate code <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="name" onClick={(event) => { window.omSort('name') }}>Name <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="desig" onClick={(event) => { window.omSort('desig') }}>Designation <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="dept" onClick={(event) => { window.omSort('dept') }}>Department <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="mgr" onClick={(event) => { window.omSort('mgr') }}>Reporting manager <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="uan" onClick={(event) => { window.omSort('uan') }}>UAN no <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="esi" onClick={(event) => { window.omSort('esi') }}>ESI no <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="lang" onClick={(event) => { window.omSort('lang') }}>Language <span className="om-caret">⇅</span></th>
               </tr>
             </thead>
             <tbody id="om-grid-body" />
@@ -223,6 +223,8 @@ export default function SecDirectory() {
         <div id="om-noresults" className="wk-noresults" style={{ display: "none" }}>
           No associates match your search and filters.
         </div>
+        {' '}
+        <div id="om-pagination" className="om-pagination" />
       </div>
       {/*  ─── compliance drill-down ───  */}
       {' '}
