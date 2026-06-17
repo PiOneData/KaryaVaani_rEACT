@@ -215,7 +215,7 @@ export default function SecVaaniBroadcast() {
             <span className="vbm-row-k">Email to</span>
             {' '}
             <div className="vbm-row-v">
-              <input type="email" className="vbm-subject" id="vb-email-to" multiple placeholder="recipient@company.com" defaultValue="karyavaani.pionedata.com" />
+              <input type="email" className="vbm-subject" id="vb-email-to" multiple placeholder="recipient@company.com" defaultValue="karyavaani@pionedata.com" />
               {' '}
               <div className="vbm-row-hint">
                 Sends translated broadcast + voice-note WAV attachments via the VAANI mailer (localhost:5050). Translate first.
