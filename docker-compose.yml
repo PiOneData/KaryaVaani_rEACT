@@ -10,6 +10,10 @@ services:
       - "3241:3241"
     environment:
       - PORT=3241
+      - MAIL_HOST=smtp.office365.com
+      - EMAIL_PORT=587
+      - EMAIL_HOST_USER=support@pionedata.com
+      - EMAIL_HOST_PASSWORD=yxfczkkwrqdtsrcz
     restart: unless-stopped
 
   frontend:
