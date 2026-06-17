@@ -6094,9 +6094,9 @@ function __kvOnReady(fn) {
 
   /* ── VAANI mailer integration ────────────────────────────────────────
      Sends the broadcast (English + all translated languages) to an email
-     recipient via the vaani_mailer.py backend (POST /send-email).
+     recipient via the Node.js backend (POST /api/send-email).
      Each translated language is also attached as a synthesised .wav voice note.
-     Requires vaani_mailer.py running on localhost:5050.
+     Uses the Node.js backend /api/send-email route (Office365 SMTP).
      ─────────────────────────────────────────────────────────────────── */
   function blobToBase64(blob) {
     return new Promise(function (resolve, reject) {
@@ -6148,7 +6148,7 @@ function __kvOnReady(fn) {
         attachments.push({ filename: fname, data: b64 });
       }
 
-      const resp = await fetch('http://localhost:5050/send-email', {
+      const resp = await fetch('/api/send-email', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
@@ -6166,7 +6166,7 @@ function __kvOnReady(fn) {
         toast('Email failed: ' + (json.error || 'unknown error'), 'red');
       }
     } catch (err) {
-      toast('Could not reach VAANI mailer — is vaani_mailer.py running on :5050? (' + (err.message || err) + ')', 'red');
+      toast('Could not reach the backend /api/send-email endpoint (' + (err.message || err) + ')', 'red');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '📧 Send via email'; }
     }
