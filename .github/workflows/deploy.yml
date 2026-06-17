@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  FRONTEND_IMAGE: karyavaani-frontend
+  FRONTEND_IMAGE: karyavaani-ui
   BACKEND_IMAGE: karyavaani-backend
 
 jobs:
