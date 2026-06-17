@@ -5,6 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: ghcr.io/pionedata/karyavaani-backend:latest
     container_name: karyavaani-backend
     ports:
       - "3241:3241"
@@ -20,6 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ghcr.io/pionedata/karyavaani-ui:latest
     container_name: karyavaani-frontend
     ports:
       - "3240:3240"

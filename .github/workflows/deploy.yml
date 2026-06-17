@@ -83,6 +83,7 @@ jobs:
 
             cd /home/${{ secrets.SERVER_USER }}/KaryaVaani_rEACT
 
+            git pull origin main
             docker compose pull
             docker compose up -d
 
