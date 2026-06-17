@@ -63,6 +63,12 @@ jobs:
     needs: docker-build
 
     steps:
+      - name: Debug secrets
+        run: |
+          echo "SERVER_IP set:       ${{ secrets.SERVER_IP != '' }}"
+          echo "SERVER_USER set:     ${{ secrets.SERVER_USER != '' }}"
+          echo "SSH_PRIVATE_KEY set: ${{ secrets.SSH_PRIVATE_KEY != '' }}"
+
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.0.3
         with:
