@@ -97,6 +97,20 @@ jobs:
             cd /home/${{ secrets.SERVER_USER }}/KaryaVaani_rEACT
 
             git pull origin main
+
+            # Write the runtime .env that docker compose reads for variable
+            # substitution. Values come from GitHub repository secrets.
+            cat > .env <<'ENVEOF'
+            COMMS_API_KEY=${{ secrets.COMMS_API_KEY }}
+            META_API_VERSION=v21.0
+            META_PHONE_NUMBER_ID=${{ secrets.META_PHONE_NUMBER_ID }}
+            META_ACCESS_TOKEN=${{ secrets.META_ACCESS_TOKEN }}
+            META_VERIFY_TOKEN=${{ secrets.META_VERIFY_TOKEN }}
+            META_APP_SECRET=${{ secrets.META_APP_SECRET }}
+            COMMS_VERIFY_SIGNATURE=false
+            WHATSAPP_TEST_RECIPIENT=919500200300
+            ENVEOF
+
             docker compose pull
             docker compose up -d
 
