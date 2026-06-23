@@ -260,7 +260,7 @@ export default function SecDashboard() {
                 {' '}
                 <div className="chain-title">Safety briefing dispatched · 4 languages</div>
                 {' '}
-                <div className="chain-detail">2,087 workers · WA + PA + notice board · MSG-87412</div>
+                <div className="chain-detail">3,526 workers · WA + PA + notice board · MSG-87412</div>
                 {' '}
                 <div className="chain-hash">a3f7…d290</div>
               </div>

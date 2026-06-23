@@ -1196,7 +1196,7 @@
    "scope": "Contract",
    "enc": "AES-256 · per-tenant",
    "ret": "Statutory min",
-   "entries": 2757
+   "entries": 1240
   },
   {
    "type": "CLRA licence",
@@ -1217,21 +1217,21 @@
    "scope": "Both",
    "enc": "AES-256 · per-tenant",
    "ret": "Active + 3y",
-   "entries": 3526
+   "entries": 2087
   },
   {
    "type": "Offer letter",
    "scope": "Direct",
    "enc": "AES-256 · per-tenant",
    "ret": "Active + 3y",
-   "entries": 769
+   "entries": 847
   },
   {
    "type": "UAN seed record",
    "scope": "Both",
    "enc": "AES-256 · per-tenant",
    "ret": "While active + 7y",
-   "entries": 3526
+   "entries": 2087
   },
   {
    "type": "Education certificate",
@@ -1273,7 +1273,7 @@
    "scope": "Both",
    "enc": "AES-256 · per-tenant",
    "ret": "Active + 3y",
-   "entries": 3526
+   "entries": 2087
   },
   {
    "type": "PPE / uniform issue receipt",
@@ -2543,7 +2543,7 @@
    "kind": "Location",
    "name": "Entire location",
    "sub": "Daikin Sricity · AP",
-   "headcount": 3526,
+   "headcount": 2087,
    "ids": [
     "WRK-2207",
     "WRK-3318",
@@ -2611,7 +2611,7 @@
    "kind": "Worker type",
    "name": "Contract workers",
    "sub": "All contractors on site",
-   "headcount": 2757,
+   "headcount": 1240,
    "ids": [
     "WRK-3318",
     "WRK-4102"

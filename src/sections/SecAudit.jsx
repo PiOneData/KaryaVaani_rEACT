@@ -185,7 +185,7 @@ export default function SecAudit() {
               {' '}
               <div className="row-between">
                 <span>Channels + audience</span>
-                <span className="mono">5 · 2087</span>
+                <span className="mono">5 · 3526</span>
               </div>
               {' '}
               <div className="row-between">

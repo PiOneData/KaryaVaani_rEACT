@@ -243,13 +243,13 @@ export default function NavBar() {
         <div className="nb-stat">
           <span className="nb-stat-k">Workers</span>
           {' '}
-          <span className="nb-stat-v">2,087</span>
+          <span className="nb-stat-v">3,526</span>
         </div>
         {' '}
         <div className="nb-stat">
           <span className="nb-stat-k">Direct / Contract</span>
           {' '}
-          <span className="nb-stat-v">847 / 1,240</span>
+          <span className="nb-stat-v">769 / 2,757</span>
         </div>
         {' '}
         <div className="nb-stat">
