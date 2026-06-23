@@ -8,6 +8,18 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
+/* Gracefully handle malformed JSON bodies. Without this, body-parser's
+   SyntaxError bubbles up to Express's default handler and dumps a full stack
+   trace to the logs on every bad request. Instead, return a clean 400 and log
+   a single line identifying the caller so the source can be traced. */
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.parse.failed' || (err instanceof SyntaxError && 'body' in err))) {
+    console.warn(`Malformed JSON body — ${req.method} ${req.originalUrl} from ${req.ip} (${err.message})`);
+    return res.status(400).json({ ok: false, error: 'Invalid JSON body' });
+  }
+  return next(err);
+});
+
 app.get('/api/health', (req, res) => {
   const s = readStore();
   res.json({ ok: !!s, seededAt: s ? s.seededAt : null, counts: s ? s.counts : null, sources: s ? s.sources : null });
