@@ -30,6 +30,8 @@ export default function SecChat() {
         </div>
         {' '}
         <div className="page-h-right">
+          <span id="kv-wa-status" className="kv-wa-badge off" style={{ marginRight: "10px" }}>WhatsApp gateway: checking...</span>
+          {' '}
           <button className="btn" onClick={(event) => { window.vbGoToChatAnalytics() }} data-onclick="vbGoToChatAnalytics()">
             View analytics
           </button>

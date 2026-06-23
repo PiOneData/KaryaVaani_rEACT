@@ -10,6 +10,7 @@ env:
   REGISTRY: ghcr.io
   FRONTEND_IMAGE: karyavaani-ui
   BACKEND_IMAGE: karyavaani-backend
+  COMMS_IMAGE: karyavaani-comms
 
 jobs:
   docker-build:
@@ -49,6 +50,13 @@ jobs:
             -t ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
             .
 
+      - name: Build Comms Server Image
+        run: |
+          docker build \
+            -t ghcr.io/${{ env.USERNAME }}/${{ env.COMMS_IMAGE }}:latest \
+            -t ghcr.io/${{ env.USERNAME }}/${{ env.COMMS_IMAGE }}:${{ github.sha }} \
+            ./comms-server
+
       - name: Push Backend Image
         run: |
           docker push ghcr.io/${{ env.USERNAME }}/${{ env.BACKEND_IMAGE }}:latest
@@ -58,6 +66,11 @@ jobs:
         run: |
           docker push ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:latest
           docker push ghcr.io/${{ env.USERNAME }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+
+      - name: Push Comms Server Image
+        run: |
+          docker push ghcr.io/${{ env.USERNAME }}/${{ env.COMMS_IMAGE }}:latest
+          docker push ghcr.io/${{ env.USERNAME }}/${{ env.COMMS_IMAGE }}:${{ github.sha }}
 
   deploy:
     runs-on: ubuntu-latest

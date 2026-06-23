@@ -15,6 +15,37 @@ services:
       - EMAIL_PORT=587
       - EMAIL_HOST_USER=support@pionedata.com
       - EMAIL_HOST_PASSWORD=yxfczkkwrqdtsrcz
+      # WhatsApp gateway (standalone comms server, shared across apps)
+      - COMMS_BASE_URL=http://comms-server:4100
+      - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}
+    depends_on:
+      - comms-server
+    restart: unless-stopped
+
+  # Standalone, reusable communication server (WhatsApp via Meta Cloud API).
+  # Holds the provider credentials so any app can send/receive through it.
+  # With no Meta creds it runs in mock mode (messages logged, not sent).
+  comms-server:
+    build:
+      context: ./comms-server
+      dockerfile: Dockerfile
+    image: ghcr.io/pionedata/karyavaani-comms:latest
+    container_name: karyavaani-comms
+    ports:
+      - "4100:4100"
+    environment:
+      - PORT=4100
+      - WHATSAPP_PROVIDER=meta
+      - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}
+      - META_API_VERSION=${META_API_VERSION:-v21.0}
+      - META_PHONE_NUMBER_ID=${META_PHONE_NUMBER_ID:-}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN:-}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-karya-vaani-verify}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+      - COMMS_VERIFY_SIGNATURE=${COMMS_VERIFY_SIGNATURE:-false}
+      # TEST ONLY: redirect every outbound message to this one number.
+      # Remove (set empty) to send to real recipients in production.
+      - WHATSAPP_TEST_RECIPIENT=${WHATSAPP_TEST_RECIPIENT:-919500200300}
     restart: unless-stopped
 
   frontend:
@@ -27,4 +58,5 @@ services:
       - "3240:3240"
     depends_on:
       - backend
+      - comms-server
     restart: unless-stopped

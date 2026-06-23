@@ -889,6 +889,15 @@ function __kvOnReady(fn) {
     renderWkGrid && renderWkGrid();
     wkRenderRegistry && wkRenderRegistry();
     toast('Re-upload request sent to ' + w.name + ' on WhatsApp', 'green');
+    /* real WhatsApp re-upload request via the communication gateway */
+    if (window.KVWhatsApp) {
+      const num = w.phone || w.mobile;
+      if (num) {
+        window.KVWhatsApp.send(num,
+          'Karya Vaani: Please re-upload your "' + (d.title || d.name || 'document') +
+          '". ' + reason.trim());
+      }
+    }
   }
 
   /* commit an HRBP escalation */
@@ -6071,6 +6080,17 @@ function __kvOnReady(fn) {
     window.open('karya-vaani-walkthrough.html', '_blank');
 
     const workers = res.workers;
+
+    /* real WhatsApp fan-out via the communication gateway — each worker gets
+       the message in their own language when a translation is available */
+    if (window.KVWhatsApp) {
+      const tr = VB_STATE.translations || {};
+      workers.forEach(function (w) {
+        const body = tr[w.lang] || VB_STATE.source || VB_STATE.subject || '';
+        if (w.phone && body) window.KVWhatsApp.send(w.phone, body);
+      });
+    }
+
     workers.forEach(function (w, idx) {
       const row = VB_STATE.rows.find(function (r) { return r.id === w.id; });
       setTimeout(function () { row.stage = 'sending'; vbRenderBroadcastRows(); }, 250 + idx * 420);
@@ -6099,6 +6119,16 @@ function __kvOnReady(fn) {
     const pending = VB_STATE.rows.filter(function (r) { return r.stage !== 'ack'; });
     if (!pending.length) { toast('Everyone has already acknowledged', 'green'); return; }
     toast('WhatsApp ACK reminder sent to ' + pending.length + ' worker' + (pending.length > 1 ? 's' : ''), 'green');
+    /* real WhatsApp ACK reminders via the communication gateway */
+    if (window.KVWhatsApp) {
+      const tr = VB_STATE.translations || {};
+      pending.forEach(function (r) {
+        const w = (VB_WORKERS || []).find(function (x) { return x.id === r.id; }) || r;
+        const reminder = (typeof CHAT_REMINDER !== 'undefined' && CHAT_REMINDER[w.lang]) ||
+          'Reminder: please acknowledge the recent Karya Vaani notice.';
+        if (w.phone) window.KVWhatsApp.send(w.phone, reminder);
+      });
+    }
   }
 
   /* ── VAANI mailer integration ────────────────────────────────────────
@@ -6617,6 +6647,10 @@ function __kvOnReady(fn) {
         toast('Response-bot reminder #' + r.msg.reminders + ' sent to ' + c.name +
           ' in ' + chatLang(c.lang).name, 'green');
       }
+      /* real WhatsApp reminder via the communication gateway */
+      if (window.KVWhatsApp) {
+        window.KVWhatsApp.send(c.phone, (CHAT_REMINDER[c.lang] || CHAT_REMINDER.HI));
+      }
     }, 900);
   }
 
@@ -6956,6 +6990,11 @@ function __kvOnReady(fn) {
         const lng = chatLang(c.lang);
         toast('Broadcast "' + chatSubject(preset) + '" sent to ' + c.name +
           ' in ' + lng.name, 'green');
+      }
+      /* real WhatsApp delivery via the communication gateway */
+      if (window.KVWhatsApp) {
+        const body = chatLocalised(preset, c.lang);
+        window.KVWhatsApp.send(c.phone, body);
       }
     }, 1100);
   }
@@ -11299,6 +11338,12 @@ function __kvOnReady(fn) {
     });
     capRenderRecent();
     toast('Profile saved · confirmation link sent to ' + name + ' on WhatsApp (' + capLangName() + ')', 'green');
+    /* real WhatsApp confirmation link via the communication gateway */
+    if (window.KVWhatsApp && mobile) {
+      window.KVWhatsApp.send(mobile,
+        'Namaste ' + name + ', please confirm your Karya Vaani worker profile: ' +
+        'https://karyavaani.app/confirm/' + wid);
+    }
     capReset(true);
   }
 
@@ -11465,6 +11510,12 @@ function __kvOnReady(fn) {
         id: wid, name: r.name, type: r.type, lang: r.language,
         category: r.category, photo: null, mobile: r.mobile, status: 'sent'
       });
+      /* real WhatsApp confirmation link via the communication gateway */
+      if (window.KVWhatsApp && r.mobile) {
+        window.KVWhatsApp.send(r.mobile,
+          'Namaste ' + r.name + ', please confirm your Karya Vaani worker profile: ' +
+          'https://karyavaani.app/confirm/' + wid);
+      }
     });
     capRenderRecent();
     document.getElementById('cap-bulk-status').innerHTML =

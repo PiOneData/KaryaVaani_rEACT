@@ -1,0 +1,60 @@
+/* config.js -- central configuration, sourced entirely from environment variables.
+   Nothing app-specific lives here, so the server can be reused as-is by any
+   application that needs a WhatsApp (or, later, multi-channel) gateway. */
+
+function bool(v, def = false) {
+  if (v === undefined || v === null || v === '') return def;
+  return String(v).toLowerCase() === 'true' || v === '1';
+}
+
+const config = {
+  port: parseInt(process.env.PORT || '4100', 10),
+
+  /* Comma-separated list of allowed CORS origins, or "*" for any. */
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '*').trim(),
+
+  /* API key that callers must present (x-api-key header) on send endpoints.
+     If unset, auth is disabled -- only do that on a trusted private network. */
+  apiKey: process.env.COMMS_API_KEY || '',
+
+  /* Which provider drives WhatsApp: "meta" or "mock".
+     If "meta" is selected but credentials are missing, the server
+     automatically falls back to "mock" so callers never hard-fail. */
+  provider: (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase(),
+
+  meta: {
+    apiVersion: process.env.META_API_VERSION || 'v21.0',
+    phoneNumberId: process.env.META_PHONE_NUMBER_ID || '',
+    accessToken: process.env.META_ACCESS_TOKEN || '',
+    /* Token you choose; must match what you enter in the Meta webhook setup. */
+    verifyToken: process.env.META_VERIFY_TOKEN || 'karya-vaani-verify',
+    /* App secret, used to validate the X-Hub-Signature-256 on inbound calls.
+       Optional but recommended in production. */
+    appSecret: process.env.META_APP_SECRET || '',
+    graphBase: process.env.META_GRAPH_BASE || 'https://graph.facebook.com'
+  },
+
+  /* Optional: every inbound message / status is POSTed to this URL so other
+     applications can subscribe without polling. Leave empty to disable. */
+  forwardUrl: process.env.COMMS_FORWARD_URL || '',
+
+  /* How many messages to keep in the in-memory log (per process). */
+  storeLimit: parseInt(process.env.COMMS_STORE_LIMIT || '500', 10),
+
+  /* TEST SAFETY VALVE: when set, every outbound message is redirected to this
+     single number regardless of the requested recipient. Use during testing
+     so nothing reaches real workers. Leave empty in production. */
+  testRecipient: process.env.WHATSAPP_TEST_RECIPIENT || '',
+
+  verifySignature: bool(process.env.COMMS_VERIFY_SIGNATURE, false)
+};
+
+/* Decide the effective provider. */
+config.effectiveProvider =
+  config.provider === 'meta' && config.meta.phoneNumberId && config.meta.accessToken
+    ? 'meta'
+    : config.provider === 'meta'
+      ? 'mock' /* meta requested but not configured */
+      : config.provider;
+
+module.exports = config;

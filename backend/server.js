@@ -71,5 +71,80 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
+/* --- WhatsApp gateway proxy -----------------------------------------------
+   The browser never talks to the comms server directly -- it calls these
+   endpoints, which forward to the standalone communication server using the
+   server-side API key. This keeps the WhatsApp credentials/secret off the
+   client and lets the comms server be shared by other applications too.
+
+   Configure via env:
+     COMMS_BASE_URL   default http://localhost:4100  (in Docker: http://comms-server:4100)
+     COMMS_API_KEY    shared secret matching the comms server
+   ------------------------------------------------------------------------- */
+const COMMS_BASE_URL = (process.env.COMMS_BASE_URL || 'http://localhost:4100').replace(/\/$/, '');
+const COMMS_API_KEY = process.env.COMMS_API_KEY || '';
+
+async function commsFetch(path, options = {}) {
+  const headers = Object.assign(
+    { 'Content-Type': 'application/json' },
+    COMMS_API_KEY ? { 'x-api-key': COMMS_API_KEY } : {},
+    options.headers || {}
+  );
+  const resp = await fetch(COMMS_BASE_URL + path, { ...options, headers });
+  const text = await resp.text();
+  let json;
+  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  return { status: resp.status, json };
+}
+
+/* health passthrough -- handy to confirm the gateway is reachable */
+app.get('/api/whatsapp/health', async (req, res) => {
+  try {
+    const { status, json } = await commsFetch('/health', { method: 'GET' });
+    res.status(status).json(json);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
+  }
+});
+
+/* send a free-form text message to one or many recipients */
+app.post('/api/whatsapp/send', async (req, res) => {
+  try {
+    const { status, json } = await commsFetch('/v1/whatsapp/send', {
+      method: 'POST',
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(status).json(json);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
+  }
+});
+
+/* send an approved template message */
+app.post('/api/whatsapp/send-template', async (req, res) => {
+  try {
+    const { status, json } = await commsFetch('/v1/whatsapp/send-template', {
+      method: 'POST',
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(status).json(json);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
+  }
+});
+
+/* poll the inbound/outbound message log (for the two-way chat surface) */
+app.get('/api/whatsapp/messages', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const { status, json } = await commsFetch('/v1/whatsapp/messages' + (qs ? '?' + qs : ''), {
+      method: 'GET'
+    });
+    res.status(status).json(json);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));

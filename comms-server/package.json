@@ -1,0 +1,19 @@
+{
+  "name": "comms-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone, reusable communication server. Provides a provider-agnostic HTTP API for sending and receiving WhatsApp messages (Meta WhatsApp Cloud API), designed to be shared across multiple applications.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
