@@ -111,7 +111,11 @@ jobs:
             WHATSAPP_TEST_RECIPIENT=919500200300
             ENVEOF
 
-            docker compose pull
-            docker compose up -d
+            # Build images from the freshly pulled source instead of pulling
+            # the registry tag. This guarantees the running containers reflect
+            # the latest committed code, even if the CI build/push step lagged
+            # or the :latest tag is stale. --pull refreshes the base images.
+            docker compose build --pull
+            docker compose up -d --force-recreate
 
             echo "Deployment completed"
