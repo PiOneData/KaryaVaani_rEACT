@@ -3101,5 +3101,322 @@
    "clra": "CLRA/AP/0312-2026",
    "category": "Semi-skilled"
   }
- ]
+ ],
+ "chatContacts": [
+  {
+   "id": "WRK-5012",
+   "name": "Mohan Das",
+   "role": "Forklift driver",
+   "zone": "Warehouse",
+   "dept": "Logistics",
+   "sup": "Vikram Shah",
+   "type": "Contract",
+   "contractor": "Pavan Manpower",
+   "lang": "OR",
+   "phone": "••• ••• 2231"
+  },
+  {
+   "id": "WRK-5188",
+   "name": "Naga Babu",
+   "role": "Tool-room fitter",
+   "zone": "Tool Room",
+   "dept": "Maintenance",
+   "sup": "Suresh Pillai",
+   "type": "Contract",
+   "contractor": "Sai Industrial",
+   "lang": "TE",
+   "phone": "••• ••• 7714"
+  },
+  {
+   "id": "WRK-6201",
+   "name": "Praveen N.",
+   "role": "Packing operator",
+   "zone": "Packaging",
+   "dept": "Production",
+   "sup": "Anitha Rao",
+   "type": "Contract",
+   "contractor": "Sri Lakshmi Engg",
+   "lang": "TA",
+   "phone": "••• ••• 5520"
+  }
+ ],
+ "chatThreads": {
+  "WRK-2207": {
+   "lastSeen": "today at 09:14",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "wage",
+     "time": "Yesterday · 16:42",
+     "at": "25 May 2026 · 16:42:08 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "25 May 2026 · 17:08:21 IST"
+    },
+    {
+     "dir": "out",
+     "text": "అర్థమైంది, ధన్యవాదాలు",
+     "en": "Understood, thank you",
+     "time": "Yesterday · 17:08",
+     "at": "25 May 2026 · 17:08:21 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "ppe",
+     "time": "Today · 07:32",
+     "at": "26 May 2026 · 07:32:11 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "26 May 2026 · 07:39:02 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": true,
+     "acked": false
+    }
+   ]
+  },
+  "WRK-3318": {
+   "lastSeen": "today at 08:47",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "heat",
+     "time": "Mon · 11:00",
+     "at": "20 May 2026 · 11:00:14 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "20 May 2026 · 11:24:09 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "transport",
+     "time": "Tue · 06:55",
+     "at": "21 May 2026 · 06:55:00 IST",
+     "read": true,
+     "acked": false
+    },
+    {
+     "dir": "out",
+     "text": "समझ गया, धन्यवाद",
+     "en": "Understood, thank you",
+     "time": "Tue · 07:01",
+     "at": "21 May 2026 · 07:01:33 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": true,
+     "acked": false
+    }
+   ]
+  },
+  "WRK-2884": {
+   "lastSeen": "today at 08:55",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "fire",
+     "time": "Fri · 14:20",
+     "at": "23 May 2026 · 14:20:00 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "23 May 2026 · 14:31:11 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "roster",
+     "time": "Sat · 09:10",
+     "at": "24 May 2026 · 09:10:25 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "24 May 2026 · 09:15:02 IST"
+    },
+    {
+     "dir": "out",
+     "text": "సరే, షిఫ్ట్ సోమవారం నుండి",
+     "en": "OK, shift from Monday",
+     "time": "Sat · 09:15",
+     "at": "24 May 2026 · 09:15:02 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "ppe",
+     "time": "Today · 07:32",
+     "at": "26 May 2026 · 07:32:11 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "26 May 2026 · 07:45:18 IST"
+    }
+   ]
+  },
+  "WRK-4102": {
+   "lastSeen": "today at 06:30",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "induction",
+     "time": "Mon · 10:00",
+     "at": "20 May 2026 · 10:00:00 IST",
+     "read": true,
+     "acked": false
+    },
+    {
+     "dir": "in",
+     "preset": "transport",
+     "time": "Tue · 06:55",
+     "at": "21 May 2026 · 06:55:00 IST",
+     "read": true,
+     "acked": false
+    },
+    {
+     "dir": "out",
+     "text": "ठीक है",
+     "en": "OK",
+     "time": "Tue · 07:00",
+     "at": "21 May 2026 · 07:00:12 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": false,
+     "acked": false
+    }
+   ]
+  },
+  "WRK-3771": {
+   "lastSeen": "today at 10:11",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "evac",
+     "time": "Wed · 15:30",
+     "at": "21 May 2026 · 15:30:00 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "21 May 2026 · 15:35:44 IST"
+    },
+    {
+     "dir": "out",
+     "text": "రిపోర్ట్ చేశాను",
+     "en": "Reported in",
+     "time": "Wed · 15:35",
+     "at": "21 May 2026 · 15:35:44 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "holiday",
+     "time": "Thu · 11:20",
+     "at": "22 May 2026 · 11:20:00 IST",
+     "read": true,
+     "acked": false
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": true,
+     "acked": false
+    }
+   ]
+  },
+  "WRK-5012": {
+   "lastSeen": "today at 08:02",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "transport",
+     "time": "Mon · 06:55",
+     "at": "20 May 2026 · 06:55:00 IST",
+     "read": true,
+     "acked": false
+    },
+    {
+     "dir": "in",
+     "preset": "ppe",
+     "time": "Today · 07:32",
+     "at": "26 May 2026 · 07:32:11 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "26 May 2026 · 07:50:09 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": false,
+     "acked": false
+    }
+   ]
+  },
+  "WRK-5188": {
+   "lastSeen": "yesterday",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "roster",
+     "time": "Sat · 09:10",
+     "at": "24 May 2026 · 09:10:25 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "24 May 2026 · 09:18:00 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": false,
+     "acked": false
+    }
+   ]
+  },
+  "WRK-6201": {
+   "lastSeen": "today at 09:30",
+   "msgs": [
+    {
+     "dir": "in",
+     "preset": "heat",
+     "time": "Mon · 11:00",
+     "at": "20 May 2026 · 11:00:14 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "20 May 2026 · 11:30:55 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "evac",
+     "time": "Wed · 15:30",
+     "at": "21 May 2026 · 15:30:00 IST",
+     "read": true,
+     "acked": true,
+     "ackedAt": "21 May 2026 · 15:36:12 IST"
+    },
+    {
+     "dir": "out",
+     "text": "புரிந்தது",
+     "en": "Understood",
+     "time": "Wed · 15:36",
+     "at": "21 May 2026 · 15:36:12 IST"
+    },
+    {
+     "dir": "in",
+     "preset": "rain",
+     "time": "Today · 09:02",
+     "at": "26 May 2026 · 09:02:48 IST",
+     "read": true,
+     "acked": false
+    }
+   ]
+  }
+ }
 }

@@ -5602,8 +5602,91 @@ function __kvOnReady(fn) {
     if (sel && sel.value !== matched) sel.value = matched;
   }
 
-  /* ── translate via VAANI (simulated) ── */
-  function vbTranslate() {
+  /* ── VAANI engine wiring (real open-source models) ──
+     Talks to the self-hosted vaani-engine service (IndicTrans2 + MMS/IndicF5).
+     If the engine is unreachable the UI falls back to the curated/mock path so
+     the demo never hard-breaks — but with the engine running, translation and
+     voice are genuinely produced by open-source Indian-language models.
+     Configure the host via window.VAANI_ENGINE_URL (default localhost:5060). */
+  window.VAANI_ENGINE_URL = window.VAANI_ENGINE_URL || 'http://localhost:5060';
+  /* Set window.VAANI_API_KEY (e.g. in index.html) when the engine has auth on. */
+  const VB_AUDIO_CACHE = {};   /* code -> object URL of the fetched voice WAV */
+
+  function vbEngineUrl(path) { return window.VAANI_ENGINE_URL.replace(/\/$/, '') + path; }
+  function vbEngineHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    if (window.VAANI_API_KEY) h['x-api-key'] = window.VAANI_API_KEY;
+    return h;
+  }
+
+  /* POST /translate → resolves to { code: text } */
+  function vbEngineTranslate(text, codes) {
+    return fetch(vbEngineUrl('/translate'), {
+      method: 'POST',
+      headers: vbEngineHeaders(),
+      body: JSON.stringify({ text: text, targets: codes })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('translate ' + r.status);
+      return r.json();
+    }).then(function (j) { return j.translations || {}; });
+  }
+
+  /* POST /tts → resolves to an audio/wav Blob */
+  function vbEngineTts(text, code) {
+    return fetch(vbEngineUrl('/tts'), {
+      method: 'POST',
+      headers: vbEngineHeaders(),
+      body: JSON.stringify({ text: text, lang: code })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('tts ' + r.status);
+      return r.blob();
+    });
+  }
+
+  /* discard cached voice audio when the translation changes */
+  function vbClearAudioCache() {
+    Object.keys(VB_AUDIO_CACHE).forEach(function (k) {
+      try { URL.revokeObjectURL(VB_AUDIO_CACHE[k]); } catch (e) {}
+      delete VB_AUDIO_CACHE[k];
+    });
+  }
+
+  /* NLLB-style language codes the VAANI translation service expects.
+     Maps our short UI codes → the model's language identifiers. */
+  const VB_NLLB = {
+    TE: 'tel_Telu', HI: 'hin_Deva', TA: 'tam_Taml',
+    OR: 'ory_Orya', BN: 'ben_Beng', MR: 'mar_Deva'
+  };
+
+  /* call the live VAANI translation service for one target language.
+     Goes through the backend proxy (/api/translate) so the service address
+     stays server-side and we avoid mixed-content / CORS issues. */
+  async function vbTranslateOne(text, code) {
+    const target = VB_NLLB[code];
+    if (!target) throw new Error('unsupported language ' + code);
+    const resp = await fetch('/api/translate', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text: text, source: 'eng_Latn', target: target })
+    });
+    const json = await resp.json().catch(function () { return {}; });
+    if (!resp.ok || json.success === false || !json.translation) {
+      throw new Error(json.error || ('HTTP ' + resp.status));
+    }
+    return json.translation;
+  }
+
+  /* curated / simulated rendering used as a graceful fallback when the live
+     service is unreachable, so the demo still works fully offline. */
+  function vbSimTranslate(code) {
+    if (VB_STATE.preset !== 'custom' && VB_TRANSLATIONS[VB_STATE.preset]) {
+      return VB_TRANSLATIONS[VB_STATE.preset][code];
+    }
+    return VB_STATE.source + '  〔' + vbLang(code).name + ' · VAANI Mayura v1〕';
+  }
+
+  /* ── translate via the live VAANI service (graceful fallback on failure) ── */
+  async function vbTranslate() {
     VB_STATE.source = document.getElementById('vb-source').value.trim();
     VB_STATE.subject = document.getElementById('vb-subject').value.trim();
     if (!VB_STATE.source) { toast('Write a message to translate', 'red'); return; }
@@ -5614,22 +5697,31 @@ function __kvOnReady(fn) {
     btn.disabled = true;
     btn.textContent = 'Translating…';
 
-    setTimeout(function () {
-      const out = {};
-      VB_STATE.langs.forEach(function (code) {
-        if (VB_STATE.preset !== 'custom' && VB_TRANSLATIONS[VB_STATE.preset]) {
-          out[code] = VB_TRANSLATIONS[VB_STATE.preset][code];
-        } else {
-          out[code] = VB_STATE.source + '  〔' + vbLang(code).name + ' · VAANI Mayura v1〕';
-        }
-      });
-      VB_STATE.translations = out;
-      btn.disabled = false;
-      btn.textContent = 'Re-translate via VAANI';
-      vbRenderTranslations();
-      document.getElementById('vb-step1-next').disabled = false;
-      toast('Translated into ' + VB_STATE.langs.map(function (c) { return vbLang(c).name; }).join(' & '), 'green');
-    }, 650);
+    const out = {};
+    let failed = 0;
+    await Promise.all(VB_STATE.langs.map(async function (code) {
+      try {
+        out[code] = await vbTranslateOne(VB_STATE.source, code);
+      } catch (err) {
+        failed++;
+        out[code] = vbSimTranslate(code);
+      }
+    }));
+
+    VB_STATE.translations = out;
+    btn.disabled = false;
+    btn.textContent = 'Re-translate via VAANI';
+    vbRenderTranslations();
+    document.getElementById('vb-step1-next').disabled = false;
+
+    const names = VB_STATE.langs.map(function (c) { return vbLang(c).name; }).join(' & ');
+    if (failed === 0) {
+      toast('Translated into ' + names, 'green');
+    } else if (failed < VB_STATE.langs.length) {
+      toast('Partly translated — service unavailable for one language, used fallback', 'amber');
+    } else {
+      toast('Translation service unreachable — showing fallback rendering', 'amber');
+    }
   }
 
   function vbRenderTranslations() {
@@ -5653,7 +5745,7 @@ function __kvOnReady(fn) {
         '</div>' +
         '<div class="vb-tcard-body">' + VB_STATE.translations[code] + '</div>' +
         '<div class="vb-voice-track" id="vb-voice-track-' + code + '" style="display:none;margin:2px 18px 8px"><span></span></div>' +
-        '<div class="vb-tcard-foot">VAANI · Bulbul v3 voice — Play to hear it aloud, or Download the .wav voice note</div>' +
+        '<div class="vb-tcard-foot">VAANI · open-source voice (IndicTrans2 + MMS-TTS / IndicF5) — Play to hear it aloud, or Download the .wav voice note</div>' +
       '</div>';
     }).join('');
     /* one-time capability hint */
@@ -5696,7 +5788,48 @@ function __kvOnReady(fn) {
     const bar   = track ? track.firstElementChild : null;
     if (chip)  chip.classList.add('playing');
     if (ico)   ico.innerHTML = '<span class="vb-eq"><span></span><span></span><span></span><span></span></span>';
-    if (label) label.textContent = 'Playing · ' + vbLang(code).name;
+    if (label) label.textContent = 'Loading · ' + vbLang(code).name;
+    if (track) track.style.display = 'block';
+
+    const text = VB_STATE.translations[code];
+
+    /* Preferred path: real synthesised voice from the VAANI engine. */
+    const cached = VB_AUDIO_CACHE[code]
+      ? Promise.resolve(VB_AUDIO_CACHE[code])
+      : vbEngineTts(text, code).then(function (blob) {
+          const url = URL.createObjectURL(blob);
+          VB_AUDIO_CACHE[code] = url;
+          return url;
+        });
+
+    cached.then(function (url) {
+      if (VB_STATE.playing !== code) return;           /* user stopped meanwhile */
+      const audio = new Audio(url);
+      if (chip) chip._audio = audio;
+      if (label) label.textContent = 'Playing · ' + vbLang(code).name;
+      audio.ontimeupdate = function () {
+        if (bar && audio.duration) bar.style.width = Math.min(99, audio.currentTime / audio.duration * 100) + '%';
+      };
+      audio.onended = function () { if (bar) bar.style.width = '100%'; vbStopVoice(code); };
+      audio.onerror = function () { vbPlayVoiceSpeech(code); };
+      audio.play().catch(function () { vbPlayVoiceSpeech(code); });
+      toast('Playing voice note · ' + vbLang(code).name + ' · VAANI', 'green');
+    }).catch(function () {
+      /* engine unreachable — fall back to the browser speech engine */
+      vbPlayVoiceSpeech(code);
+    });
+  }
+
+  /* Fallback playback using the browser's built-in speech engine. Assumes the
+     UI/“playing” state has already been started by vbPlayVoice. */
+  function vbPlayVoiceSpeech(code) {
+    VB_STATE.playing = code;
+    const chip  = document.getElementById('vb-voice-' + code);
+    const ico   = document.getElementById('vb-voice-ico-' + code);
+    const label = document.getElementById('vb-voice-label-' + code);
+    const track = document.getElementById('vb-voice-track-' + code);
+    const bar   = track ? track.firstElementChild : null;
+    if (chip)  chip.classList.add('playing');
     if (track) track.style.display = 'block';
 
     const text   = VB_STATE.translations[code];
@@ -5747,9 +5880,9 @@ function __kvOnReady(fn) {
       }
       speakNext();
 
-      toast('Playing voice note · ' + vbLang(code).name, 'green');
+      toast('Engine offline — using browser voice · ' + vbLang(code).name, 'amber');
       if (!v) {
-        toast(vbLang(code).name + ' voice not installed — using the default engine voice', 'amber');
+        toast(vbLang(code).name + ' voice not installed in this browser', 'amber');
       }
     } else {
       /* no speech engine — animated fallback only */
@@ -5769,6 +5902,7 @@ function __kvOnReady(fn) {
     const label = document.getElementById('vb-voice-label-' + code);
     const track = document.getElementById('vb-voice-track-' + code);
     if (chip && chip._timer) { clearInterval(chip._timer); chip._timer = null; }
+    if (chip && chip._audio) { try { chip._audio.pause(); } catch (e) {} chip._audio = null; }
     if (VB_STATE._phraseTimer) { clearTimeout(VB_STATE._phraseTimer); VB_STATE._phraseTimer = null; }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (chip)  chip.classList.remove('playing');
@@ -5782,10 +5916,10 @@ function __kvOnReady(fn) {
   }
 
   /* ── download the voice note as a real, playable WAV file ──
-     Renders the translated text to speech and captures it to a WAV.
-     Where the browser exposes the speech engine to MediaRecorder this is
-     the true synthesised audio; otherwise a valid spoken-cadence WAV is
-     generated so the demo always yields a downloadable, playable file. */
+     Fetches genuine synthesised speech from the VAANI engine (MMS-TTS /
+     IndicF5). If the engine is unreachable it falls back to a synthetic
+     placeholder tone so the demo still yields a downloadable file — that
+     fallback is clearly labelled so it is never mistaken for real audio. */
   function vbDownloadVoice(code) {
     if (!VB_STATE.translations || !VB_STATE.translations[code]) return;
     const lang = vbLang(code);
@@ -5794,19 +5928,18 @@ function __kvOnReady(fn) {
     const dlLabel = document.getElementById('vb-voice-dl-label-' + code);
     if (dlLabel) dlLabel.textContent = 'Preparing…';
 
-    /* try true speech capture first (Chrome/Edge expose the engine) */
-    vbCaptureSpeech(code, text)
+    vbEngineTts(text, code)
       .then(function (wavBlob) {
         vbSaveBlob(wavBlob, fname);
         if (dlLabel) dlLabel.textContent = 'Download';
-        toast('Voice note downloaded · ' + lang.name + ' (' + fname + ')', 'green');
+        toast('Voice note downloaded · ' + lang.name + ' · VAANI (' + fname + ')', 'green');
       })
       .catch(function () {
-        /* fallback — synthesise a valid WAV with spoken cadence */
+        /* engine offline — synthesise a clearly-labelled placeholder tone */
         const wav = vbBuildWav(text);
-        vbSaveBlob(wav, fname);
+        vbSaveBlob(wav, 'PLACEHOLDER-' + fname);
         if (dlLabel) dlLabel.textContent = 'Download';
-        toast('Voice note downloaded · ' + lang.name + ' (' + fname + ')', 'green');
+        toast('Engine offline — saved a placeholder tone, not real voice · ' + lang.name, 'amber');
       });
   }
 
@@ -6175,15 +6308,23 @@ function __kvOnReady(fn) {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
 
     try {
-      /* generate a WAV voice note for each translated language */
+      /* generate a real voice note per language via the VAANI engine;
+         fall back to a clearly-labelled placeholder tone if it is offline */
       const attachments = [];
       for (var i = 0; i < VB_STATE.langs.length; i++) {
         var code  = VB_STATE.langs[i];
         var l     = vbLang(code);
         var text  = VB_STATE.translations[code] || '';
-        var fname = 'karya-vaani-voice-' + l.name.toLowerCase().replace(/\s+/g, '-') + '.wav';
-        var blob  = vbBuildWav(text);
-        var b64   = await blobToBase64(blob);
+        var base  = 'karya-vaani-voice-' + l.name.toLowerCase().replace(/\s+/g, '-') + '.wav';
+        var blob, fname;
+        try {
+          blob  = await vbEngineTts(text, code);   /* real synthesised speech */
+          fname = base;
+        } catch (e) {
+          blob  = vbBuildWav(text);                /* offline placeholder tone */
+          fname = 'PLACEHOLDER-' + base;
+        }
+        var b64 = await blobToBase64(blob);
         attachments.push({ filename: fname, data: b64 });
       }
 
@@ -6457,16 +6598,20 @@ function __kvOnReady(fn) {
   }
 
   /* contacts — drawn from the Vaani worker pool, extended slightly */
+  /* contact roster extension — sourced from the database (/api/bootstrap →
+     __KVDATA.chatContacts) so the chat + analytics reflect the live store.
+     The hardcoded list is kept only as an offline fallback. */
   const CHAT_CONTACTS = (typeof VB_WORKERS !== 'undefined' ? VB_WORKERS.slice() : [])
-    .concat([
+    .concat((window.__KVDATA && window.__KVDATA.chatContacts) || [
       { id: 'WRK-5012', name: 'Mohan Das',    role: 'Forklift driver',  zone: 'Warehouse',  dept: 'Logistics',  sup: 'Vikram Shah',  type: 'Contract', contractor: 'Pavan Manpower',    lang: 'OR', phone: '••• ••• 2231' },
       { id: 'WRK-5188', name: 'Naga Babu',    role: 'Tool-room fitter', zone: 'Tool Room',  dept: 'Maintenance',sup: 'Suresh Pillai',type: 'Contract', contractor: 'Sai Industrial',    lang: 'TE', phone: '••• ••• 7714' },
       { id: 'WRK-6201', name: 'Praveen N.',   role: 'Packing operator', zone: 'Packaging',  dept: 'Production', sup: 'Anitha Rao',   type: 'Contract', contractor: 'Sri Lakshmi Engg', lang: 'TA', phone: '••• ••• 5520' }
     ]);
 
-  /* each worker carries a curated thread of recent multilingual
-     deliveries — these are real templates from Vaani Broadcasting */
-  const CHAT_THREADS = {
+  /* each worker carries a curated thread of recent multilingual deliveries.
+     These now come from the database (__KVDATA.chatThreads) so the analytics
+     aggregate off the live store; the literal below is the offline fallback. */
+  const CHAT_THREADS = (window.__KVDATA && window.__KVDATA.chatThreads) || {
     'WRK-2207': {                            // Ramesh · Telugu
       lastSeen: 'today at 09:14',
       msgs: [
@@ -7255,6 +7400,156 @@ function __kvOnReady(fn) {
     });
     return Object.values(by);
   }
+
+  /* ════════════════════════════════════════════════════════════════
+     LIVE COMMS BRIDGE
+     Pulls the actual WhatsApp message log from the communication gateway
+     (/api/whatsapp/messages, via KVWhatsApp) and folds it into CHAT_THREADS
+     so the analytics reflect real traffic — not just the seeded history.
+
+       · outbound gateway send  → the worker *received* a broadcast (dir:'in')
+       · inbound worker reply   → acknowledgement of the latest open message
+       · status:read/delivered  → marks the matching delivery as read
+
+     Idempotent: every record is keyed by its messageId so re-polling and
+     UI-originated sends are never double-counted.
+     ════════════════════════════════════════════════════════════════ */
+  const CHAT_LIVE_SEEN = {};            /* messageId → true (dedupe) */
+  let CHAT_PRESET_TEXT_IDX = null;      /* normalised body text → preset key */
+  let CHAT_PHONE_IDX = null;            /* last-4 digits → contact id */
+  let CHAT_LIVE_POLL = null;
+  let CHAT_LIVE_STARTED = false;
+
+  function chatNormTxt(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+  function chatLast4(p) { const d = String(p == null ? '' : p).replace(/\D/g, ''); return d.slice(-4); }
+
+  /* reverse map: any localised/English body → its preset key, so a free-text
+     gateway message can be classified back to a broadcast subject + tier */
+  function chatBuildPresetTextIdx() {
+    const idx = {};
+    if (typeof VB_PRESETS !== 'undefined') {
+      Object.keys(VB_PRESETS).forEach(function (p) {
+        const b = VB_PRESETS[p] && VB_PRESETS[p].body;
+        if (b) idx[chatNormTxt(b)] = p;
+      });
+    }
+    if (typeof VB_TRANSLATIONS !== 'undefined') {
+      Object.keys(VB_TRANSLATIONS).forEach(function (p) {
+        Object.keys(VB_TRANSLATIONS[p] || {}).forEach(function (lang) {
+          const t = VB_TRANSLATIONS[p][lang];
+          if (t) idx[chatNormTxt(t)] = p;
+        });
+      });
+    }
+    return idx;
+  }
+
+  /* last-4-digit index of every contact phone — masked rosters still carry
+     the trailing four digits, which is enough to attribute live traffic */
+  function chatBuildPhoneIdx() {
+    const idx = {};
+    CHAT_CONTACTS.forEach(function (c) {
+      const k = chatLast4(c.phone);
+      if (k && k.length === 4 && idx[k] === undefined) idx[k] = c.id;
+    });
+    return idx;
+  }
+
+  /* fold a batch of gateway records into the threads. Returns true if any
+     thread changed (so the caller can re-render). */
+  function chatIngestLiveComms(items) {
+    if (!Array.isArray(items) || !items.length) return false;
+    if (!CHAT_PRESET_TEXT_IDX) CHAT_PRESET_TEXT_IDX = chatBuildPresetTextIdx();
+    CHAT_PHONE_IDX = chatBuildPhoneIdx();   /* contacts may have been re-seeded */
+    let changed = false;
+
+    items.forEach(function (m) {
+      const mid = m.messageId || ('seq-' + m.seq);
+      if (!mid || CHAT_LIVE_SEEN[mid]) return;
+
+      /* delivery status callback → mark the originating message read */
+      if (m.direction === 'status') {
+        if (m.status === 'read' || m.status === 'delivered') {
+          const tgt = m.messageId;
+          Object.keys(CHAT_THREADS).some(function (wid) {
+            const hit = (CHAT_THREADS[wid].msgs || []).find(function (x) { return x.msgId === tgt; });
+            if (hit && hit.dir === 'in') { hit.read = true; changed = true; return true; }
+            return false;
+          });
+        }
+        CHAT_LIVE_SEEN[mid] = true;
+        return;
+      }
+
+      const phone = m.to || m.from || m.intendedFor;
+      const cid = CHAT_PHONE_IDX[chatLast4(phone)];
+      if (!cid) { CHAT_LIVE_SEEN[mid] = true; return; }   /* unknown recipient */
+      const th = CHAT_THREADS[cid] || (CHAT_THREADS[cid] = { lastSeen: 'now', msgs: [] });
+      const stamp = m.at ? ('Live · ' + String(m.at).replace('T', ' ').slice(0, 16)) : 'Live';
+
+      if (m.direction === 'out') {
+        /* broadcast leaving the gateway = the worker received it */
+        const preset = CHAT_PRESET_TEXT_IDX[chatNormTxt(m.text)] || 'holiday';
+        th.msgs.push({
+          id: cid + '-live-' + mid, msgId: mid, dir: 'in', preset: preset,
+          time: stamp, at: m.at || '', live: true,
+          read: (m.status === 'read' || m.status === 'delivered'), acked: false
+        });
+        changed = true;
+      } else if (m.direction === 'in') {
+        /* worker reply = acknowledge the most recent open inbound delivery */
+        for (let i = th.msgs.length - 1; i >= 0; i--) {
+          if (th.msgs[i].dir === 'in' && !th.msgs[i].acked) {
+            th.msgs[i].acked = true; th.msgs[i].read = true; th.msgs[i].ackedAt = m.at || '';
+            break;
+          }
+        }
+        th.msgs.push({ id: cid + '-live-' + mid, msgId: mid, dir: 'out', text: m.text || '', time: stamp, at: m.at || '', live: true });
+        changed = true;
+      }
+      CHAT_LIVE_SEEN[mid] = true;
+    });
+    return changed;
+  }
+
+  /* poll the gateway log once and re-render the surfaces that depend on it */
+  function chatRefreshLiveComms() {
+    if (!window.KVWhatsApp || typeof window.KVWhatsApp.messages !== 'function') {
+      return Promise.resolve(false);
+    }
+    return window.KVWhatsApp.messages({ limit: 200 })
+      .then(function (res) {
+        const items = (res && (res.items || res.messages)) || [];
+        const changed = chatIngestLiveComms(items);
+        if (changed) {
+          chatEnsureIds();
+          if (document.getElementById('cv-an-grid-body')) chatRenderAnalytics();
+          if (document.getElementById('chat-list')) { try { chatRenderList(); chatRenderConv(); } catch (e) { /* ignore */ } }
+        }
+        return changed;
+      })
+      .catch(function () { return false; });
+  }
+
+  /* one-time: track UI-originated sends so the poll never re-ingests them,
+     then begin polling the live log */
+  function chatLiveStart() {
+    if (CHAT_LIVE_STARTED) return;
+    CHAT_LIVE_STARTED = true;
+    if (window.KVWhatsApp && typeof window.KVWhatsApp.send === 'function' && !window.KVWhatsApp.__kvLiveTracked) {
+      const _send = window.KVWhatsApp.send.bind(window.KVWhatsApp);
+      window.KVWhatsApp.send = function (to, msg) {
+        return _send(to, msg).then(function (r) {
+          try { ((r && r.results) || []).forEach(function (x) { if (x && x.id) CHAT_LIVE_SEEN[x.id] = true; }); } catch (e) { /* ignore */ }
+          return r;
+        });
+      };
+      window.KVWhatsApp.__kvLiveTracked = true;
+    }
+    chatRefreshLiveComms();
+    if (!CHAT_LIVE_POLL) CHAT_LIVE_POLL = setInterval(chatRefreshLiveComms, 15000);
+  }
+  __kvOnReady(chatLiveStart);
 
   function chatRenderAnalytics() {
     chatRenderHero();
@@ -8659,8 +8954,11 @@ function __kvOnReady(fn) {
 
   /* refresh-all hook for the "↻ Refresh" button */
   function cvaRefreshAll() {
-    chatRenderAnalytics();
-    if (typeof toast === 'function') toast('Analytics refreshed', 'green');
+    /* pull the live gateway log first, then re-render off the merged data */
+    chatRefreshLiveComms().then(function () {
+      chatRenderAnalytics();
+      if (typeof toast === 'function') toast('Analytics refreshed from live comms log', 'green');
+    });
   }
 
   /* smart-insight callout — surfaces the most pressing pending item, or
