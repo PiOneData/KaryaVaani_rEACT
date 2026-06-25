@@ -5662,18 +5662,19 @@ function __kvOnReady(fn) {
      Goes through the backend proxy (/api/translate) so the service address
      stays server-side and we avoid mixed-content / CORS issues. */
   async function vbTranslateOne(text, code) {
-    const target = VB_NLLB[code];
-    if (!target) throw new Error('unsupported language ' + code);
+    // Call backend proxy with frontend language code(s) in `targets` as the
+    // VAANI engine expects. The engine maps frontend codes (TE/HI/...) to the
+    // internal model identifiers.
     const resp = await fetch('/api/translate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ text: text, source: 'eng_Latn', target: target })
+      body:    JSON.stringify({ text: text, targets: [code] })
     });
     const json = await resp.json().catch(function () { return {}; });
-    if (!resp.ok || json.success === false || !json.translation) {
+    if (!resp.ok || !json.translations || !json.translations[code]) {
       throw new Error(json.error || ('HTTP ' + resp.status));
     }
-    return json.translation;
+    return json.translations[code];
   }
 
   /* curated / simulated rendering used as a graceful fallback when the live
