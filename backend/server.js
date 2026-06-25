@@ -83,6 +83,39 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
+/* ── VAANI translation proxy ──────────────────────────────────────────────
+   POST /api/translate
+   Body: { text, source, target }  — NLLB-style codes, e.g. eng_Latn → tam_Taml
+   Forwards to the VAANI translation service (FastAPI). Proxying server-side
+   keeps the service address off the client and avoids browser mixed-content /
+   CORS issues, mirroring the WhatsApp gateway and mailer endpoints.
+
+   Configure via env:
+     TRANSLATE_API_URL   default http://4.247.160.91:64573
+   ──────────────────────────────────────────────────────────────────────── */
+const TRANSLATE_API_URL = (process.env.TRANSLATE_API_URL || 'http://4.247.160.91:64573').replace(/\/$/, '');
+
+app.post('/api/translate', async (req, res) => {
+  const { text, source, target } = req.body || {};
+  if (!text || !source || !target) {
+    return res.status(400).json({ success: false, error: 'text, source and target are required' });
+  }
+  try {
+    const resp = await fetch(TRANSLATE_API_URL + '/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, source, target })
+    });
+    const body = await resp.text();
+    let json;
+    try { json = body ? JSON.parse(body) : {}; } catch { json = { raw: body }; }
+    res.status(resp.status).json(json);
+  } catch (err) {
+    console.error('translate error:', err.message);
+    res.status(502).json({ success: false, error: 'translation service unreachable: ' + err.message });
+  }
+});
+
 /* --- WhatsApp gateway proxy -----------------------------------------------
    The browser never talks to the comms server directly -- it calls these
    endpoints, which forward to the standalone communication server using the
