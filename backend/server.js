@@ -96,15 +96,18 @@ app.post('/api/send-email', async (req, res) => {
 const TRANSLATE_API_URL = (process.env.TRANSLATE_API_URL || 'http://4.247.160.91:64573').replace(/\/$/, '');
 
 app.post('/api/translate', async (req, res) => {
-  const { text, source, target } = req.body || {};
-  if (!text || !source || !target) {
-    return res.status(400).json({ success: false, error: 'text, source and target are required' });
+  const { text, source, target, targets } = req.body || {};
+  // Accept either frontend-style { text, targets: ["TE","HI"] }
+  // or legacy { text, source, target } for single-target callers.
+  const toTargets = Array.isArray(targets) && targets.length ? targets : (target ? [target] : null);
+  if (!text || !toTargets) {
+    return res.status(400).json({ success: false, error: 'text and targets (or target) are required' });
   }
   try {
     const resp = await fetch(TRANSLATE_API_URL + '/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, source, target })
+      body: JSON.stringify({ text, targets: toTargets })
     });
     const body = await resp.text();
     let json;
