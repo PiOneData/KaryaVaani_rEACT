@@ -120,7 +120,7 @@ app.post('/api/translate', async (req, res) => {
       toTargets.map(async (tgt) => {
         const nllbTgt = toNllb(tgt);
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 240_000); // 4 min hard cap
+        const timer = setTimeout(() => controller.abort(), 600_000); // 10 min hard cap
         let resp;
         try {
           resp = await fetch(TRANSLATE_API_URL + '/translate', {
