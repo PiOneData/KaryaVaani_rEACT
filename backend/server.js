@@ -95,6 +95,15 @@ app.post('/api/send-email', async (req, res) => {
    ──────────────────────────────────────────────────────────────────────── */
 const TRANSLATE_API_URL = (process.env.TRANSLATE_API_URL || 'http://4.247.160.91:64573').replace(/\/$/, '');
 
+/* ISO-639-1 / short code → NLLB tag used by the FastAPI translation service */
+const NLLB_MAP = {
+  EN: 'eng_Latn', TA: 'tam_Taml', HI: 'hin_Deva', TE: 'tel_Telu',
+  KN: 'kan_Knda', ML: 'mal_Mlym', BN: 'ben_Beng', GU: 'guj_Gujr',
+  MR: 'mar_Deva', PA: 'pan_Guru', UR: 'urd_Arab', OR: 'ory_Orya',
+  AS: 'asm_Beng', NE: 'npi_Deva', SA: 'san_Deva',
+};
+const toNllb = (code) => NLLB_MAP[String(code).toUpperCase()] || code;
+
 app.post('/api/translate', async (req, res) => {
   const { text, source, target, targets } = req.body || {};
   // Accept either frontend-style { text, targets: ["TE","HI"] }
@@ -106,13 +115,14 @@ app.post('/api/translate', async (req, res) => {
   try {
     // The upstream FastAPI requires { text, source, target } — all required, target is a single
     // string (not an array). Fan out one request per target language and aggregate.
-    const src = source || 'eng_Latn';
+    const src = toNllb(source || 'eng_Latn');
     const results = await Promise.all(
       toTargets.map(async (tgt) => {
+        const nllbTgt = toNllb(tgt);
         const resp = await fetch(TRANSLATE_API_URL + '/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, source: src, target: tgt })
+          body: JSON.stringify({ text, source: src, target: nllbTgt })
         });
         const body = await resp.text();
         let json;
