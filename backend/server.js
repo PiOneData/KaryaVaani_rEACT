@@ -104,15 +104,28 @@ app.post('/api/translate', async (req, res) => {
     return res.status(400).json({ success: false, error: 'text and targets (or target) are required' });
   }
   try {
-    const resp = await fetch(TRANSLATE_API_URL + '/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, targets: toTargets })
-    });
-    const body = await resp.text();
-    let json;
-    try { json = body ? JSON.parse(body) : {}; } catch { json = { raw: body }; }
-    res.status(resp.status).json(json);
+    // The upstream FastAPI requires { text, source, target } — all required, target is a single
+    // string (not an array). Fan out one request per target language and aggregate.
+    const src = source || 'eng_Latn';
+    const results = await Promise.all(
+      toTargets.map(async (tgt) => {
+        const resp = await fetch(TRANSLATE_API_URL + '/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, source: src, target: tgt })
+        });
+        const body = await resp.text();
+        let json;
+        try { json = body ? JSON.parse(body) : {}; } catch { json = { raw: body }; }
+        return { target: tgt, httpStatus: resp.status, ...json };
+      })
+    );
+    // Single-target callers get the original flat response shape for backward compat.
+    if (toTargets.length === 1) {
+      const { httpStatus, ...data } = results[0];
+      return res.status(httpStatus).json(data);
+    }
+    res.json({ results });
   } catch (err) {
     console.error('translate error:', err.message);
     res.status(502).json({ success: false, error: 'translation service unreachable: ' + err.message });
