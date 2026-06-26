@@ -5700,14 +5700,18 @@ function __kvOnReady(fn) {
 
     const out = {};
     let failed = 0;
-    await Promise.all(VB_STATE.langs.map(async function (code) {
+    // Translate sequentially — the Python service runs a single GPU worker so
+    // parallel requests simply queue behind each other, and the second one hits
+    // Nginx's proxy_read_timeout before the GPU finishes.  Sequential calls
+    // keep each round-trip within the timeout window.
+    for (const code of VB_STATE.langs) {
       try {
         out[code] = await vbTranslateOne(VB_STATE.source, code);
       } catch (err) {
         failed++;
         out[code] = vbSimTranslate(code);
       }
-    }));
+    }
 
     VB_STATE.translations = out;
     btn.disabled = false;

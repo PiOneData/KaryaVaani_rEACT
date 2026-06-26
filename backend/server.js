@@ -119,11 +119,19 @@ app.post('/api/translate', async (req, res) => {
     const results = await Promise.all(
       toTargets.map(async (tgt) => {
         const nllbTgt = toNllb(tgt);
-        const resp = await fetch(TRANSLATE_API_URL + '/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, source: src, target: nllbTgt })
-        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 240_000); // 4 min hard cap
+        let resp;
+        try {
+          resp = await fetch(TRANSLATE_API_URL + '/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, source: src, target: nllbTgt }),
+            signal: controller.signal
+          });
+        } finally {
+          clearTimeout(timer);
+        }
         const body = await resp.text();
         let json;
         try { json = body ? JSON.parse(body) : {}; } catch { json = { raw: body }; }
