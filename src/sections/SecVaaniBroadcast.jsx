@@ -158,7 +158,7 @@ export default function SecVaaniBroadcast() {
                   <option value="custom">Custom message…</option>
                 </select>
                 {' '}
-                <select className="sel" id="vb-tone" style={{ width: "auto" }}>
+                <select className="sel" id="vb-tone" style={{ width: "auto" }} disabled title="Tone selection coming soon">
                   <option>Tone · Safety-critical</option>
                   <option>Tone · Formal</option>
                   {' '}
