@@ -32,7 +32,10 @@ function runLegacyInits() {
 
 function injectLegacy() {
   const s = document.createElement('script');
-  s.src = `${import.meta.env.BASE_URL}legacy/app.js`;
+  // Cache-bust per build: /legacy/app.js is an unversioned URL, so without a
+  // changing query string browsers can serve a stale copy after a deploy.
+  const v = (typeof __KV_BUILD_ID__ !== 'undefined') ? __KV_BUILD_ID__ : 'dev';
+  s.src = `${import.meta.env.BASE_URL}legacy/app.js?v=${v}`;
   s.onload = () => { window.__kvLegacyReady = true; };
   document.body.appendChild(s);
 }
