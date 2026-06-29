@@ -96,7 +96,13 @@ jobs:
 
             cd /home/${{ secrets.SERVER_USER }}/KaryaVaani_rEACT
 
-            git pull origin main
+            # Force the server checkout to exactly match the pushed commit.
+            # A deploy box should mirror the repo, not accumulate hand-edits;
+            # `git pull` aborts when tracked files have drifted locally, which
+            # silently breaks deploys. reset --hard is idempotent and leaves
+            # untracked/ignored runtime files (.env, backend/data/*) intact.
+            git fetch origin main
+            git reset --hard origin/main
 
             # Write the runtime .env that docker compose reads for variable
             # substitution. Values come from GitHub repository secrets.
