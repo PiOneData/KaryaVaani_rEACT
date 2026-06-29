@@ -41,6 +41,10 @@ export default function SecAnalytics() {
           Exposure analytics
         </div>
         {' '}
+        <div className="tab" id="an-tab-readiness" onClick={(event) => { window.anTab('readiness', event.currentTarget) }} data-onclick="anTab('readiness', this)">
+          Readiness trend
+        </div>
+        {' '}
         <div className="tab" id="an-tab-chat" onClick={(event) => { window.anTab('chat', event.currentTarget) }} data-onclick="anTab('chat', this)">
           Chat engagement analytics
         </div>
@@ -116,6 +120,54 @@ export default function SecAnalytics() {
             </thead>
             <tbody id="exp-table-body" />
           </table>
+        </div>
+      </div>
+      {' '}
+      {/* ── READINESS TREND PANE (Labour Code Readiness Survey history) ── */}
+      <div id="an-pane-readiness" className="an-pane" style={{ display: "none" }}>
+        <div id="rdz-kpis" className="g4" style={{ margin: "4px 0 16px" }} />
+        {' '}
+        <div className="card" style={{ marginBottom: "16px" }}>
+          <div className="card-h">
+            <div>
+              <div className="card-h-title">Readiness score over time</div>
+              <div className="card-h-sub">Every completed Labour Code Readiness Survey, by the date it was taken — watch the trajectory move</div>
+            </div>
+            <span className="pill outline" id="rdz-trend-count">—</span>
+          </div>
+          <div id="rdz-trend" />
+        </div>
+        {' '}
+        <div className="g2" style={{ marginBottom: "16px" }}>
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Month-by-month</div>
+                <div className="card-h-sub">Average and latest score per month</div>
+              </div>
+            </div>
+            <table className="t" id="rdz-month">
+              <thead>
+                <tr><th>Month</th><th>Checks</th><th>Avg score</th><th>Latest</th><th>Trend</th></tr>
+              </thead>
+              <tbody id="rdz-month-body" />
+            </table>
+          </div>
+          {' '}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Day-by-day history</div>
+                <div className="card-h-sub">Each check with its date and score on that day</div>
+              </div>
+            </div>
+            <table className="t" id="rdz-history">
+              <thead>
+                <tr><th>Date</th><th>Score</th><th>Band</th><th>Sector</th><th>Gaps</th></tr>
+              </thead>
+              <tbody id="rdz-history-body" />
+            </table>
+          </div>
         </div>
       </div>
       {' '}

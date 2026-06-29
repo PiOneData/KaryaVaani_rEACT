@@ -178,6 +178,50 @@ app.delete('/api/appointment-orders/:id', (req, res) => {
   }
 });
 
+/* ── Labour Code readiness surveys ─────────────────────────────────────────
+   Each completed survey is appended to data.readinessSurveys with the date it
+   was taken and the score on that day, so readiness can be tracked day-by-day /
+   month-by-month in the Analytics hub.
+   POST /api/readiness-surveys   save a result → { ok, survey }
+   GET  /api/readiness-surveys   list (oldest→newest) → { ok, surveys }
+   ──────────────────────────────────────────────────────────────────────── */
+app.post('/api/readiness-surveys', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+
+  const p = req.body || {};
+  const score = Number(p.score);
+  if (!Number.isFinite(score)) {
+    return res.status(400).json({ ok: false, error: 'score is required' });
+  }
+  store.data.readinessSurveys = store.data.readinessSurveys || [];
+  const survey = {
+    id: 'rs_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    score: Math.round(score),
+    sector: p.sector || null,
+    headcount: p.headcount || null,
+    contractorRatio: p.contractorRatio || null,
+    gaps: Number.isFinite(Number(p.gaps)) ? Number(p.gaps) : null,
+    benchmarkAvg: Number.isFinite(Number(p.benchmarkAvg)) ? Number(p.benchmarkAvg) : null,
+    benchmarkTop: Number.isFinite(Number(p.benchmarkTop)) ? Number(p.benchmarkTop) : null,
+    takenAt: new Date().toISOString()
+  };
+  store.data.readinessSurveys.push(survey);
+  try {
+    writeStore(store);
+    res.json({ ok: true, survey });
+  } catch (err) {
+    console.error('readiness-survey save error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/readiness-surveys', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  res.json({ ok: true, surveys: store.data.readinessSurveys || [] });
+});
+
 /* ── VAANI translation proxy ──────────────────────────────────────────────
    POST /api/translate
    Body: { text, source, target }  — NLLB-style codes, e.g. eng_Latn → tam_Taml

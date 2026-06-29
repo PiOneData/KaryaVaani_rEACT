@@ -7363,8 +7363,9 @@ function __kvOnReady(fn) {
     window.nav = function (id, el) {
       origNav(id, el);
       if (id === 'analytics') {
-        // Re-render both panes whenever the hub is shown.
+        // Re-render every pane whenever the hub is shown.
         if (typeof initExposureAnalytics === 'function') initExposureAnalytics();
+        if (typeof initReadinessAnalytics === 'function') initReadinessAnalytics();
         initChatAnalytics();
       }
       if (id === 'chat') {
@@ -12152,6 +12153,34 @@ function __kvOnReady(fn) {
     document.getElementById('cs-result').style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'instant' });
     toast('Benchmark ready · readiness score ' + score + '/100', 'green');
+
+    /* persist this result (date + score on that day) so readiness can be
+       tracked day-by-day / month-by-month under Analytics → Readiness trend */
+    csSaveSurvey(score, sector, bench, gaps.length);
+  }
+
+  /* fire-and-forget save of a completed survey to the backend history */
+  function csSaveSurvey(score, sector, bench, gapCount) {
+    const s = CS_STATE.answers;
+    fetch((window.__KV_API_BASE || '') + '/api/readiness-surveys', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        score: score,
+        sector: sector,
+        headcount: s.q2 || null,
+        contractorRatio: s.q3 || null,
+        gaps: gapCount,
+        benchmarkAvg: bench.avg,
+        benchmarkTop: bench.top
+      })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          toast('Readiness check recorded · trend updated', 'green');
+          if (typeof initReadinessAnalytics === 'function') initReadinessAnalytics();
+        }
+      })
+      .catch(function () { /* offline / not seeded — history simply not recorded */ });
   }
 
   /* ── reset / retake ── */
@@ -13327,6 +13356,8 @@ function __kvOnReady(fn) {
     }
     if (name === 'exposure') {
       initExposureAnalytics();
+    } else if (name === 'readiness') {
+      initReadinessAnalytics();
     } else if (name === 'chat') {
       // Render now that the pane is visible (width-dependent charts need layout).
       try { initChatAnalytics(); } catch (e) {}
@@ -13506,4 +13537,130 @@ function __kvOnReady(fn) {
     if (cnt) cnt.textContent = cs.length + ' contractors';
   }
   __kvOnReady(initExposureAnalytics);
+
+  /* ════════════════════════════════════════════════════════════════════════
+     READINESS TREND · history of completed Labour Code Readiness Surveys
+     Each survey is stored with the date it was taken and the score on that day
+     (POST /api/readiness-surveys from csSubmit). This renders the trajectory so
+     readiness can be verified day-by-day and month-by-month.
+     ════════════════════════════════════════════════════════════════════════ */
+  function rdzBand(s) { return s >= 65 ? 'green' : s >= 45 ? 'amber' : 'red'; }
+  function rdzColor(s) { return s >= 65 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)'; }
+  function rdzFmtDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso || '—';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return String(d.getDate()).padStart(2, '0') + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function rdzMonthKey(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '—';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function initReadinessAnalytics() {
+    const host = document.getElementById('rdz-kpis');
+    if (!host) return;                       // pane not mounted
+    fetch((window.__KV_API_BASE || '') + '/api/readiness-surveys')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { rdzRender((j && j.surveys) || []); })
+      .catch(function () { rdzRender([]); });
+  }
+
+  function rdzRender(surveys) {
+    const host = document.getElementById('rdz-kpis');
+    if (!host) return;
+    const empty = function (msg) {
+      host.innerHTML = '<div class="tiny muted" style="grid-column:span 4">' + msg + '</div>';
+      ['rdz-trend', 'rdz-month-body', 'rdz-history-body'].forEach(function (id) { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+      const tc = document.getElementById('rdz-trend-count'); if (tc) tc.textContent = '0 checks';
+    };
+    if (!surveys.length) {
+      empty('No readiness checks recorded yet. Complete the <strong>Labour Code Readiness Survey</strong> (Overview) and the dated score will appear here to track over time.');
+      return;
+    }
+    // chronological (oldest → newest)
+    const list = surveys.slice().sort(function (a, b) { return new Date(a.takenAt) - new Date(b.takenAt); });
+    const latest = list[list.length - 1];
+    const prev = list.length > 1 ? list[list.length - 2] : null;
+    const delta = prev ? (latest.score - prev.score) : 0;
+    const avg = Math.round(list.reduce(function (s, x) { return s + x.score; }, 0) / list.length);
+    const best = list.reduce(function (a, b) { return b.score > a.score ? b : a; }, list[0]);
+
+    /* KPI strip */
+    host.innerHTML =
+      '<div class="kpi"><div class="kpi-eye">Latest readiness</div>' +
+        '<div class="kpi-val" style="color:' + rdzColor(latest.score) + '">' + latest.score + '<small>/100</small></div>' +
+        '<div class="kpi-sub">on ' + rdzFmtDate(latest.takenAt) + '</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Change vs previous</div>' +
+        '<div class="kpi-val" style="color:' + (delta >= 0 ? 'var(--green-dk)' : 'var(--red-dk)') + '">' +
+          (prev ? (delta >= 0 ? '▲ +' + delta : '▼ ' + delta) : '—') + '</div>' +
+        '<div class="kpi-sub">' + (prev ? 'since ' + rdzFmtDate(prev.takenAt) : 'first recorded check') + '</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Checks recorded</div>' +
+        '<div class="kpi-val">' + list.length + '</div>' +
+        '<div class="kpi-sub">' + rdzFmtDate(list[0].takenAt) + ' → ' + rdzFmtDate(latest.takenAt) + '</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Average / best</div>' +
+        '<div class="kpi-val">' + avg + '<small>/' + best.score + '</small></div>' +
+        '<div class="kpi-sub">mean across all · best on ' + rdzFmtDate(best.takenAt) + '</div></div>';
+
+    /* trend — vertical bars, one per check, height = score, coloured by band */
+    const trend = document.getElementById('rdz-trend');
+    if (trend) {
+      const recent = list.slice(-24);
+      const bars = recent.map(function (x) {
+        const h = Math.max(4, Math.round(x.score * 1.6));   // px height, score 0–100 → 0–160
+        return '<div style="flex:1;min-width:24px;display:flex;flex-direction:column;align-items:center;gap:4px">' +
+          '<div class="mono" style="font-size:0.7rem;color:' + rdzColor(x.score) + '">' + x.score + '</div>' +
+          '<div title="' + rdzFmtDate(x.takenAt) + ' · ' + x.score + '/100" style="width:60%;height:' + h + 'px;background:' + rdzColor(x.score) + ';border-radius:3px 3px 0 0"></div>' +
+          '<div class="tiny muted" style="font-size:0.62rem;writing-mode:vertical-rl;transform:rotate(180deg);max-height:64px;overflow:hidden">' + rdzFmtDate(x.takenAt) + '</div>' +
+        '</div>';
+      }).join('');
+      trend.innerHTML =
+        '<div style="display:flex;align-items:flex-end;gap:6px;height:230px;border-bottom:1px solid var(--line);padding:8px 4px 0">' + bars + '</div>' +
+        '<div class="tiny muted" style="margin-top:8px">Bands: <span style="color:var(--green)">●</span> ready ≥65 · <span style="color:var(--amber)">●</span> moderate 45–64 · <span style="color:var(--red)">●</span> below 45' +
+        (list.length > 24 ? ' · showing last 24 of ' + list.length : '') + '</div>';
+      const tc = document.getElementById('rdz-trend-count'); if (tc) tc.textContent = list.length + ' check' + (list.length === 1 ? '' : 's');
+    }
+
+    /* month-by-month rollup */
+    const months = {};
+    list.forEach(function (x) {
+      const k = rdzMonthKey(x.takenAt);
+      (months[k] || (months[k] = [])).push(x);
+    });
+    const mbody = document.getElementById('rdz-month-body');
+    if (mbody) {
+      const keys = Object.keys(months);   // already chronological (list was sorted)
+      const seen = [];
+      keys.forEach(function (k) { if (seen.indexOf(k) === -1) seen.push(k); });
+      mbody.innerHTML = seen.map(function (k, i) {
+        const arr = months[k];
+        const mavg = Math.round(arr.reduce(function (s, x) { return s + x.score; }, 0) / arr.length);
+        const mlatest = arr[arr.length - 1].score;
+        const prevKey = i > 0 ? seen[i - 1] : null;
+        const prevLatest = prevKey ? months[prevKey][months[prevKey].length - 1].score : null;
+        const d = prevLatest != null ? mlatest - prevLatest : null;
+        const trendTxt = d == null ? '—' : (d >= 0 ? '<span style="color:var(--green-dk)">▲ +' + d + '</span>' : '<span style="color:var(--red-dk)">▼ ' + d + '</span>');
+        return '<tr><td class="t-strong">' + k + '</td><td>' + arr.length + '</td>' +
+          '<td><span class="mono" style="color:' + rdzColor(mavg) + '">' + mavg + '</span></td>' +
+          '<td><span class="mono" style="color:' + rdzColor(mlatest) + '">' + mlatest + '</span></td>' +
+          '<td>' + trendTxt + '</td></tr>';
+      }).join('');
+    }
+
+    /* day-by-day history (newest first) */
+    const hbody = document.getElementById('rdz-history-body');
+    if (hbody) {
+      const sectorNames = { manufacturing: 'Manufacturing', construction: 'Construction', logistics: 'Logistics', mining: 'Mining', engineering: 'Engineering', other: 'Other' };
+      hbody.innerHTML = list.slice().reverse().map(function (x) {
+        return '<tr><td>' + rdzFmtDate(x.takenAt) + '</td>' +
+          '<td><span class="mono" style="color:' + rdzColor(x.score) + '">' + x.score + '</span>/100</td>' +
+          '<td><span class="pill ' + rdzBand(x.score) + ' tiny">' + (x.score >= 65 ? 'Ready' : x.score >= 45 ? 'Moderate' : 'Below') + '</span></td>' +
+          '<td>' + (sectorNames[x.sector] || x.sector || '—') + '</td>' +
+          '<td>' + (x.gaps != null ? x.gaps : '—') + '</td></tr>';
+      }).join('');
+    }
+  }
+  __kvOnReady(initReadinessAnalytics);
 
