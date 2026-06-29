@@ -5672,10 +5672,13 @@ function __kvOnReady(fn) {
       body:    JSON.stringify({ text: text, targets: [code] })
     });
     const json = await resp.json().catch(function () { return {}; });
-    if (!resp.ok || !json.translations || !json.translations[code]) {
+    // The proxy returns the flat single-target shape { success, translation }
+    // for one target; tolerate the multi shape { translations: { code } } too.
+    const translated = json.translation || (json.translations && json.translations[code]);
+    if (!resp.ok || json.success === false || !translated) {
       throw new Error(json.error || ('HTTP ' + resp.status));
     }
-    return json.translations[code];
+    return translated;
   }
 
   /* curated / simulated rendering used as a graceful fallback when the live
