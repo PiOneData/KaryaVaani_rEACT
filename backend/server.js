@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const { readStore } = require('./db');
+const { readStore, writeStore } = require('./db');
 
 const app = express();
 app.use(cors());
@@ -62,10 +62,12 @@ app.post('/api/send-email', async (req, res) => {
     tls: { ciphers: 'SSLv3' }
   });
 
+  // contentType is per-attachment so non-audio payloads (e.g. appointment-order
+  // PDFs) attach correctly; older callers that omit it keep the WAV default.
   const mailAttachments = attachments.map(a => ({
     filename: a.filename,
     content:  Buffer.from(a.data, 'base64'),
-    contentType: 'audio/wav'
+    contentType: a.contentType || 'audio/wav'
   }));
 
   try {
@@ -79,6 +81,99 @@ app.post('/api/send-email', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('send-email error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ── Appointment orders ────────────────────────────────────────────────────
+   Persisted in the same file-backed store under data.appointmentOrders, so
+   saved drafts and generated orders survive reloads and ship via /api/bootstrap.
+   POST   /api/appointment-orders        save (draft|final) → { ok, order }
+   GET    /api/appointment-orders        list all → { ok, orders }
+   GET    /api/appointment-orders/:id    fetch one → { ok, order }
+   DELETE /api/appointment-orders/:id    remove one → { ok }
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Generate a human-friendly reference number: AO/<FY>/<zero-padded seq>. */
+function nextOrderRef(existing) {
+  const now = new Date();
+  // Indian financial year (Apr–Mar), e.g. 2026-27.
+  const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const fy = `${y}-${String((y + 1) % 100).padStart(2, '0')}`;
+  const seq = String((existing ? existing.length : 0) + 1).padStart(4, '0');
+  return `AO/${fy}/${seq}`;
+}
+
+app.post('/api/appointment-orders', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+
+  const payload = req.body || {};
+  if (!payload.name) {
+    return res.status(400).json({ ok: false, error: 'employee name is required' });
+  }
+  // Privacy gate: never persist an Aadhaar number without explicit consent.
+  if (!payload.aadhaarConsent) payload.aadhaar = '';
+
+  store.data.appointmentOrders = store.data.appointmentOrders || [];
+  const orders = store.data.appointmentOrders;
+  const nowIso = new Date().toISOString();
+
+  let order;
+  if (payload.id) {
+    // Update an existing draft/order in place.
+    const idx = orders.findIndex(o => o.id === payload.id);
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'order not found' });
+    order = { ...orders[idx], ...payload, updatedAt: nowIso };
+    orders[idx] = order;
+  } else {
+    order = {
+      ...payload,
+      id: 'ao_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      refNo: payload.refNo || nextOrderRef(orders),
+      status: payload.status || 'draft',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    orders.push(order);
+  }
+
+  try {
+    writeStore(store);
+    res.json({ ok: true, order });
+  } catch (err) {
+    console.error('appointment-order save error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/appointment-orders', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  res.json({ ok: true, orders: store.data.appointmentOrders || [] });
+});
+
+app.get('/api/appointment-orders/:id', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const order = (store.data.appointmentOrders || []).find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: 'order not found' });
+  res.json({ ok: true, order });
+});
+
+app.delete('/api/appointment-orders/:id', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const orders = store.data.appointmentOrders || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'order not found' });
+  orders.splice(idx, 1);
+  store.data.appointmentOrders = orders;
+  try {
+    writeStore(store);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('appointment-order delete error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

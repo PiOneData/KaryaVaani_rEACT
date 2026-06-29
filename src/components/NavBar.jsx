@@ -100,6 +100,26 @@ export default function NavBar() {
         </div>
       </div>
       {' '}
+      {/*  ─── group: HR Documents ───  */}
+      {' '}
+      <div className="nb-group" id="grp-hrdocs">
+        <span className="nb-group-label">
+          {"HR Documents "}
+          <span className="nb-caret">▾</span>
+        </span>
+        {' '}
+        <div className="nb-panel">
+          <div className="nb-panel-title">HR Documents · generated letters & orders</div>
+          {' '}
+          <div className="sb-item" onClick={(event) => { window.nav('appointment', event.currentTarget) }} data-onclick="nav('appointment', this)">
+            <span className="sb-icon">✒</span>
+            <span className="sb-label">Appointment Order</span>
+            {' '}
+            <span className="sb-badge amber">new</span>
+          </div>
+        </div>
+      </div>
+      {' '}
       {/*  ─── group: Localisation Engine ───  */}
       {' '}
       <div className="nb-group" id="grp-engines">

@@ -23,6 +23,7 @@ function __kvOnReady(fn) {
     recruitment:         'grp-verticals',
     onboarding:          'grp-verticals',
     induction:           'grp-verticals',
+    appointment:         'grp-hrdocs',
     vendor:              'grp-verticals',
     ohs:                 'grp-verticals',
     compliance:          'grp-verticals',
@@ -12646,4 +12647,652 @@ function __kvOnReady(fn) {
     if (ent.kind === 'contractor' && ent.extra) msg += ' · compliance score ' + ent.extra.score + '/100';
     toast(msg, decision === 'approved' ? 'green' : 'red');
   }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     HR DOCUMENTS · APPOINTMENT ORDER GENERATOR
+     Form → professionally formatted appointment letter on company letterhead,
+     produced client-side as a print-ready A4 PDF via pdfmake (loaded from CDN
+     in index.html). Download / Print / Email (existing /api/send-email) / Save
+     draft (/api/appointment-orders). Branding lives in the editable
+     COMPANY_PROFILE config; standard legal clauses live in AO_CLAUSES — both are
+     the single place to customise output, and the structure leaves room for
+     future enhancements (multiple templates, per-company branding, bulk runs).
+     ════════════════════════════════════════════════════════════════════════ */
+
+  /* ── EDIT ME · company letterhead / branding ──────────────────────────────
+     Replace the placeholder values with the real establishment details. `logo`
+     may be set to a base64 data-URL (e.g. 'data:image/png;base64,iVBOR…') to
+     print a logo image in the header; leave '' for a text-only letterhead. */
+  const COMPANY_PROFILE = {
+    name:    'Daikin Air-conditioning India Pvt. Ltd.',   // « company legal name »
+    address: 'Sri City SEZ, Plot No. 00, Chittoor District, Andhra Pradesh 517646, India', // « registered address »
+    cin:     'U00000AP0000PTC000000',                     // « CIN »
+    gst:     '37AAAAA0000A1Z5',                            // « GSTIN »
+    phone:   '+91 00000 00000',                            // « contact number »
+    email:   'hr@example.com',                              // « HR email »
+    website: 'www.example.com',                             // « website »
+    logo:    '',                                            // « base64 data-URL or '' »
+    watermark: ''                                           // e.g. 'ORIGINAL' for a faint watermark, or '' for none
+  };
+
+  /* Standard clause text. Functions receive the collected form data so wording
+     can adapt; kept here so HR can tune language without touching logic. */
+  const AO_CLAUSES = {
+    confidentiality: 'You shall maintain strict confidentiality of all proprietary, technical, commercial and personnel information of the Company, both during and after your employment. You shall not disclose or use such information for any purpose other than the discharge of your duties. Any breach may result in disciplinary action and legal proceedings.',
+    conduct: 'You shall at all times conduct yourself with integrity and professionalism, comply with the Company’s policies, code of conduct, standing orders and all applicable laws, and devote your full time and attention to the Company’s business. You shall not engage in any other employment, trade or business without the prior written consent of the Company.',
+    terminationBody: function (d) {
+      const np = d.notice || 'the notice period stipulated in the Company policy';
+      return 'This appointment may be terminated by either party by giving ' + np + ' written notice or salary in lieu thereof. The Company reserves the right to terminate your services without notice in the event of misconduct, breach of terms, or unsatisfactory performance, in accordance with the applicable standing orders and law.';
+    }
+  };
+
+  /* field-id → storage-key map (text/select inputs). Checkboxes handled separately. */
+  const AO_FIELDS = [
+    ['ao-name','name'], ['ao-dob','dob'], ['ao-parent','parent'], ['ao-gender','gender'],
+    ['ao-email','email'], ['ao-mobile','mobile'], ['ao-aadhaar','aadhaar'], ['ao-address','address'],
+    ['ao-lin','lin'], ['ao-uan','uan'], ['ao-esic','esic'], ['ao-empid','empid'],
+    ['ao-designation','designation'], ['ao-department','department'], ['ao-manager','manager'],
+    ['ao-emptype','emptype'], ['ao-skill','skill'],
+    ['ao-doj','doj'], ['ao-probation','probation'], ['ao-confirmdate','confirmdate'],
+    ['ao-posting','posting'], ['ao-worklocation','worklocation'], ['ao-transferable','transferable'],
+    ['ao-basic','basic'], ['ao-da','da'], ['ao-hra','hra'], ['ao-medical','medical'],
+    ['ao-travel','travel'], ['ao-special','special'], ['ao-accom','accom'], ['ao-bonus','bonus'],
+    ['ao-net','net'], ['ao-freq','freq'],
+    ['ao-epfo','epfo'], ['ao-esicapp','esicapp'], ['ao-ptax','ptax'], ['ao-gratuity','gratuity'],
+    ['ao-duties','duties'], ['ao-responsibilities','responsibilities'], ['ao-hours','hours'],
+    ['ao-weeklyoff','weeklyoff'], ['ao-notice','notice'], ['ao-probationterms','probationterms'], ['ao-leave','leave'],
+    ['ao-maternity','maternity'],
+    ['ao-additional','additional'], ['ao-special2','special2'], ['ao-other','other'],
+    ['ao-signame','signame'], ['ao-sigdesignation','sigdesignation'], ['ao-digsig','digsig']
+  ];
+
+  /* required field-id → human label, for validation messaging. */
+  const AO_REQUIRED = [
+    ['ao-name','Name of Employee'], ['ao-dob','Date of Birth'], ['ao-parent','Father’s / Mother’s Name'],
+    ['ao-email','Employee Email'], ['ao-mobile','Mobile Number'], ['ao-lin','LIN of Establishment'],
+    ['ao-designation','Designation'], ['ao-department','Department'], ['ao-emptype','Employment Type'],
+    ['ao-doj','Date of Joining'], ['ao-basic','Basic Pay'], ['ao-da','Dearness Allowance'],
+    ['ao-duties','Broad Nature of Duties']
+  ];
+
+  const AO_SALARY_ROWS = [
+    ['basic','Basic Pay'], ['da','Dearness Allowance'], ['hra','House Rent Allowance'],
+    ['medical','Medical Allowance'], ['travel','Travel Allowance'], ['special','Special Allowance'],
+    ['accom','Accommodation'], ['bonus','Bonus']
+  ];
+
+  let AO_STATE = { currentId: null, refNo: null };
+
+  function aoEl(id) { return document.getElementById(id); }
+  function aoVal(id) { const e = aoEl(id); return e ? String(e.value || '').trim() : ''; }
+  function aoNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
+  function aoMoney(v) { return 'Rs. ' + Number(aoNum(v)).toLocaleString('en-IN'); }
+  function aoEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function aoApiBase() { return window.__KV_API_BASE || ''; }
+
+  /* YYYY-MM-DD → "01 Jan 2026"; passes through anything it can't parse. */
+  function aoFmtDate(s) {
+    if (!s) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) return s;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return m[3] + ' ' + months[parseInt(m[2], 10) - 1] + ' ' + m[1];
+  }
+
+  function aoYesNo(v) { return v === 'Yes' ? 'Applicable' : 'Not applicable'; }
+
+  /* ── form markup ──────────────────────────────────────────────────────── */
+  function aoFormHtml() {
+    return '' +
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">1</span> Personal details</div>' +
+      '<div class="g3" style="gap:10px 14px">' +
+        aoField('Name of Employee', 'ao-name', 'As per records', true) +
+        aoField('Date of Birth', 'ao-dob', '', true, 'date') +
+        aoField('Father’s / Mother’s Name', 'ao-parent', 'Parent name', true) +
+        aoSelect('Gender', 'ao-gender', ['Male','Female','Other','Prefer not to say'], false, 'window.aoToggleMaternity()') +
+        aoField('Employee Email', 'ao-email', 'name@example.com', true, 'email') +
+        aoField('Mobile Number', 'ao-mobile', '10-digit mobile', true) +
+      '</div>' +
+      '<div class="field"><label class="cap-check"><input type="checkbox" id="ao-aadhaar-consent" onchange="window.aoToggleAadhaar()"> Employee has provided consent for Aadhaar collection.</label></div>' +
+      '<div class="g3" style="gap:10px 14px">' +
+        aoField('Aadhaar Number (optional)', 'ao-aadhaar', 'Enabled after consent', false) +
+        aoTextarea('Residential Address', 'ao-address', 'House / street / city / state / PIN', 2, 'grid-column:span 2') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">2</span> Employment details</div>' +
+      '<div class="g3" style="gap:10px 14px">' +
+        aoField('LIN of Establishment', 'ao-lin', 'Labour Identification Number', true) +
+        aoField('UAN (optional)', 'ao-uan', 'Universal Account Number') +
+        aoField('ESIC Insurance Number (optional)', 'ao-esic', 'ESIC IP number') +
+        aoField('Employee ID', 'ao-empid', 'Auto-generated if blank') +
+        aoField('Designation', 'ao-designation', 'e.g. Quality Engineer', true) +
+        aoField('Department', 'ao-department', 'e.g. Production', true) +
+        aoField('Reporting Manager', 'ao-manager', 'Manager name') +
+        aoSelect('Employment Type', 'ao-emptype', ['Regular','Fixed-Term Employment','Contractual','Consultant'], true) +
+        aoSelect('Skill Category', 'ao-skill', ['Highly Skilled','Skilled','Semi-skilled','Unskilled']) +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">3</span> Joining details</div>' +
+      '<div class="g3" style="gap:10px 14px">' +
+        aoField('Date of Joining', 'ao-doj', '', true, 'date') +
+        aoField('Probation Period', 'ao-probation', 'e.g. 6 months') +
+        aoField('Confirmation Date', 'ao-confirmdate', '', false, 'date') +
+        aoField('Place of Posting', 'ao-posting', 'City / site') +
+        aoField('Work Location', 'ao-worklocation', 'Plant / office') +
+        aoSelect('Transferable', 'ao-transferable', ['No','Yes']) +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">4</span> Salary details</div>' +
+      '<div class="g4" style="gap:10px 14px">' +
+        aoField('Basic Pay', 'ao-basic', '0', true, 'number', 'window.aoRecalcSalary()') +
+        aoField('Dearness Allowance', 'ao-da', '0', true, 'number', 'window.aoRecalcSalary()') +
+        aoField('House Rent Allowance', 'ao-hra', '0', false, 'number', 'window.aoRecalcSalary()') +
+        aoField('Medical Allowance', 'ao-medical', '0', false, 'number', 'window.aoRecalcSalary()') +
+        aoField('Travel Allowance', 'ao-travel', '0', false, 'number', 'window.aoRecalcSalary()') +
+        aoField('Special Allowance', 'ao-special', '0', false, 'number', 'window.aoRecalcSalary()') +
+        aoField('Accommodation', 'ao-accom', '0', false, 'number', 'window.aoRecalcSalary()') +
+        aoField('Bonus', 'ao-bonus', '0', false, 'number', 'window.aoRecalcSalary()') +
+        aoField('Gross Salary (auto)', 'ao-gross', '0', false, 'text', null, true) +
+        aoField('Net Salary (optional)', 'ao-net', '0', false, 'number') +
+        aoSelect('Salary Payment Frequency', 'ao-freq', ['Monthly','Weekly','Daily']) +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">5</span> Social security</div>' +
+      '<div class="g4" style="gap:10px 14px">' +
+        aoSelect('EPFO Applicable', 'ao-epfo', ['Yes','No']) +
+        aoSelect('ESIC Applicable', 'ao-esicapp', ['Yes','No']) +
+        aoSelect('Professional Tax Applicable', 'ao-ptax', ['Yes','No']) +
+        aoSelect('Gratuity Applicable', 'ao-gratuity', ['Yes','No']) +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">6</span> Job information</div>' +
+      '<div class="g2" style="gap:10px 14px">' +
+        aoTextarea('Broad Nature of Duties', 'ao-duties', 'Summary of the role’s scope', 3, 'grid-column:span 2', true) +
+        aoTextarea('Job Responsibilities', 'ao-responsibilities', 'Key responsibilities', 3, 'grid-column:span 2') +
+        aoField('Working Hours', 'ao-hours', 'e.g. 9:00–17:30, Mon–Sat') +
+        aoField('Weekly Off', 'ao-weeklyoff', 'e.g. Sunday') +
+        aoField('Notice Period', 'ao-notice', 'e.g. 30 days') +
+        aoField('Probation Terms', 'ao-probationterms', 'e.g. confirmation on satisfactory review') +
+        aoTextarea('Leave Policy', 'ao-leave', 'Leave entitlement summary', 2, 'grid-column:span 2') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" id="ao-maternity-card" style="display:none">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">7</span> Maternity benefit</div>' +
+      '<div class="cap-hint" style="margin-bottom:10px">Visible for female employees. Benefits available under Chapter VI of the Code on Social Security, 2020.</div>' +
+      aoTextarea('Maternity benefit details', 'ao-maternity', 'Maternity benefit entitlement under Chapter VI, Social Security Code 2020', 3) +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">8</span> Other information</div>' +
+      '<div class="g2" style="gap:10px 14px">' +
+        aoTextarea('Additional Terms', 'ao-additional', 'Any additional terms', 2, 'grid-column:span 2') +
+        aoTextarea('Special Conditions', 'ao-special2', 'Any special conditions', 2, 'grid-column:span 2') +
+        aoTextarea('Other Information', 'ao-other', 'Anything else to include', 2, 'grid-column:span 2') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="cap-sec-h"><span class="cap-sec-n">9</span> Employer details</div>' +
+      '<div class="g3" style="gap:10px 14px">' +
+        aoField('Authorized Signatory Name', 'ao-signame', 'e.g. Head – Human Resources') +
+        aoField('Signatory Designation', 'ao-sigdesignation', 'e.g. HR Director') +
+        aoField('Digital Signature (typed)', 'ao-digsig', 'Typed name / initials') +
+      '</div>' +
+      '<div class="field"><label class="cap-check"><input type="checkbox" id="ao-seal"> Affix company seal on the document</label></div>' +
+    '</div>';
+  }
+
+  function aoField(label, id, ph, req, type, oninput, readonly) {
+    return '<div class="field"><label class="field-l">' + label + (req ? ' <span class="cap-req">*</span>' : '') + '</label>' +
+      '<input class="input" id="' + id + '" type="' + (type || 'text') + '" placeholder="' + (ph || '') + '"' +
+      (oninput ? ' oninput="' + oninput + '"' : '') + (readonly ? ' readonly' : '') + (id === 'ao-aadhaar' ? ' disabled' : '') + '></div>';
+  }
+  function aoSelect(label, id, opts, req, onchange) {
+    return '<div class="field"><label class="field-l">' + label + (req ? ' <span class="cap-req">*</span>' : '') + '</label>' +
+      '<select class="sel" id="' + id + '"' + (onchange ? ' onchange="' + onchange + '"' : '') + '>' +
+      opts.map(function (o) { return '<option>' + o + '</option>'; }).join('') + '</select></div>';
+  }
+  function aoTextarea(label, id, ph, rows, style, req) {
+    return '<div class="field"' + (style ? ' style="' + style + '"' : '') + '><label class="field-l">' + label + (req ? ' <span class="cap-req">*</span>' : '') + '</label>' +
+      '<textarea class="ta" id="' + id + '" rows="' + (rows || 2) + '" placeholder="' + (ph || '') + '"></textarea></div>';
+  }
+
+  function aoActionsHtml() {
+    return '<div class="card sunken" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">' +
+      '<div class="tiny" style="color:var(--ink-2)">Generate the letter, then download, print or email it. Email sends a PDF via the existing service.</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
+        '<button class="btn primary" onclick="window.aoGenerate()">Generate Appointment Order</button>' +
+        '<button class="btn" onclick="window.aoPreview()">Preview</button>' +
+        '<button class="btn" onclick="window.aoDownload()">Download PDF</button>' +
+        '<button class="btn" onclick="window.aoPrint()">Print</button>' +
+        '<button class="btn" onclick="window.aoSendEmail()">Send Email</button>' +
+        '<button class="btn" onclick="window.aoSaveDraft()">Save Draft</button>' +
+        '<button class="btn" onclick="window.aoEdit()">Edit</button>' +
+        '<button class="btn amber" onclick="window.aoRegenerate()">Regenerate</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function initAppointmentOrder() {
+    const form = aoEl('ao-form');
+    if (!form) return;                 // section not mounted
+    if (!form.dataset.built) {
+      form.innerHTML = aoFormHtml();
+      form.dataset.built = '1';
+      const actions = aoEl('ao-actions');
+      if (actions) actions.innerHTML = aoActionsHtml();
+      aoRecalcSalary();
+    }
+    aoPopulateRoster();
+    aoRenderSaved();
+  }
+
+  function aoPopulateRoster() {
+    const sel = aoEl('ao-roster');
+    if (!sel) return;
+    const roster = (window.__KVDATA && window.__KVDATA.omMapping) || [];
+    if (sel.dataset.filled || !roster.length) return;
+    roster.forEach(function (r) {
+      const o = document.createElement('option');
+      o.value = r.code || r.name;
+      o.textContent = (r.name || '—') + (r.code ? ' · ' + r.code : '');
+      sel.appendChild(o);
+    });
+    sel.dataset.filled = '1';
+  }
+
+  function aoLoadFromRoster(code) {
+    if (!code) return;
+    const roster = (window.__KVDATA && window.__KVDATA.omMapping) || [];
+    const r = roster.find(function (x) { return (x.code || x.name) === code; });
+    if (!r) return;
+    const set = function (id, v) { const e = aoEl(id); if (e && v) e.value = v; };
+    set('ao-name', r.name);
+    set('ao-designation', r.designation);
+    set('ao-department', r.department);
+    set('ao-manager', r.managerName);
+    set('ao-uan', r.uan);
+    set('ao-esic', r.esi);
+    set('ao-worklocation', r.location);
+    set('ao-posting', r.location);
+    set('ao-empid', r.code);
+    if (r.esi) { const ea = aoEl('ao-esicapp'); if (ea) ea.value = 'Yes'; }
+    toast('Prefilled from roster · ' + (r.name || code), 'green');
+  }
+
+  function aoToggleMaternity() {
+    const card = aoEl('ao-maternity-card');
+    if (card) card.style.display = (aoVal('ao-gender') === 'Female') ? 'block' : 'none';
+  }
+  function aoToggleAadhaar() {
+    const consent = aoEl('ao-aadhaar-consent');
+    const field = aoEl('ao-aadhaar');
+    if (!field) return;
+    field.disabled = !(consent && consent.checked);
+    if (field.disabled) field.value = '';
+  }
+  function aoRecalcSalary() {
+    const g = ['ao-basic','ao-da','ao-hra','ao-medical','ao-travel','ao-special','ao-accom','ao-bonus']
+      .reduce(function (sum, id) { return sum + aoNum(aoVal(id)); }, 0);
+    const gross = aoEl('ao-gross');
+    if (gross) gross.value = g ? Number(g).toLocaleString('en-IN') : '';
+  }
+
+  function aoReset() {
+    const form = aoEl('ao-form');
+    if (!form) return;
+    AO_FIELDS.forEach(function (f) { const e = aoEl(f[0]); if (e) e.value = ''; });
+    ['ao-aadhaar-consent','ao-seal'].forEach(function (id) { const e = aoEl(id); if (e) e.checked = false; });
+    const ros = aoEl('ao-roster'); if (ros) ros.value = '';
+    AO_STATE = { currentId: null, refNo: null };
+    aoToggleAadhaar(); aoToggleMaternity(); aoRecalcSalary();
+    const prev = aoEl('ao-preview'); if (prev) prev.innerHTML = '';
+    toast('Form cleared', 'green');
+  }
+
+  function aoCollect() {
+    const d = {};
+    AO_FIELDS.forEach(function (f) { d[f[1]] = aoVal(f[0]); });
+    const consent = aoEl('ao-aadhaar-consent');
+    d.aadhaarConsent = !!(consent && consent.checked);
+    if (!d.aadhaarConsent) d.aadhaar = '';     // privacy gate
+    const seal = aoEl('ao-seal');
+    d.seal = !!(seal && seal.checked);
+    d.gross = ['basic','da','hra','medical','travel','special','accom','bonus']
+      .reduce(function (s, k) { return s + aoNum(d[k]); }, 0);
+    if (AO_STATE.currentId) d.id = AO_STATE.currentId;
+    if (AO_STATE.refNo) d.refNo = AO_STATE.refNo;
+    return d;
+  }
+
+  function aoValidate() {
+    const missing = [];
+    AO_FIELDS.forEach(function (f) { const e = aoEl(f[0]); if (e) e.style.borderColor = ''; });
+    AO_REQUIRED.forEach(function (r) {
+      const e = aoEl(r[0]);
+      if (!e || !String(e.value || '').trim()) { missing.push(r[1]); if (e) e.style.borderColor = 'var(--red)'; }
+    });
+    const email = aoVal('ao-email');
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { missing.push('valid Employee Email'); const e = aoEl('ao-email'); if (e) e.style.borderColor = 'var(--red)'; }
+    const mob = aoVal('ao-mobile').replace(/\D/g, '');
+    if (mob && mob.length !== 10) { missing.push('valid 10-digit Mobile Number'); const e = aoEl('ao-mobile'); if (e) e.style.borderColor = 'var(--red)'; }
+    const aad = aoVal('ao-aadhaar').replace(/\D/g, '');
+    if (aad && aad.length !== 12) { missing.push('valid 12-digit Aadhaar Number'); const e = aoEl('ao-aadhaar'); if (e) e.style.borderColor = 'var(--red)'; }
+    return missing;
+  }
+
+  /* Ensure pdfmake is present; collect + validate; returns data or null. */
+  function aoReady() {
+    if (!window.pdfMake) { toast('PDF engine still loading — please retry in a moment', 'red'); return null; }
+    const missing = aoValidate();
+    if (missing.length) {
+      toast('Please complete: ' + missing.slice(0, 4).join(', ') + (missing.length > 4 ? ' …' : ''), 'red');
+      const form = aoEl('ao-form'); if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return null;
+    }
+    return aoCollect();
+  }
+
+  /* ── pdfmake document definition ──────────────────────────────────────── */
+  function aoBuildDocDef(d) {
+    const C = COMPANY_PROFILE;
+    const today = aoFmtDate(new Date().toISOString().slice(0, 10));
+    const ref = d.refNo || AO_STATE.refNo || '(to be assigned on save)';
+    const empId = d.empid || '(to be assigned)';
+    const name = d.name || '';
+    const honorific = d.gender === 'Female' ? 'Ms.' : (d.gender === 'Male' ? 'Mr.' : 'Mr./Ms.');
+
+    var sec = function (n, title, body) {
+      const arr = [{ text: n + '. ' + title, style: 'h2' }];
+      (Array.isArray(body) ? body : [body]).forEach(function (b) {
+        arr.push(typeof b === 'string' ? { text: b, style: 'p' } : b);
+      });
+      return arr;
+    };
+
+    // salary table rows (only non-zero components, plus gross)
+    const rows = [[{ text: 'Component', style: 'th' }, { text: 'Amount', style: 'th', alignment: 'right' }]];
+    AO_SALARY_ROWS.forEach(function (s) {
+      if (aoNum(d[s[0]]) > 0) rows.push([{ text: s[1] }, { text: aoMoney(d[s[0]]), alignment: 'right' }]);
+    });
+    rows.push([{ text: 'Gross Salary', bold: true }, { text: aoMoney(d.gross), alignment: 'right', bold: true }]);
+    if (aoNum(d.net) > 0) rows.push([{ text: 'Net Salary', bold: true }, { text: aoMoney(d.net), alignment: 'right', bold: true }]);
+
+    const socialItems = [
+      'Provident Fund (EPFO): ' + aoYesNo(d.epfo),
+      'Employees’ State Insurance (ESIC): ' + aoYesNo(d.esicapp),
+      'Professional Tax: ' + aoYesNo(d.ptax),
+      'Gratuity: ' + aoYesNo(d.gratuity)
+    ];
+
+    const content = [];
+    content.push({ text: 'APPOINTMENT ORDER', style: 'title' });
+    content.push({
+      columns: [
+        { width: '*', stack: [{ text: 'Date: ' + today, style: 'meta' }, { text: 'Employee ID: ' + empId, style: 'meta' }] },
+        { width: 'auto', stack: [{ text: 'Reference No.: ' + ref, style: 'meta', alignment: 'right' }] }
+      ], margin: [0, 0, 0, 10]
+    });
+    content.push({ text: 'Dear ' + honorific + ' ' + name + ',', style: 'p' });
+    content.push({ text: 'We are pleased to appoint you as ' + (d.designation || '—') + ' in ' + (d.department || '—') + ' with effect from ' + (aoFmtDate(d.doj) || '—') + ', subject to the following terms and conditions.', style: 'p' });
+
+    var n = 1;
+    content.push.apply(content, sec(n++, 'Appointment', 'You are appointed as ' + (d.designation || '—') + ' in the ' + (d.department || '—') + ' department' + (d.manager ? ', reporting to ' + d.manager : '') + '. This appointment is governed by the Company’s policies, standing orders and the applicable provisions of the Labour Codes. LIN of the establishment: ' + (d.lin || '—') + '.'));
+    content.push.apply(content, sec(n++, 'Place of Posting', 'Your initial place of posting is ' + (d.posting || d.worklocation || '—') + (d.worklocation && d.posting && d.worklocation !== d.posting ? ' (work location: ' + d.worklocation + ')' : '') + '. ' + (d.transferable === 'Yes' ? 'Your services are transferable to any location, unit, department or associate company of the Company.' : 'This posting is presently non-transferable unless mutually agreed in writing.')));
+    content.push.apply(content, sec(n++, 'Nature of Employment', 'Your employment is on a ' + (d.emptype || 'Regular') + ' basis' + (d.skill ? ', under the ' + d.skill + ' category' : '') + '.'));
+    var duties = [];
+    if (d.duties) duties.push({ text: 'Broad nature of duties: ' + d.duties, style: 'p' });
+    if (d.responsibilities) duties.push({ text: 'Responsibilities: ' + d.responsibilities, style: 'p' });
+    if (!duties.length) duties.push({ text: 'As assigned by the Company from time to time.', style: 'p' });
+    content.push.apply(content, sec(n++, 'Duties and Responsibilities', duties));
+    content.push.apply(content, sec(n++, 'Working Hours', (d.hours ? 'Your working hours shall be ' + d.hours + '. ' : 'As per the Company’s standard working hours. ') + (d.weeklyoff ? 'Weekly off: ' + d.weeklyoff + '.' : '')));
+    content.push.apply(content, sec(n++, 'Compensation', [
+      { text: 'Your remuneration shall be as follows' + (d.freq ? ' (' + d.freq + ')' : '') + ':', style: 'p' },
+      { table: { headerRows: 1, widths: ['*', 'auto'], body: rows }, layout: 'lightHorizontalLines', margin: [0, 4, 0, 6] }
+    ]));
+    content.push.apply(content, sec(n++, 'Social Security', { ul: socialItems, style: 'p' }));
+    content.push.apply(content, sec(n++, 'Probation', 'You shall be on probation for ' + (d.probation || 'the period specified in Company policy') + '.' + (d.confirmdate ? ' Expected confirmation date: ' + aoFmtDate(d.confirmdate) + '.' : '') + (d.probationterms ? ' ' + d.probationterms : '')));
+    content.push.apply(content, sec(n++, 'Leave Policy', d.leave || 'You shall be entitled to leave as per the Company’s leave policy and applicable law.'));
+    content.push.apply(content, sec(n++, 'Confidentiality', AO_CLAUSES.confidentiality));
+    content.push.apply(content, sec(n++, 'Code of Conduct', AO_CLAUSES.conduct));
+    content.push.apply(content, sec(n++, 'Termination', AO_CLAUSES.terminationBody(d)));
+    if (d.gender === 'Female' && d.maternity) {
+      content.push.apply(content, sec(n++, 'Maternity Benefit', 'You shall be entitled to maternity benefits under Chapter VI of the Code on Social Security, 2020. ' + d.maternity));
+    }
+    var other = [];
+    if (d.additional) other.push({ text: 'Additional terms: ' + d.additional, style: 'p' });
+    if (d.special2) other.push({ text: 'Special conditions: ' + d.special2, style: 'p' });
+    if (d.other) other.push({ text: d.other, style: 'p' });
+    if (!other.length) other.push({ text: 'This letter, together with the Company’s policies, constitutes the complete terms of your appointment.', style: 'p' });
+    content.push.apply(content, sec(n++, 'Other Terms', other));
+
+    // acceptance + signatures
+    content.push({ text: 'Acceptance', style: 'h2', margin: [0, 14, 0, 4] });
+    content.push({ text: '“I hereby accept the terms and conditions mentioned above.”', style: 'p', italics: true });
+    content.push({
+      columns: [
+        { width: '*', stack: [{ text: '\n\n_____________________', style: 'p' }, { text: 'Employee Signature', style: 'small' }, { text: 'Name: ' + name, style: 'small' }, { text: 'Date: ____________', style: 'small' }] },
+        { width: '*', stack: [
+            { text: '\nFor ' + C.name + ',', style: 'p' },
+            { text: (d.digsig ? '/s/ ' + d.digsig : '_____________________'), style: 'p', bold: !!d.digsig },
+            { text: (d.signame || 'Authorised Signatory'), style: 'small' },
+            { text: (d.sigdesignation || ''), style: 'small' },
+            (d.seal ? { text: '(Company Seal Affixed)', style: 'small', italics: true, margin: [0, 4, 0, 0] } : {})
+          ], alignment: 'left' }
+      ], margin: [0, 6, 0, 0]
+    });
+
+    const header = function () {
+      const left = [];
+      if (C.logo) left.push({ image: C.logo, width: 54, margin: [0, 0, 10, 0] });
+      const info = {
+        width: '*', stack: [
+          { text: C.name, style: 'coName' },
+          { text: C.address, style: 'coMeta' },
+          { text: 'CIN: ' + C.cin + '   |   GST: ' + C.gst, style: 'coMeta' },
+          { text: C.phone + '   |   ' + C.email + '   |   ' + C.website, style: 'coMeta' }
+        ]
+      };
+      return {
+        margin: [40, 22, 40, 0],
+        stack: [
+          { columns: C.logo ? [left[0], info] : [info] },
+          { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1, lineColor: '#1F2B5C' }] }
+        ]
+      };
+    };
+    const footer = function (currentPage, pageCount) {
+      return {
+        margin: [40, 8, 40, 0],
+        columns: [
+          { text: 'Confidential · ' + C.name, style: 'foot' },
+          { text: 'Page ' + currentPage + ' of ' + pageCount, style: 'foot', alignment: 'right' }
+        ]
+      };
+    };
+
+    const def = {
+      pageSize: 'A4',
+      pageMargins: [40, 110, 40, 50],
+      header: header,
+      footer: footer,
+      info: { title: 'Appointment Order - ' + name, author: C.name },
+      content: content,
+      defaultStyle: { fontSize: 10, lineHeight: 1.25, color: '#1B1B17' },
+      styles: {
+        title: { fontSize: 16, bold: true, alignment: 'center', margin: [0, 0, 0, 12], color: '#1F2B5C' },
+        h2: { fontSize: 11, bold: true, margin: [0, 8, 0, 3], color: '#1F2B5C' },
+        p: { fontSize: 10, margin: [0, 0, 0, 4], alignment: 'justify' },
+        small: { fontSize: 9, color: '#444' },
+        meta: { fontSize: 9, color: '#444' },
+        th: { bold: true, fontSize: 10, fillColor: '#F0EEE7' },
+        coName: { fontSize: 13, bold: true, color: '#1F2B5C' },
+        coMeta: { fontSize: 8, color: '#555' },
+        foot: { fontSize: 8, color: '#888' }
+      }
+    };
+    if (C.watermark) def.watermark = { text: C.watermark, color: '#1F2B5C', opacity: 0.05, bold: true };
+    return def;
+  }
+
+  function aoPdf(d) { return window.pdfMake.createPdf(aoBuildDocDef(d)); }
+  function aoFileName(d) { return 'Appointment-Order-' + (d.name || 'employee').replace(/[^A-Za-z0-9]+/g, '-') + '.pdf'; }
+
+  /* ── inline HTML preview (mirrors the PDF) ────────────────────────────── */
+  function aoRenderPreview(d) {
+    const host = aoEl('ao-preview');
+    if (!host) return;
+    const C = COMPANY_PROFILE;
+    const today = aoFmtDate(new Date().toISOString().slice(0, 10));
+    const honorific = d.gender === 'Female' ? 'Ms.' : (d.gender === 'Male' ? 'Mr.' : 'Mr./Ms.');
+    var salary = AO_SALARY_ROWS.filter(function (s) { return aoNum(d[s[0]]) > 0; })
+      .map(function (s) { return '<tr><td>' + s[1] + '</td><td style="text-align:right">' + aoEsc(aoMoney(d[s[0]])) + '</td></tr>'; }).join('');
+    salary += '<tr><td><strong>Gross Salary</strong></td><td style="text-align:right"><strong>' + aoEsc(aoMoney(d.gross)) + '</strong></td></tr>';
+    host.innerHTML =
+      '<div class="card" style="margin-top:14px">' +
+        '<div class="card-h"><div class="card-h-title">Letter preview</div><div class="card-h-sub">Rendered from the entered details · use Download / Print / Send Email for the PDF</div></div>' +
+        '<div style="border:1px solid var(--line);border-radius:8px;padding:22px;background:#fff;max-width:780px;margin:0 auto">' +
+          '<div style="border-bottom:2px solid var(--indigo);padding-bottom:8px;margin-bottom:14px">' +
+            '<div style="font-size:1.1rem;font-weight:700;color:var(--indigo)">' + aoEsc(C.name) + '</div>' +
+            '<div class="tiny" style="color:#555">' + aoEsc(C.address) + '</div>' +
+            '<div class="tiny" style="color:#555">CIN: ' + aoEsc(C.cin) + ' · GST: ' + aoEsc(C.gst) + ' · ' + aoEsc(C.email) + ' · ' + aoEsc(C.website) + '</div>' +
+          '</div>' +
+          '<h2 style="text-align:center;color:var(--indigo);letter-spacing:1px">APPOINTMENT ORDER</h2>' +
+          '<div class="tiny" style="display:flex;justify-content:space-between;color:#444"><span>Date: ' + today + ' · Employee ID: ' + aoEsc(d.empid || '(to be assigned)') + '</span><span>Ref: ' + aoEsc(d.refNo || AO_STATE.refNo || '(on save)') + '</span></div>' +
+          '<p>Dear ' + honorific + ' ' + aoEsc(d.name) + ',</p>' +
+          '<p>We are pleased to appoint you as <strong>' + aoEsc(d.designation) + '</strong> in <strong>' + aoEsc(d.department) + '</strong> with effect from <strong>' + aoEsc(aoFmtDate(d.doj)) + '</strong>, subject to the following terms and conditions.</p>' +
+          '<p><strong>Nature of employment:</strong> ' + aoEsc(d.emptype) + (d.skill ? ' · ' + aoEsc(d.skill) : '') + '</p>' +
+          '<p><strong>Place of posting:</strong> ' + aoEsc(d.posting || d.worklocation || '—') + (d.transferable === 'Yes' ? ' (transferable)' : '') + '</p>' +
+          (d.duties ? '<p><strong>Duties:</strong> ' + aoEsc(d.duties) + '</p>' : '') +
+          '<p><strong>Compensation' + (d.freq ? ' (' + aoEsc(d.freq) + ')' : '') + ':</strong></p>' +
+          '<table class="t" style="max-width:360px">' + salary + '</table>' +
+          '<p><strong>Social security:</strong> EPFO ' + aoYesNo(d.epfo) + ' · ESIC ' + aoYesNo(d.esicapp) + ' · P.Tax ' + aoYesNo(d.ptax) + ' · Gratuity ' + aoYesNo(d.gratuity) + '</p>' +
+          (d.gender === 'Female' && d.maternity ? '<p><strong>Maternity benefit (Chapter VI, Social Security Code 2020):</strong> ' + aoEsc(d.maternity) + '</p>' : '') +
+          '<p style="margin-top:14px;font-style:italic">"I hereby accept the terms and conditions mentioned above."</p>' +
+          '<div style="display:flex;justify-content:space-between;margin-top:18px" class="tiny"><div>_______________<br>Employee Signature</div><div>For ' + aoEsc(C.name) + '<br>' + aoEsc(d.signame || 'Authorised Signatory') + (d.seal ? '<br><em>(Seal affixed)</em>' : '') + '</div></div>' +
+        '</div>' +
+      '</div>';
+    host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ── actions ──────────────────────────────────────────────────────────── */
+  function aoGenerate() {
+    const d = aoReady();
+    if (!d) return;
+    aoRenderPreview(d);
+    toast('Appointment Order generated · review the preview, then download / print / email', 'green');
+  }
+  function aoRegenerate() { aoGenerate(); }
+  function aoPreview() {
+    const d = aoReady();
+    if (!d) return;
+    aoRenderPreview(d);
+    try { aoPdf(d).open(); } catch (e) { /* popup blocked — inline preview already shown */ }
+  }
+  function aoDownload() { const d = aoReady(); if (!d) return; aoPdf(d).download(aoFileName(d)); toast('PDF downloaded', 'green'); }
+  function aoPrint() { const d = aoReady(); if (!d) return; aoPdf(d).print(); }
+
+  function aoSendEmail() {
+    const d = aoReady();
+    if (!d) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { toast('A valid Employee Email is required to send', 'red'); return; }
+    if (!window.confirm('Send the Appointment Order PDF to ' + d.email + ' via the company mail service?')) return;
+    aoPdf(d).getBase64(function (b64) {
+      fetch(aoApiBase() + '/api/send-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: [d.email],
+          subject: 'Appointment Order – ' + d.name,
+          message: 'Dear ' + d.name + ',\n\nPlease find attached your Appointment Order.\n\nRegards,\nHR Department',
+          attachments: [{ filename: aoFileName(d), data: b64, contentType: 'application/pdf' }]
+        })
+      }).then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) {
+          if (j.ok) toast('Appointment Order emailed to ' + d.email, 'green');
+          else toast('Email failed: ' + (j.error || 'unknown error'), 'red');
+        })
+        .catch(function (e) { toast('Email failed: ' + e.message, 'red'); });
+    });
+  }
+
+  function aoSaveDraft() {
+    const d = aoCollect();
+    if (!d.name) { toast('Enter at least the employee name to save a draft', 'red'); return; }
+    d.status = 'draft';
+    fetch(aoApiBase() + '/api/appointment-orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d)
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j.ok && j.order) {
+          AO_STATE.currentId = j.order.id;
+          AO_STATE.refNo = j.order.refNo;
+          toast('Draft saved · Ref ' + j.order.refNo, 'green');
+          aoRenderSaved();
+        } else { toast('Save failed: ' + (j.error || 'unknown error'), 'red'); }
+      })
+      .catch(function (e) { toast('Save failed: ' + e.message, 'red'); });
+  }
+
+  function aoEdit() { const form = aoEl('ao-form'); if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+  function aoRenderSaved() {
+    const host = aoEl('ao-saved');
+    if (!host) return;
+    fetch(aoApiBase() + '/api/appointment-orders').then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        const orders = (j && j.orders) || [];
+        if (!orders.length) { host.innerHTML = ''; return; }
+        const rows = orders.slice().reverse().map(function (o) {
+          return '<tr><td>' + aoEsc(o.name || '—') + '</td><td>' + aoEsc(o.designation || '') + '</td><td>' + aoEsc(o.refNo || '') + '</td>' +
+            '<td><span class="pill ' + (o.status === 'final' ? 'green' : 'amber') + ' tiny">' + aoEsc(o.status || 'draft') + '</span></td>' +
+            '<td style="text-align:right"><button class="btn" onclick="window.aoLoadOrder(\'' + o.id + '\')">Load</button> ' +
+            '<button class="btn danger" onclick="window.aoDeleteOrder(\'' + o.id + '\')">Delete</button></td></tr>';
+        }).join('');
+        host.innerHTML = '<div class="card" style="margin-top:14px"><div class="card-h"><div class="card-h-title">Saved appointment orders</div>' +
+          '<span class="pill outline">' + orders.length + '</span></div>' +
+          '<table class="t"><thead><tr><th>Employee</th><th>Designation</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      })
+      .catch(function () { host.innerHTML = ''; });
+  }
+
+  function aoLoadOrder(id) {
+    fetch(aoApiBase() + '/api/appointment-orders/' + id).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (!j.ok || !j.order) { toast('Could not load order', 'red'); return; }
+        const o = j.order;
+        AO_FIELDS.forEach(function (f) { const e = aoEl(f[0]); if (e) e.value = (o[f[1]] != null ? o[f[1]] : ''); });
+        const cons = aoEl('ao-aadhaar-consent'); if (cons) cons.checked = !!o.aadhaarConsent;
+        const seal = aoEl('ao-seal'); if (seal) seal.checked = !!o.seal;
+        AO_STATE.currentId = o.id; AO_STATE.refNo = o.refNo;
+        aoToggleAadhaar(); aoToggleMaternity(); aoRecalcSalary();
+        const form = aoEl('ao-form'); if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        toast('Loaded · ' + (o.name || o.refNo), 'green');
+      })
+      .catch(function (e) { toast('Load failed: ' + e.message, 'red'); });
+  }
+
+  function aoDeleteOrder(id) {
+    if (!window.confirm('Delete this saved appointment order?')) return;
+    fetch(aoApiBase() + '/api/appointment-orders/' + id, { method: 'DELETE' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j.ok) { toast('Deleted', 'green'); if (AO_STATE.currentId === id) AO_STATE = { currentId: null, refNo: null }; aoRenderSaved(); }
+        else toast('Delete failed: ' + (j.error || 'unknown error'), 'red');
+      })
+      .catch(function (e) { toast('Delete failed: ' + e.message, 'red'); });
+  }
+
+  __kvOnReady(initAppointmentOrder);
 

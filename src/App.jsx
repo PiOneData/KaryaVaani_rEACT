@@ -14,6 +14,7 @@ import SecKaryaNirnay from './sections/SecKaryaNirnay.jsx';
 import SecRecruitment from './sections/SecRecruitment.jsx';
 import SecOnboarding from './sections/SecOnboarding.jsx';
 import SecInduction from './sections/SecInduction.jsx';
+import SecAppointmentOrder from './sections/SecAppointmentOrder.jsx';
 import SecVendor from './sections/SecVendor.jsx';
 import SecOhs from './sections/SecOhs.jsx';
 import SecCompliance from './sections/SecCompliance.jsx';
@@ -71,6 +72,12 @@ export default function App() {
      6 · INDUCTION TRAINING · MODULE 3
      ─────────────────────────────────────────────────────────────────  */}
           <SecInduction />
+          {/*  ─────────────────────────────────────────────────────────────────
+     HR DOCUMENTS · APPOINTMENT ORDER
+     Form → professionally formatted appointment letter (PDF) on company
+     letterhead. Download / print / email via the existing mailer.
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecAppointmentOrder />
           {/*  ─────────────────────────────────────────────────────────────────
      7 · VENDOR / CONTRACTOR COMPLIANCE
      ─────────────────────────────────────────────────────────────────  */}
