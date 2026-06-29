@@ -170,6 +170,13 @@ export default function NavBar() {
         <div className="nb-panel">
           <div className="nb-panel-title">Governance · transparency & control</div>
           {' '}
+          <div className="sb-item" onClick={(event) => { window.nav('analytics', event.currentTarget) }} data-onclick="nav('analytics', this)">
+            <span className="sb-icon">📊</span>
+            <span className="sb-label">Analytics</span>
+            {' '}
+            <span className="sb-badge amber">new</span>
+          </div>
+          {' '}
           <div className="sb-item" onClick={(event) => { window.nav('rules', event.currentTarget) }} data-onclick="nav('rules', this)">
             <span className="sb-icon">⌒</span>
             <span className="sb-label">Rule library</span>

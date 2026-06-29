@@ -1,13 +1,18 @@
-/* SecChatAnalytics — converted 1:1 from karya-vaani_v3.html · <section id="sec-chat-analytics"> */
+/* SecChatAnalytics — chat engagement analytics. Originally its own
+   <section id="sec-chat-analytics">, now rendered inside the Analytics hub's
+   "Chat engagement" tab (SecAnalytics). The outer wrapper is a plain <div> so
+   it is not toggled by the SPA .section nav; every inner element id is kept
+   unchanged so the legacy renderers (chatRenderAnalytics, cvaRefreshAll, …)
+   keep working as-is. */
 export default function SecChatAnalytics() {
   return (
-    <section id="sec-chat-analytics" className="section">
+    <div className="an-chat-inner">
       <div className="crumbs">
-        <span>Localisation Engine</span>
+        <span>Analytics</span>
         {' '}
         <span className="crumb-sep">/</span>
         {' '}
-        <span className="crumb-here">Chat analytics</span>
+        <span className="crumb-here">Chat engagement analytics</span>
       </div>
       {' '}
       {/*  ── MODERN HERO ──  */}
@@ -543,6 +548,6 @@ export default function SecChatAnalytics() {
           </table>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

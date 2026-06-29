@@ -19,7 +19,7 @@ import SecVendor from './sections/SecVendor.jsx';
 import SecOhs from './sections/SecOhs.jsx';
 import SecCompliance from './sections/SecCompliance.jsx';
 import SecVaaniBroadcast from './sections/SecVaaniBroadcast.jsx';
-import SecChatAnalytics from './sections/SecChatAnalytics.jsx';
+import SecAnalytics from './sections/SecAnalytics.jsx';
 import SecChat from './sections/SecChat.jsx';
 import SecEmpHome from './sections/SecEmpHome.jsx';
 import SecCtHome from './sections/SecCtHome.jsx';
@@ -101,7 +101,9 @@ export default function App() {
      Shows multilingual messages flowing from the Vaani Localisation
      engine to workers. The bot appears as a contact.
      ─────────────────────────────────────────────────────────────────  */}
-          <SecChatAnalytics />
+          {/*  Analytics hub (Governance): Exposure analytics + Chat engagement
+     analytics (the latter moved here from its own section).  */}
+          <SecAnalytics />
           <SecChat />
           {/*  ─────────────────────────────────────────────────────────────────
      10c · EMPLOYEE HOME — the worker-facing surface

@@ -29,9 +29,9 @@ function __kvOnReady(fn) {
     compliance:          'grp-verticals',
     'vaani-broadcast':   'grp-engines',
     chat:                'grp-engines',
-    'chat-analytics':    'grp-engines',
     transport:           'grp-engines',
     lms:                 'grp-engines',
+    analytics:           'grp-governance',
     rules:               'grp-governance',
     locale:              'grp-governance',
     audit:               'grp-governance',
@@ -6065,9 +6065,12 @@ function __kvOnReady(fn) {
   /* step 4 · navigate to the standalone Chat analytics section */
   function vbGoToChatAnalytics() {
     if (typeof nav === 'function') {
-      nav('chat-analytics', null);
+      // Chat analytics now lives under the Analytics hub's chat tab.
+      const item = document.querySelector('[data-onclick="nav(\'analytics\', this)"]');
+      nav('analytics', item || null);
       const cur = document.getElementById('current-label');
-      if (cur) cur.textContent = 'Chat analytics';
+      if (cur) cur.textContent = 'Analytics';
+      if (typeof anTab === 'function') anTab('chat');
     }
   }
 
@@ -7359,7 +7362,11 @@ function __kvOnReady(fn) {
     if (typeof origNav !== 'function') return;
     window.nav = function (id, el) {
       origNav(id, el);
-      if (id === 'chat-analytics') initChatAnalytics();
+      if (id === 'analytics') {
+        // Re-render both panes whenever the hub is shown.
+        if (typeof initExposureAnalytics === 'function') initExposureAnalytics();
+        initChatAnalytics();
+      }
       if (id === 'chat') {
         /* re-render queue strip on entering the chat page too */
         if (document.getElementById('cv-qstrip')) chatRenderQueueStrip();
@@ -13298,4 +13305,205 @@ function __kvOnReady(fn) {
   }
 
   __kvOnReady(initAppointmentOrder);
+
+  /* ════════════════════════════════════════════════════════════════════════
+     ANALYTICS HUB · tab switching + EXPOSURE ANALYTICS (compliance-driven)
+     Exposure analytics are computed from the contractor records (CONTRACTORS):
+     each carries a compliance `score`, six `subscores` (CLRA / ESIC / PF /
+     Min-wage / Migrant / Safety) and a `liability` breakdown. Per the dashboard
+     model, estimated exposure = statutory penalty + operational-stop risk +
+     customer-audit risk + audit-weighted contract value (all ₹ Lakhs).
+     ════════════════════════════════════════════════════════════════════════ */
+
+  /* switch between the Exposure / Chat tabs inside #sec-analytics */
+  function anTab(name, el) {
+    document.querySelectorAll('#sec-analytics .an-pane').forEach(function (p) { p.style.display = 'none'; });
+    const pane = document.getElementById('an-pane-' + name);
+    if (pane) pane.style.display = 'block';
+    const btn = el || document.getElementById('an-tab-' + name);
+    if (btn && btn.parentElement) {
+      btn.parentElement.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('on'); });
+      btn.classList.add('on');
+    }
+    if (name === 'exposure') {
+      initExposureAnalytics();
+    } else if (name === 'chat') {
+      // Render now that the pane is visible (width-dependent charts need layout).
+      try { initChatAnalytics(); } catch (e) {}
+      if (typeof cvaRefreshAll === 'function') { try { cvaRefreshAll(); } catch (e) {} }
+    }
+  }
+
+  const EXP_DIMS = [
+    ['clra', 'CLRA'], ['esic', 'ESIC'], ['pf', 'PF'],
+    ['minWage', 'Min wage'], ['migrant', 'Migrant'], ['safety', 'Safety']
+  ];
+
+  function expContractors() {
+    return (typeof CONTRACTORS !== 'undefined' && Array.isArray(CONTRACTORS)) ? CONTRACTORS : [];
+  }
+  function expColor(score) {
+    return (typeof colorForScore === 'function') ? colorForScore(score)
+      : (score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)');
+  }
+  function expBand(score) { return score >= 80 ? 'green' : score >= 60 ? 'amber' : 'red'; }
+  function expL(v) { return '₹' + (Math.round(v * 10) / 10).toLocaleString('en-IN') + ' L'; }
+  function expCr(v) { return '₹' + (v / 100).toFixed(2) + ' Cr'; }
+
+  /* estimated exposure components for one contractor (₹ Lakhs) */
+  function expCalc(c) {
+    const L = c.liability || {};
+    const opStop = (L.operationalDays || 0) * (L.operationalPerDay || 0);
+    const audit = L.customerAudit || 0;
+    const cv = L.contractValueRisk || 0;
+    const statLow = L.statutoryLow || 0, statMid = L.statutoryMid || 0, statHigh = L.statutoryHigh || 0;
+    return {
+      statLow: statLow, statMid: statMid, statHigh: statHigh, opStop: opStop, audit: audit, cv: cv,
+      low: statLow + opStop + audit + cv,
+      mid: statMid + opStop + audit + cv,
+      high: statHigh + opStop + audit + cv
+    };
+  }
+  function expWorstDim(c) {
+    const sub = c.subscores || {};
+    let worst = EXP_DIMS[0], wv = sub[EXP_DIMS[0][0]] != null ? sub[EXP_DIMS[0][0]] : 100;
+    EXP_DIMS.forEach(function (d) { const v = sub[d[0]]; if (v != null && v < wv) { wv = v; worst = d; } });
+    return { label: worst[1], value: wv };
+  }
+  function expBar(value, color, w) {
+    return '<div class="bar thin" style="width:' + (w || 120) + 'px;display:inline-block;vertical-align:middle">' +
+      '<span style="width:' + Math.max(2, Math.min(100, value)) + '%;background:' + color + '"></span></div>';
+  }
+
+  function initExposureAnalytics() {
+    const host = document.getElementById('exp-kpis');
+    if (!host) return;                       // pane not mounted
+    const cs = expContractors();
+    if (!cs.length) {
+      host.innerHTML = '<div class="tiny muted" style="grid-column:span 4">No contractor data available — exposure analytics will populate once the roster is loaded.</div>';
+      ['exp-bycontractor', 'exp-composition', 'exp-subscores', 'exp-bands', 'exp-table-body'].forEach(function (id) { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+      return;
+    }
+
+    const rows = cs.map(function (c) { return { c: c, e: expCalc(c) }; });
+    rows.sort(function (a, b) { return b.e.mid - a.e.mid; });
+    const totMid = rows.reduce(function (s, r) { return s + r.e.mid; }, 0);
+    const totLow = rows.reduce(function (s, r) { return s + r.e.low; }, 0);
+    const totHigh = rows.reduce(function (s, r) { return s + r.e.high; }, 0);
+    const atRisk = cs.filter(function (c) { return c.score < 60; });
+    const avgScore = Math.round(cs.reduce(function (s, c) { return s + (c.score || 0); }, 0) / cs.length);
+    const totalWorkers = cs.reduce(function (s, c) { return s + (c.deployed || 0); }, 0);
+    const exposedWorkers = cs.filter(function (c) { return c.score < 80; }).reduce(function (s, c) { return s + (c.deployed || 0); }, 0);
+    const maxMid = rows.length ? rows[0].e.mid : 1;
+
+    /* KPI strip */
+    host.innerHTML =
+      '<div class="kpi"><div class="kpi-eye">Total estimated exposure</div>' +
+        '<div class="kpi-val" style="color:var(--red-dk)">' + expCr(totMid) + '</div>' +
+        '<div class="kpi-sub">range ' + expCr(totLow) + ' – ' + expCr(totHigh) + ' (mid-case)</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Contractors at risk</div>' +
+        '<div class="kpi-val" style="color:var(--amber-dk)">' + atRisk.length + '<small>/' + cs.length + '</small></div>' +
+        '<div class="kpi-sub">compliance score below 60</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Avg compliance score</div>' +
+        '<div class="kpi-val" style="color:' + expColor(avgScore) + '">' + avgScore + '<small>/100</small></div>' +
+        '<div class="kpi-sub">across ' + cs.length + ' contractors</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Workers under exposed firms</div>' +
+        '<div class="kpi-val">' + exposedWorkers.toLocaleString('en-IN') + '</div>' +
+        '<div class="kpi-sub">of ' + totalWorkers.toLocaleString('en-IN') + ' deployed (score &lt; 80)</div></div>';
+
+    /* exposure by contractor */
+    const bc = document.getElementById('exp-bycontractor');
+    if (bc) {
+      bc.innerHTML = rows.map(function (r) {
+        const col = expColor(r.c.score);
+        const w = Math.max(3, Math.round(r.e.mid / maxMid * 100));
+        return '<div style="margin:9px 0">' +
+          '<div class="row-between" style="font-size:0.8rem;margin-bottom:3px">' +
+            '<span class="t-strong">' + r.c.name + '</span>' +
+            '<span class="mono" style="color:' + col + '">' + expL(r.e.mid) + '</span></div>' +
+          '<div class="bar"><span style="width:' + w + '%;background:' + col + '"></span></div>' +
+          '<div class="tiny muted" style="margin-top:2px">' + (r.c.deployed || 0) + ' workers · score ' + r.c.score + ' · ' + r.c.area + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    /* exposure composition */
+    const comp = [
+      ['Statutory penalty', rows.reduce(function (s, r) { return s + r.e.statMid; }, 0), 'var(--red)'],
+      ['Operational-stop risk', rows.reduce(function (s, r) { return s + r.e.opStop; }, 0), 'var(--amber)'],
+      ['Customer-audit risk', rows.reduce(function (s, r) { return s + r.e.audit; }, 0), 'var(--indigo)'],
+      ['Contract value at risk', rows.reduce(function (s, r) { return s + r.e.cv; }, 0), 'var(--blue)']
+    ];
+    const compTot = comp.reduce(function (s, x) { return s + x[1]; }, 0) || 1;
+    const cmp = document.getElementById('exp-composition');
+    if (cmp) {
+      cmp.innerHTML = comp.map(function (x) {
+        const pct = Math.round(x[1] / compTot * 100);
+        return '<div style="margin:10px 0">' +
+          '<div class="row-between" style="font-size:0.8rem;margin-bottom:3px">' +
+            '<span>' + x[0] + '</span><span class="mono">' + expL(x[1]) + ' · ' + pct + '%</span></div>' +
+          '<div class="bar"><span style="width:' + pct + '%;background:' + x[2] + '"></span></div>' +
+        '</div>';
+      }).join('') +
+      '<div class="tiny muted" style="margin-top:8px">Mid-case total ' + expCr(compTot) + ' across ' + cs.length + ' contractors.</div>';
+    }
+
+    /* sub-score averages (6 dimensions) */
+    const avgDim = EXP_DIMS.map(function (d) {
+      const v = Math.round(cs.reduce(function (s, c) { return s + ((c.subscores || {})[d[0]] || 0); }, 0) / cs.length);
+      return { key: d[0], label: d[1], v: v };
+    });
+    const weakest = avgDim.reduce(function (a, b) { return b.v < a.v ? b : a; }, avgDim[0]);
+    const ss = document.getElementById('exp-subscores');
+    if (ss) {
+      ss.innerHTML = avgDim.map(function (d) {
+        const col = expColor(d.v);
+        const flag = d.key === weakest.key ? ' <span class="pill red tiny">weakest</span>' : '';
+        return '<div style="margin:9px 0">' +
+          '<div class="row-between" style="font-size:0.8rem;margin-bottom:3px">' +
+            '<span>' + d.label + flag + '</span><span class="mono" style="color:' + col + '">' + d.v + '/100</span></div>' +
+          '<div class="bar"><span style="width:' + d.v + '%;background:' + col + '"></span></div>' +
+        '</div>';
+      }).join('') +
+      '<div class="tiny muted" style="margin-top:8px"><strong>' + weakest.label + '</strong> is the weakest dimension on average — the primary driver of statutory exposure.</div>';
+    }
+
+    /* score-band distribution */
+    const bands = [
+      ['Ready (80–100)', cs.filter(function (c) { return c.score >= 80; }).length, 'var(--green)'],
+      ['Watch (60–79)', cs.filter(function (c) { return c.score >= 60 && c.score < 80; }).length, 'var(--amber)'],
+      ['At risk (<60)', cs.filter(function (c) { return c.score < 60; }).length, 'var(--red)']
+    ];
+    const bd = document.getElementById('exp-bands');
+    if (bd) {
+      bd.innerHTML = bands.map(function (b) {
+        const pct = Math.round(b[1] / cs.length * 100);
+        return '<div style="margin:12px 0">' +
+          '<div class="row-between" style="font-size:0.82rem;margin-bottom:3px">' +
+            '<span>' + b[0] + '</span><span class="mono">' + b[1] + ' · ' + pct + '%</span></div>' +
+          '<div class="bar"><span style="width:' + pct + '%;background:' + b[2] + '"></span></div>' +
+        '</div>';
+      }).join('');
+    }
+
+    /* at-risk table */
+    const tb = document.getElementById('exp-table-body');
+    if (tb) {
+      tb.innerHTML = rows.map(function (r) {
+        const wd = expWorstDim(r.c);
+        const col = expColor(r.c.score);
+        return '<tr>' +
+          '<td class="t-strong">' + r.c.name + '</td>' +
+          '<td>' + (r.c.area || '—') + '</td>' +
+          '<td>' + (r.c.deployed || 0) + '</td>' +
+          '<td><span class="mono" style="color:' + col + '">' + r.c.score + '</span> ' + expBar(r.c.score, col, 56) + '</td>' +
+          '<td><span class="pill ' + expBand(wd.value) + ' tiny">' + wd.label + ' ' + wd.value + '</span></td>' +
+          '<td class="mono">' + expL(r.e.mid) + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+    const cnt = document.getElementById('exp-table-count');
+    if (cnt) cnt.textContent = cs.length + ' contractors';
+  }
+  __kvOnReady(initExposureAnalytics);
 
