@@ -53,7 +53,7 @@ export default function EmailModal() {
         <div className="modal-footer">
           <div className="modal-footer-left">
             <span className="tiny">
-              Sends via your default mail client · logs an audit entry · chains to worker record
+              Sends via the VAANI mailer &amp; WhatsApp gateway · logs an audit entry · chains to worker record
             </span>
           </div>
           {' '}
@@ -62,12 +62,12 @@ export default function EmailModal() {
               Copy
             </button>
             {' '}
-            <button className="btn" onClick={(event) => { window.openInGmail() }} data-onclick="openInGmail()">
-              Open in Gmail
+            <button className="btn" onClick={(event) => { window.waSendVendor() }} data-onclick="waSendVendor()">
+              Send WhatsApp
             </button>
             {' '}
             <button className="btn primary" onClick={(event) => { window.sendEmail() }} data-onclick="sendEmail()">
-              Send via mail client
+              Send email
             </button>
           </div>
         </div>

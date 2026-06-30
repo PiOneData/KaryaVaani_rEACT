@@ -46,7 +46,7 @@ app.get('/api/om-mapping', (req, res) => {
    Body: { to: string[], subject: string, message: string, attachments: [{filename, data}] }
    ──────────────────────────────────────────────────────────────────────── */
 app.post('/api/send-email', async (req, res) => {
-  const { to, subject, message, attachments = [] } = req.body || {};
+  const { to, cc, subject, message, attachments = [] } = req.body || {};
   if (!to || !subject || !message) {
     return res.status(400).json({ ok: false, error: 'to, subject and message are required' });
   }
@@ -74,6 +74,7 @@ app.post('/api/send-email', async (req, res) => {
     await transporter.sendMail({
       from:        process.env.EMAIL_HOST_USER,
       to:          Array.isArray(to) ? to.join(', ') : to,
+      cc:          cc ? (Array.isArray(cc) ? cc.join(', ') : cc) : undefined,
       subject,
       text:        message,
       attachments: mailAttachments
@@ -258,6 +259,59 @@ app.post('/api/worker-compliance', (req, res) => {
     console.error('worker-compliance save error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+/* ── Onboarding captures ───────────────────────────────────────────────────
+   Persists every onboarding profile captured in the Onboarding module, so the
+   full details (personal, employment, PPE, Aadhaar-verification status) survive
+   reloads and surface in the drilldown with compliance checks. Aadhaar is
+   privacy-gated — only the last 4 digits + a verified flag are stored.
+   POST /api/onboarding-captures   save → { ok, capture }
+   GET  /api/onboarding-captures   list → { ok, captures }
+   ──────────────────────────────────────────────────────────────────────── */
+app.post('/api/onboarding-captures', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const p = req.body || {};
+  if (!p.name) return res.status(400).json({ ok: false, error: 'name is required' });
+
+  // privacy: never persist the full Aadhaar — keep only last-4 + verified flag
+  const aadhaarLast4 = p.aadhaar ? String(p.aadhaar).replace(/\D/g, '').slice(-4) : (p.aadhaarLast4 || null);
+  delete p.aadhaar;
+
+  store.data.onboardingCaptures = store.data.onboardingCaptures || [];
+  const list = store.data.onboardingCaptures;
+  const nowIso = new Date().toISOString();
+  let capture;
+  if (p.id) {
+    const idx = list.findIndex(c => c.id === p.id);
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'capture not found' });
+    capture = { ...list[idx], ...p, aadhaarLast4: aadhaarLast4, updatedAt: nowIso };
+    list[idx] = capture;
+  } else {
+    capture = {
+      ...p,
+      id: 'ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      aadhaarLast4: aadhaarLast4,
+      status: p.status || 'sent',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    list.push(capture);
+  }
+  try {
+    writeStore(store);
+    res.json({ ok: true, capture });
+  } catch (err) {
+    console.error('onboarding-capture save error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/onboarding-captures', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  res.json({ ok: true, captures: store.data.onboardingCaptures || [] });
 });
 
 /* ── VAANI translation proxy ──────────────────────────────────────────────

@@ -603,7 +603,10 @@ export default function SecOnboarding() {
                       {"Aadhaar number "}
                       <span className="cap-req">*</span>
                     </label>
-                    <input className="input" id="cap-aadhaar" placeholder="XXXX XXXX XXXX" onInput={(event) => { window.capSync() }} />
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <input className="input" id="cap-aadhaar" placeholder="XXXX XXXX XXXX" onInput={(event) => { window.capSync() }} style={{ flex: 1 }} />
+                      <button type="button" className="btn" onClick={(event) => { window.capVerifyAadhaar() }} data-onclick="capVerifyAadhaar()" title="Upload Aadhaar document and auto-verify">Upload &amp; verify</button>
+                    </div>
                   </div>
                   {' '}
                   <div className="field">

@@ -2754,6 +2754,10 @@ function __kvOnReady(fn) {
     if (!w) return;
     const c = composeFor(w);
     _emailCtx = c;
+    // derive a WhatsApp number for the vendor (the directory carries no phone);
+    // KVWhatsApp falls back to the configured test recipient if unusable.
+    const vh = (typeof omHash === 'function') ? omHash(w.contractor) : 0;
+    _emailCtx.vendorPhone = '91' + ('9' + String(100000000 + (vh % 900000000)));
 
     document.getElementById('em-eye').textContent = 'Notify vendor · ' + w.contractor;
     document.getElementById('em-title').textContent = 'Compliance notice — ' + w.name;
@@ -2791,31 +2795,40 @@ function __kvOnReady(fn) {
     document.getElementById('em-cnt').textContent = v.length + ' chars · ' + v.split(/\s+/).filter(Boolean).length + ' words';
   }
 
+  /* send the vendor notice through the VAANI mailer (real /api/send-email) */
   function sendEmail() {
     if (!_emailCtx) return;
     const to = _emailCtx.vendor.email;
-    const cc = [_emailCtx.vendor.cc, CC_INTERNAL].filter(Boolean).join(',');
-    const subject = encodeURIComponent(document.getElementById('em-subject').value);
-    const body    = encodeURIComponent(document.getElementById('em-body').value);
-    const mailto = 'mailto:' + to + '?cc=' + cc + '&subject=' + subject + '&body=' + body;
-    window.location.href = mailto;
-    setTimeout(() => {
-      toast('Opened in default mail client · audit entry logged', 'green');
-      closeEmailModal();
-    }, 250);
+    const cc = [_emailCtx.vendor.cc, CC_INTERNAL].filter(Boolean);
+    const subject = document.getElementById('em-subject').value;
+    const message = document.getElementById('em-body').value;
+    toast('Sending email…', 'green');
+    fetch((window.__KV_API_BASE || '') + '/api/send-email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: [to], cc: cc, subject: subject, message: message })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) toast('Email sent to ' + _emailCtx.vendor.contact + ' · ' + to, 'green');
+        else toast('Email failed: ' + ((j && j.error) || 'unknown error'), 'red');
+        closeEmailModal();
+      })
+      .catch(function (e) { toast('Email failed: ' + e.message, 'red'); });
   }
 
-  function openInGmail() {
+  /* send the same notice over WhatsApp through the gateway (real KVWhatsApp) */
+  function waSendVendor() {
     if (!_emailCtx) return;
-    const to = _emailCtx.vendor.email;
-    const cc = [_emailCtx.vendor.cc, CC_INTERNAL].filter(Boolean).join(',');
-    const su = encodeURIComponent(document.getElementById('em-subject').value);
-    const bd = encodeURIComponent(document.getElementById('em-body').value);
-    const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) +
-                '&cc=' + encodeURIComponent(cc) + '&su=' + su + '&body=' + bd;
-    window.open(url, '_blank');
-    toast('Opening in Gmail · audit entry logged', 'green');
+    const phone = _emailCtx.vendorPhone || window.__KV_WHATSAPP_TEST_TO || '';
+    const message = document.getElementById('em-body').value;
+    if (!window.KVWhatsApp) { toast('WhatsApp gateway unavailable', 'red'); return; }
+    if (!phone) { toast('No WhatsApp number for this vendor', 'red'); return; }
+    toast('Sending WhatsApp…', 'green');
+    window.KVWhatsApp.notify(phone, message, { label: 'WhatsApp sent to ' + _emailCtx.vendor.contact })
+      .then(function () { closeEmailModal(); })
+      .catch(function (e) { toast('WhatsApp failed: ' + (e.message || e), 'red'); });
   }
+  /* kept for compatibility — the modal button now sends via WhatsApp, not Gmail */
+  function openInGmail() { waSendVendor(); }
 
   function copyEmailBody() {
     const subject = document.getElementById('em-subject').value;
@@ -11563,7 +11576,7 @@ function __kvOnReady(fn) {
     'High-visibility vest', 'Anti-vibration gloves'
   ];
 
-  const CAP_STATE = { mode: 'single', type: 'direct', lang: 'TE', ppe: [], photo: null, recent: [], bulk: [] };
+  const CAP_STATE = { mode: 'single', type: 'direct', lang: 'TE', ppe: [], photo: null, recent: [], bulk: [], aadhaarVerified: false };
 
   /* ── mode: single vs bulk ── */
   function capSetMode(m) {
@@ -11685,19 +11698,39 @@ function __kvOnReady(fn) {
     if (!ack || !ack.checked) { toast('Confirm the PPE briefing acknowledgement', 'red'); return; }
 
     const wid = (CAP_STATE.type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
-    CAP_STATE.recent.unshift({
-      id: wid, name: name, type: CAP_STATE.type,
+    const getC = function (id) { const e = document.getElementById(id); return e ? e.checked : false; };
+    const rec = {
+      id: wid, name: name, type: CAP_STATE.type, status: 'sent',
       lang: capLangName(), category: capVal('cap-category') || 'Unskilled',
-      photo: CAP_STATE.photo, mobile: mobile, status: 'sent'
-    });
+      photo: CAP_STATE.photo, mobile: mobile,
+      aadhaarVerified: !!CAP_STATE.aadhaarVerified,
+      aadhaarLast4: aadhaar.replace(/\D/g, '').slice(-4),
+      gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
+      address: { addr1: capVal('cap-addr1'), addr2: capVal('cap-addr2'), city: capVal('cap-city'), district: capVal('cap-district'), pin: capVal('cap-pin'), state: capVal('cap-homestate') },
+      migrant: getC('cap-migrant'),
+      employment: { posId: capVal('cap-posid'), dept: capVal('cap-dept'), workorder: capVal('cap-workorder'), contractor: capVal('cap-contractor'), clra: capVal('cap-clra'), shift: capVal('cap-shift'), doj: capVal('cap-doj') },
+      ppe: { uniform: capVal('cap-uniform'), shoe: capVal('cap-shoe'), helmet: capVal('cap-helmet'), glove: capVal('cap-glove'), eyewear: capVal('cap-eyewear'), hearing: capVal('cap-hearing'), extra: (CAP_STATE.ppe || []).slice() },
+      ppeAckAt: new Date().toISOString()
+    };
+    CAP_STATE.recent.unshift(rec);
     capRenderRecent();
     toast('Profile saved · confirmation link sent to ' + name + ' on WhatsApp (' + capLangName() + ')', 'green');
+
+    /* persist the full onboarding profile to the backend (Aadhaar privacy-gated) */
+    fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ aadhaar: aadhaar }, rec, { photo: undefined }))
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { if (j && j.ok && j.capture) rec.backendId = j.capture.id; })
+      .catch(function () { /* offline — kept in session */ });
+
     /* real WhatsApp confirmation link via the communication gateway */
     if (window.KVWhatsApp && mobile) {
       window.KVWhatsApp.send(mobile,
         'Namaste ' + name + ', please confirm your Karya Vaani worker profile: ' +
         'https://karyavaani.app/confirm/' + wid);
     }
+    CAP_STATE.aadhaarVerified = false;
     capReset(true);
   }
 
@@ -11715,18 +11748,21 @@ function __kvOnReady(fn) {
       const initials = r.name.split(' ').map(function (p) { return p[0]; }).join('').slice(0, 2).toUpperCase();
       const ava = r.photo ? '<img src="' + r.photo + '" alt="">' : initials;
       const confirmed = r.status === 'confirmed';
-      return '<div class="cap-recent-row">' +
+      const aadFlag = r.aadhaarVerified
+        ? ' <span class="pill green tiny">Aadhaar ✓</span>'
+        : ' <span class="pill red tiny">Aadhaar pending</span>';
+      return '<div class="cap-recent-row" style="cursor:pointer" onclick="obOpenCapture(' + i + ')" title="Open onboarding details">' +
         '<span class="cap-recent-ava">' + ava + '</span>' +
         '<div class="cap-recent-main">' +
           '<div class="cap-recent-name">' + r.name + ' <span class="pill ' +
             (r.type === 'direct' ? 'green' : 'amber') + ' tiny" style="margin-left:3px">' +
-            (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></div>' +
+            (r.type === 'direct' ? 'Direct' : 'Contract') + '</span>' + aadFlag + '</div>' +
           '<div class="cap-recent-sub">' + r.id + ' · ' + r.category + ' · ' + r.lang + ' · ' +
             (confirmed ? 'confirmed by worker ✓' : 'confirmation link sent · awaiting worker') + '</div>' +
         '</div>' +
         (confirmed
           ? '<span class="pill green tiny">Confirmed</span>'
-          : '<span class="cap-recent-link" onclick="capResend(' + i + ')">Resend link</span>') +
+          : '<span class="cap-recent-link" onclick="event.stopPropagation();capResend(' + i + ')">Resend link</span>') +
       '</div>';
     }).join('');
   }
@@ -11975,6 +12011,7 @@ function __kvOnReady(fn) {
     capInitDrop();
     capPopulateRecords();
     capSync();
+    if (typeof obLoadCaptures === 'function') obLoadCaptures();
   }
   __kvOnReady(initCap);
 
@@ -12326,18 +12363,19 @@ function __kvOnReady(fn) {
     body.innerHTML = pageRows.map(function (r) {
       const c = omWorkerCompliance(r);
       const band = omComplyBand(c.score);
-      const compCell = '<span class="pill ' + band + ' tiny" style="cursor:pointer" ' +
-        'onclick="omOpenWorker(\'' + r.code + '\')" title="Open employee compliance detail">' +
+      const compCell = '<span class="pill ' + band + ' tiny">' +
         c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span>' +
         (!c.aadhaarVerified ? ' <span class="tiny" style="color:var(--red-dk)" title="Aadhaar not verified">⚠</span>' : '');
-      return '<tr>' +
+      // whole row opens the tabbed worker modal; the UAN/ESI cells stop propagation
+      // so they still open the verifiable document viewer instead.
+      return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + r.code + '\')" title="Open worker details">' +
         '<td class="t-strong">' + r.code + '</td>' +
         '<td>' + r.name + '</td>' +
         '<td>' + r.desig + '</td>' +
         '<td>' + r.dept + '</td>' +
         '<td>' + r.mgr + ' <span style="color:var(--ink-3,#8a8f98)">· ' + r.mgrCode + '</span></td>' +
-        '<td style="font-variant-numeric:tabular-nums">' + omIdCell('UAN', r.uan, r) + '</td>' +
-        '<td style="font-variant-numeric:tabular-nums">' + omIdCell('ESI', r.esi, r) + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + omIdCell('UAN', r.uan, r) + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + omIdCell('ESI', r.esi, r) + '</td>' +
         '<td><span class="pill outline">' + r.lang + '</span></td>' +
         '<td>' + compCell + '</td>' +
       '</tr>';
@@ -13890,47 +13928,88 @@ function __kvOnReady(fn) {
 
   let OM_MODAL_CODE = null;   /* worker code the open modal refers to */
 
-  /* ── employee compliance modal ─────────────────────────────────────────── */
+  /* ── reusable tabbed modal ─────────────────────────────────────────────── */
+  function kvTabModal(opts) {
+    const tabs = opts.tabs || [];
+    const btns = tabs.map(function (t, i) {
+      return '<div class="tab' + (i === 0 ? ' on' : '') + '" onclick="kvTabSwitch(this,\'' + t.id + '\')">' + t.label + '</div>';
+    }).join('');
+    const panes = tabs.map(function (t, i) {
+      return '<div class="kvtab-pane" data-pane="' + t.id + '" style="display:' + (i === 0 ? 'block' : 'none') + '">' + t.html + '</div>';
+    }).join('');
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left">' +
+        '<span class="modal-h-eye">' + (opts.eyebrow || '') + '</span>' +
+        '<span class="modal-h-title">' + (opts.title || '') + '</span>' +
+      '</div><span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body"><div class="tabs" style="margin-bottom:14px">' + btns + '</div>' + panes + '</div>' +
+      (opts.footer ? '<div class="modal-footer">' + opts.footer + '</div>' : '')
+    );
+  }
+  function kvTabSwitch(btn, id) {
+    const modal = btn.closest('.modal');
+    if (!modal) return;
+    modal.querySelectorAll('.tabs .tab').forEach(function (t) { t.classList.remove('on'); });
+    btn.classList.add('on');
+    modal.querySelectorAll('.kvtab-pane').forEach(function (p) { p.style.display = (p.getAttribute('data-pane') === id) ? 'block' : 'none'; });
+  }
+  function kvKV(k, v) {
+    return '<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line);font-size:0.85rem">' +
+      '<span class="muted">' + k + '</span><span class="t-strong" style="text-align:right">' + (v || '—') + '</span></div>';
+  }
+
+  /* ── employee detail modal · tabbed (General / Identification / Compliance) ── */
   function omOpenWorker(code) {
     const r = OM_MAPPING.find(function (x) { return x.code === code; });
     if (!r) return;
     OM_MODAL_CODE = code;
     const c = omWorkerCompliance(r);
+
+    const general =
+      kvKV('Associate code', r.code) + kvKV('Name', r.name) + kvKV('Designation', r.desig) +
+      kvKV('Department', r.dept) + kvKV('Reporting manager', r.mgr + (r.mgrCode ? ' · ' + r.mgrCode : '')) +
+      kvKV('Preferred language', '<span class="pill outline">' + (r.lang || '—') + '</span>') +
+      '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">From the OM Manpower attendance / mapping roster — the real workforce dataset.</div>';
+
+    const aadhaarRow = c.aadhaarVerified
+      ? '<span class="pill green tiny">Verified' + (c.aadhaarLast4 ? ' · XXXX XXXX ' + c.aadhaarLast4 : '') + '</span>'
+      : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="omOpenAadhaar(\'' + code + '\')">Upload &amp; verify</button>';
+    const identification =
+      kvKV('UAN (EPFO)', omIdCell('UAN', r.uan, r)) +
+      kvKV('ESI (IP number)', omIdCell('ESI', r.esi, r)) +
+      kvKV('Aadhaar eKYC', aadhaarRow) +
+      '<div class="tiny muted" style="margin-top:10px">Click UAN / ESI to open the verifiable document viewer. Aadhaar is verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained (DPDP Act 2023).</div>';
+
     const itemsHtml = c.items.map(function (it) {
       const ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
       const sev = '<span class="pill ' + (it.severity === 'critical' ? 'red' : it.severity === 'high' ? 'amber' : 'outline') + ' tiny">' + it.severity + '</span>';
       return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">' +
         '<div style="width:18px;text-align:center">' + ico + '</div>' +
-        '<div style="flex:1">' +
-          '<div style="font-size:0.85rem"><strong>' + it.label + '</strong> ' + sev +
-            ' <span class="tiny" style="color:' + (it.ok ? 'var(--green-dk)' : 'var(--red-dk)') + '">· ' + (it.ok ? 'compliant' : 'not met') + '</span></div>' +
-          '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div>' +
-        '</div></div>';
+        '<div style="flex:1"><div style="font-size:0.85rem"><strong>' + it.label + '</strong> ' + sev +
+          ' <span class="tiny" style="color:' + (it.ok ? 'var(--green-dk)' : 'var(--red-dk)') + '">· ' + (it.ok ? 'compliant' : 'not met') + '</span></div>' +
+        '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div></div></div>';
     }).join('');
-    const aadhaarRow = c.aadhaarVerified
-      ? '<span class="pill green tiny">Aadhaar verified' + (c.aadhaarLast4 ? ' · XXXX XXXX ' + c.aadhaarLast4 : '') + '</span>'
-      : '<span class="pill red tiny">Aadhaar not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="omOpenAadhaar(\'' + code + '\')">Verify Aadhaar</button>';
+    const compliance =
+      '<div class="g2" style="gap:10px;margin-bottom:12px">' +
+        '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
+      '</div>' +
+      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + itemsHtml +
+      '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">' + OM_LAW_FACTS[0] + ' ' + OM_LAW_FACTS[2] + '</div>';
+
     const notifyBtn = (c.status !== 'compliant' || !c.aadhaarVerified)
       ? '<button class="btn amber" onclick="omOpenNotify(\'' + code + '\')">Notify worker</button>' : '';
-    omModal(
-      '<div class="modal-h"><div class="modal-h-left">' +
-        '<span class="modal-h-eye">Employee compliance · ' + r.code + '</span>' +
-        '<span class="modal-h-title">' + r.name + ' · ' + r.desig + '</span>' +
-      '</div><span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
-      '<div class="modal-body">' +
-        '<div class="g3" style="gap:10px;margin-bottom:12px">' +
-          '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
-          '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
-          '<div class="kpi"><div class="kpi-eye">Department · manager</div><div class="kpi-val" style="font-size:0.9rem">' + r.dept + '<small>' + r.mgr + '</small></div></div>' +
-        '</div>' +
-        '<div class="row-between" style="margin:6px 0 10px"><span class="card-h-title" style="font-size:0.9rem">Aadhaar eKYC</span><span>' + aadhaarRow + '</span></div>' +
-        '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' +
-        itemsHtml +
-        '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">' + OM_LAW_FACTS[0] + ' ' + OM_LAW_FACTS[2] + '</div>' +
-      '</div>' +
-      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">' + (c.notifiedAt ? 'Last notified ' + new Date(c.notifiedAt).toLocaleString('en-IN') : 'Not yet notified') + '</span></div>' +
-        '<div class="modal-footer-right">' + notifyBtn + '<button class="btn" onclick="omCloseModal()">Close</button></div></div>'
-    );
+    kvTabModal({
+      eyebrow: 'Employee · ' + r.code + ' · ' + (c.status === 'compliant' ? 'compliant' : 'non-compliant'),
+      title: r.name + ' · ' + r.desig,
+      tabs: [
+        { id: 'general', label: 'General information', html: general },
+        { id: 'ident', label: 'Identification documents', html: identification },
+        { id: 'compliance', label: 'Compliance', html: compliance }
+      ],
+      footer: '<div class="modal-footer-left"><span class="tiny muted">' + (c.notifiedAt ? 'Last notified ' + new Date(c.notifiedAt).toLocaleString('en-IN') : 'Not yet notified') + '</span></div>' +
+        '<div class="modal-footer-right">' + notifyBtn + '<button class="btn" onclick="omCloseModal()">Close</button></div>'
+    });
   }
 
   /* ── Aadhaar entry / upload / validate modal ───────────────────────────── */
@@ -14154,6 +14233,189 @@ function __kvOnReady(fn) {
       (rows || '<tr><td colspan="7" class="tiny muted" style="padding:10px">No associates in this department.</td></tr>') +
       '</tbody></table></div>';
     omExpDeptRender();   // refresh selection highlight
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     ONBOARDING · Aadhaar verify (reusable) + captured-profile storage + the
+     tabbed onboarding-detail modal with compliance checks, linked to the OM
+     compliance model and the real contractor records.
+     ════════════════════════════════════════════════════════════════════════ */
+
+  /* generic Aadhaar upload+validate modal that writes the verified number into
+     a target input (and calls onDone). Reuses the OCR + Verhoeff validator. */
+  let _KV_AAD_TARGET = null, _KV_AAD_DONE = null;
+  function kvAadhaarVerify(targetId, onDone) {
+    _KV_AAD_TARGET = targetId; _KV_AAD_DONE = onDone || null;
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Aadhaar eKYC</span>' +
+        '<span class="modal-h-title">Upload &amp; verify Aadhaar</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="cap-hint" style="margin-bottom:10px">Upload the Aadhaar document — the number is read automatically and validated (UIDAI Verhoeff checksum), or type it. Only the last 4 digits are retained (DPDP Act 2023).</div>' +
+        '<div class="cap-drop" onclick="document.getElementById(\'kv-aad-file\').click()">' +
+          '<div class="cap-drop-ico">⬆</div><div class="cap-drop-t">Drop the Aadhaar image, or click to upload</div>' +
+          '<div class="cap-drop-s" id="kv-aad-status">PNG / JPG of the Aadhaar card</div>' +
+          '<input type="file" id="kv-aad-file" accept="image/*" style="display:none" onchange="kvAadhaarFile(this)"></div>' +
+        '<div class="field" style="margin-top:12px"><label class="field-l">Aadhaar number</label>' +
+          '<input class="input" id="kv-aad-num" inputmode="numeric" placeholder="12-digit Aadhaar" oninput="kvAadhaarCheck()"></div>' +
+        '<div id="kv-aad-result" class="tiny" style="min-height:18px"></div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Verhoeff-validated · masked storage</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" id="kv-aad-verify" disabled onclick="kvAadhaarSave()">Verify</button>' +
+        '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>'
+    );
+  }
+  function kvAadhaarCheck() {
+    const inp = document.getElementById('kv-aad-num'), out = document.getElementById('kv-aad-result'), btn = document.getElementById('kv-aad-verify');
+    const raw = (inp ? inp.value : '').replace(/\D/g, '');
+    const ok = verhoeffValid(raw);
+    if (out) out.innerHTML = !raw ? '' : ok
+      ? '<span style="color:var(--green-dk)">✓ Valid Aadhaar · ' + maskAadhaar(raw) + '</span>'
+      : '<span style="color:var(--red-dk)">✕ Invalid — checksum failed</span>';
+    if (btn) btn.disabled = !ok;
+    return ok;
+  }
+  function kvAadhaarFile(input) {
+    const file = input && input.files && input.files[0]; if (!file) return;
+    const status = document.getElementById('kv-aad-status');
+    if (status) status.textContent = 'Reading document… (first run downloads the OCR engine, ~10s)';
+    omAadhaarOcr(file).then(function (num) {
+      if (num) { const inp = document.getElementById('kv-aad-num'); if (inp) inp.value = num; kvAadhaarCheck(); if (status) status.textContent = 'Read from document ✓'; toast('Aadhaar read from document', 'green'); }
+      else { if (status) status.textContent = 'Could not read a valid number — type it manually'; toast('OCR found no valid Aadhaar — enter manually', 'amber'); }
+    }).catch(function () { if (status) status.textContent = 'OCR unavailable — type the number manually'; toast('OCR unavailable — enter manually', 'amber'); });
+  }
+  function kvAadhaarSave() {
+    const raw = (document.getElementById('kv-aad-num') || {}).value || '';
+    const clean = raw.replace(/\D/g, '');
+    if (!verhoeffValid(clean)) { toast('Enter a valid Aadhaar first', 'red'); return; }
+    const t = _KV_AAD_TARGET && document.getElementById(_KV_AAD_TARGET);
+    if (t) t.value = clean;
+    if (_KV_AAD_DONE) _KV_AAD_DONE(clean);
+    toast('Aadhaar verified · ' + maskAadhaar(clean), 'green');
+    omCloseModal();
+  }
+  /* capture-form button: verify Aadhaar into #cap-aadhaar and flag the profile */
+  function capVerifyAadhaar() {
+    kvAadhaarVerify('cap-aadhaar', function () { CAP_STATE.aadhaarVerified = true; if (typeof capSync === 'function') capSync(); });
+  }
+
+  /* compliance for a captured onboarding profile — links to the contractor
+     record when present, mirrors the OM statutory checklist otherwise. */
+  function obWorkerCompliance(rec) {
+    const h = omHash(rec.id || rec.name || '');
+    const ct = (rec.employment && rec.employment.contractor)
+      ? (CONTRACTORS || []).find(function (x) { return x.name === rec.employment.contractor; }) : null;
+    const items = OM_LAWS.map(function (law, i) {
+      let ok;
+      if (law.key === 'aadhaarKyc') ok = !!rec.aadhaarVerified;
+      else if (law.key === 'appointmentLetter') ok = !!(rec.employment && (rec.employment.posId || rec.employment.workorder));
+      else if (law.key === 'inductionSafety') ok = !!rec.ppeAckAt;
+      else if (law.key === 'esic') ok = ct ? (ct.esic && ct.esic.cls !== 'red') : (((h >> i) & 1) === 1);
+      else if (law.key === 'uanEpfo') ok = ct ? (!ct.subscores || ct.subscores.pf >= 60) : (((h >> i) & 1) === 1);
+      else if (law.key === 'minWages') ok = ct ? (!ct.subscores || ct.subscores.minWage >= 60) : (((h >> (i + 2)) & 1) === 1);
+      else ok = ((h >> i) & 1) === 1;
+      return { key: law.key, label: law.label, law: law.law, severity: law.severity, weight: law.weight, ok: ok };
+    });
+    const score = items.reduce(function (s, it) { return s + (it.ok ? it.weight : 0); }, 0);
+    const criticalsOk = items.filter(function (it) { return it.severity === 'critical'; }).every(function (it) { return it.ok; });
+    return { score: score, status: (criticalsOk && score >= 80) ? 'compliant' : 'non-compliant', items: items, contractor: ct, aadhaarVerified: !!rec.aadhaarVerified };
+  }
+
+  /* tabbed onboarding-detail modal (General / Identification / Compliance) */
+  function obOpenCapture(i) {
+    const rec = CAP_STATE.recent[i];
+    if (!rec) return;
+    const a = rec.address || {};
+    const e = rec.employment || {};
+    const ppe = rec.ppe || {};
+    const general =
+      kvKV('Worker ID', rec.id) + kvKV('Name', rec.name) +
+      kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
+      kvKV('Category', rec.category) + kvKV('Gender', rec.gender) + kvKV('Date of birth', rec.dob) +
+      kvKV('Mobile', rec.mobile) + kvKV('Emergency contact', rec.emergency) +
+      kvKV('Preferred language', '<span class="pill outline">' + (rec.lang || '—') + '</span>') +
+      kvKV('Inter-state migrant', rec.migrant ? 'Yes (ISMW / OSHC)' : 'No') +
+      kvKV('Address', [a.addr1, a.addr2, a.city, a.district, a.pin, a.state].filter(Boolean).join(', ')) +
+      kvKV('PPE issued', [ppe.uniform && ('Uniform ' + ppe.uniform), ppe.shoe && ('Shoe ' + ppe.shoe), ppe.helmet, ppe.glove].filter(Boolean).join(' · '));
+    const aadhaarRow = rec.aadhaarVerified
+      ? '<span class="pill green tiny">Verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
+      : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
+    const identification =
+      kvKV('Aadhaar eKYC', aadhaarRow) +
+      (rec.type === 'direct'
+        ? kvKV('Position ID', e.posId) + kvKV('Department', e.dept)
+        : kvKV('Work order', e.workorder) + kvKV('Contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
+      kvKV('Date of joining', e.doj) +
+      '<div class="tiny muted" style="margin-top:10px">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained.</div>';
+    const c = obWorkerCompliance(rec);
+    const itemsHtml = c.items.map(function (it) {
+      const ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
+      const sev = '<span class="pill ' + (it.severity === 'critical' ? 'red' : it.severity === 'high' ? 'amber' : 'outline') + ' tiny">' + it.severity + '</span>';
+      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="width:18px;text-align:center">' + ico + '</div>' +
+        '<div style="flex:1"><div style="font-size:0.85rem"><strong>' + it.label + '</strong> ' + sev + ' <span class="tiny" style="color:' + (it.ok ? 'var(--green-dk)' : 'var(--red-dk)') + '">· ' + (it.ok ? 'compliant' : 'not met') + '</span></div>' +
+        '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div></div></div>';
+    }).join('');
+    const ctLink = c.contractor
+      ? '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Linked contractor <strong>' + c.contractor.name + '</strong> · compliance score ' + c.contractor.score + '/100 — ESIC/PF status flows from the contractor master.</div>'
+      : '';
+    const compliance =
+      '<div class="g2" style="gap:10px;margin-bottom:12px">' +
+        '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
+      '</div>' +
+      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + itemsHtml + ctLink;
+    kvTabModal({
+      eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract'),
+      title: rec.name + ' · ' + rec.category,
+      tabs: [
+        { id: 'general', label: 'General information', html: general },
+        { id: 'ident', label: 'Identification documents', html: identification },
+        { id: 'compliance', label: 'Compliance', html: compliance }
+      ],
+      footer: '<div class="modal-footer-left"><span class="tiny muted">' + (rec.mobile ? 'Worker mobile ' + rec.mobile : '') + '</span></div>' +
+        '<div class="modal-footer-right">' +
+        (c.status !== 'compliant' && rec.mobile ? '<button class="btn amber" onclick="obNotifyCapture(' + i + ')">Notify worker (WhatsApp)</button>' : '') +
+        '<button class="btn" onclick="omCloseModal()">Close</button></div>'
+    });
+  }
+  function obVerifyCaptureAadhaar(i) {
+    const rec = CAP_STATE.recent[i]; if (!rec) return;
+    kvAadhaarVerify('kv-aad-num', function (num) {
+      rec.aadhaarVerified = true; rec.aadhaarLast4 = num.slice(-4);
+      if (rec.backendId) {
+        fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: rec.backendId, name: rec.name, aadhaarLast4: num.slice(-4), aadhaarVerified: true })
+        }).catch(function () {});
+      }
+      capRenderRecent(); obOpenCapture(i);
+    });
+  }
+  function obNotifyCapture(i) {
+    const rec = CAP_STATE.recent[i]; if (!rec || !rec.mobile) return;
+    const c = obWorkerCompliance(rec);
+    const fails = c.items.filter(function (it) { return !it.ok; }).map(function (it) { return it.label; }).join(', ') || 'pending items';
+    if (window.KVWhatsApp) {
+      window.KVWhatsApp.notify(rec.mobile,
+        'Namaste ' + rec.name + ', please complete pending onboarding compliance: ' + fails + '. — Plant HR, Karya Vaani',
+        { label: 'WhatsApp sent to ' + rec.name });
+    } else { toast('WhatsApp gateway unavailable', 'red'); }
+  }
+
+  /* load persisted captures on init so they survive reloads */
+  function obLoadCaptures() {
+    fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (!j || !j.ok || !Array.isArray(j.captures) || !j.captures.length) return;
+        const have = {};
+        CAP_STATE.recent.forEach(function (x) { if (x.backendId) have[x.backendId] = 1; });
+        const loaded = j.captures.slice().reverse()
+          .filter(function (c) { return !have[c.id]; })
+          .map(function (c) { return Object.assign({}, c, { backendId: c.id, status: c.status || 'sent' }); });
+        if (loaded.length) { CAP_STATE.recent = CAP_STATE.recent.concat(loaded); capRenderRecent(); }
+      })
+      .catch(function () {});
   }
 
   /* ── workforce compliance analytics (Analytics hub tab) ────────────────── */
