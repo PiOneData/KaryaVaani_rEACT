@@ -5611,7 +5611,9 @@ function __kvOnReady(fn) {
      Configure the host via window.VAANI_ENGINE_URL (default localhost:5060). */
   window.VAANI_ENGINE_URL = window.VAANI_ENGINE_URL || 'http://localhost:5060';
   /* Set window.VAANI_API_KEY (e.g. in index.html) when the engine has auth on. */
-  const VB_AUDIO_CACHE = {};   /* code -> object URL of the fetched voice WAV */
+  const VB_AUDIO_CACHE = {};   /* code -> object URL (for inline playback) */
+  const VB_VOICE_CACHE = {};   /* code -> synthesised WAV Blob (the real voice file) */
+  let vbTtsChain = Promise.resolve();   /* serialises every TTS request — the voice model is single-worker */
 
   function vbEngineUrl(path) { return window.VAANI_ENGINE_URL.replace(/\/$/, '') + path; }
   function vbEngineHeaders() {
@@ -5632,16 +5634,38 @@ function __kvOnReady(fn) {
     }).then(function (j) { return j.translations || {}; });
   }
 
-  /* POST /tts → resolves to an audio/wav Blob */
+  /* Low-level TTS call → audio/wav Blob. Goes through the backend proxy
+     (/api/tts) so the voice-service address stays server-side and we avoid
+     mixed-content / CORS. The model synthesises speech for the supplied
+     (already-translated) text. */
   function vbEngineTts(text, code) {
-    return fetch(vbEngineUrl('/tts'), {
+    return fetch('/api/tts', {
       method: 'POST',
-      headers: vbEngineHeaders(),
-      body: JSON.stringify({ text: text, lang: code })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
     }).then(function (r) {
       if (!r.ok) throw new Error('tts ' + r.status);
       return r.blob();
     });
+  }
+
+  /* Get the synthesised voice Blob for a language, generating it once and
+     caching it. All requests are queued onto vbTtsChain so they hit the
+     single-worker voice model strictly one at a time (sequential). The cached
+     blob is reused for playback, download AND the email attachment. */
+  function vbGetVoice(code) {
+    if (VB_VOICE_CACHE[code]) return Promise.resolve(VB_VOICE_CACHE[code]);
+    const text = (VB_STATE.translations && VB_STATE.translations[code]) || '';
+    if (!text) return Promise.reject(new Error('no translated text for ' + code));
+    const run = vbTtsChain.then(function () {
+      if (VB_VOICE_CACHE[code]) return VB_VOICE_CACHE[code];   // filled while queued
+      return vbEngineTts(text, code).then(function (blob) {
+        VB_VOICE_CACHE[code] = blob;
+        return blob;
+      });
+    });
+    vbTtsChain = run.catch(function () {});   // keep the queue alive after a failure
+    return run;
   }
 
   /* discard cached voice audio when the translation changes */
@@ -5650,6 +5674,7 @@ function __kvOnReady(fn) {
       try { URL.revokeObjectURL(VB_AUDIO_CACHE[k]); } catch (e) {}
       delete VB_AUDIO_CACHE[k];
     });
+    Object.keys(VB_VOICE_CACHE).forEach(function (k) { delete VB_VOICE_CACHE[k]; });
   }
 
   /* NLLB-style language codes the VAANI translation service expects.
@@ -5718,6 +5743,7 @@ function __kvOnReady(fn) {
     }
 
     VB_STATE.translations = out;
+    vbClearAudioCache();   /* text changed → drop any previously synthesised voices */
     btn.disabled = false;
     btn.textContent = 'Re-translate via VAANI';
     vbRenderTranslations();
@@ -5805,7 +5831,7 @@ function __kvOnReady(fn) {
     /* Preferred path: real synthesised voice from the VAANI engine. */
     const cached = VB_AUDIO_CACHE[code]
       ? Promise.resolve(VB_AUDIO_CACHE[code])
-      : vbEngineTts(text, code).then(function (blob) {
+      : vbGetVoice(code).then(function (blob) {
           const url = URL.createObjectURL(blob);
           VB_AUDIO_CACHE[code] = url;
           return url;
@@ -5937,7 +5963,7 @@ function __kvOnReady(fn) {
     const dlLabel = document.getElementById('vb-voice-dl-label-' + code);
     if (dlLabel) dlLabel.textContent = 'Preparing…';
 
-    vbEngineTts(text, code)
+    vbGetVoice(code)
       .then(function (wavBlob) {
         vbSaveBlob(wavBlob, fname);
         if (dlLabel) dlLabel.textContent = 'Download';
@@ -6330,14 +6356,14 @@ function __kvOnReady(fn) {
         var base  = 'karya-vaani-voice-' + l.name.toLowerCase().replace(/\s+/g, '-') + '.wav';
         var blob, fname;
         try {
-          blob  = await vbEngineTts(text, code);   /* real synthesised speech */
+          blob  = await vbGetVoice(code);          /* cached/queued real synthesised speech */
           fname = base;
         } catch (e) {
           blob  = vbBuildWav(text);                /* offline placeholder tone */
           fname = 'PLACEHOLDER-' + base;
         }
         var b64 = await blobToBase64(blob);
-        attachments.push({ filename: fname, data: b64 });
+        attachments.push({ filename: fname, data: b64, contentType: 'audio/wav' });
       }
 
       const resp = await fetch('/api/send-email', {

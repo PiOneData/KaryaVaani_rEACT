@@ -289,6 +289,47 @@ app.post('/api/translate', async (req, res) => {
   }
 });
 
+/* ── VAANI voice (TTS) proxy ───────────────────────────────────────────────
+   POST /api/tts   Body: { text }  → audio/wav bytes
+   Forwards to the MMS-TTS voice service. Proxying server-side keeps the service
+   address off the client and avoids browser mixed-content (https page → http
+   service) / CORS issues, mirroring the translation proxy. The model takes the
+   already-translated text and returns synthesised speech for it.
+
+   Configure via env:
+     TTS_API_URL   default http://4.247.160.91:64574
+   ──────────────────────────────────────────────────────────────────────── */
+const TTS_API_URL = (process.env.TTS_API_URL || 'http://4.247.160.91:64574').replace(/\/$/, '');
+
+app.post('/api/tts', async (req, res) => {
+  const { text } = req.body || {};
+  if (!text) {
+    return res.status(400).json({ ok: false, error: 'text is required' });
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 600000); // 10 min hard cap
+  try {
+    const resp = await fetch(TTS_API_URL + '/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: controller.signal
+    });
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => '');
+      return res.status(resp.status).json({ ok: false, error: 'tts service ' + resp.status + (detail ? ': ' + detail.slice(0, 200) : '') });
+    }
+    const buf = Buffer.from(await resp.arrayBuffer());
+    res.set('Content-Type', resp.headers.get('content-type') || 'audio/wav');
+    res.send(buf);
+  } catch (err) {
+    console.error('tts error:', err.message);
+    res.status(502).json({ ok: false, error: 'tts service unreachable: ' + err.message });
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
 /* --- WhatsApp gateway proxy -----------------------------------------------
    The browser never talks to the comms server directly -- it calls these
    endpoints, which forward to the standalone communication server using the
