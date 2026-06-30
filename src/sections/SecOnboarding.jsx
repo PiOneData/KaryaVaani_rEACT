@@ -762,10 +762,10 @@ export default function SecOnboarding() {
                     <label className="field-l">Contractor</label>
                     {' '}
                     <select className="sel" id="cap-contractor" disabled>
-                      <option>Sri Lakshmi Engineering</option>
-                      <option>Venkateswara Manpower</option>
-                      <option>Coastal Facility Services</option>
-                      <option>Annapurna Staffing</option>
+                      <option>ARK HR Solutions &amp; Services</option>
+                      <option>OM Manpower Services</option>
+                      <option>Saptagiri Enterprises</option>
+                      <option>CHR Enterprises</option>
                     </select>
                   </div>
                   {' '}

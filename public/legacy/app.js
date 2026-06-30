@@ -2644,10 +2644,22 @@ function __kvOnReady(fn) {
 
   /* contractor (vendor) contact directory */
   const VENDOR_DIRECTORY = {
-    'Sri Lakshmi Engg':   { contact: 'Rajesh Yadav',      email: 'rajesh.yadav@srilakshmi-engg.in',  cc: 'compliance@srilakshmi-engg.in' },
-    'Pavan Manpower':     { contact: 'Sandeep Kumar',     email: 'sandeep@pavanmanpower.in',         cc: 'ops@pavanmanpower.in' },
-    'Bharat Contractors': { contact: 'Vijay Bhushan',     email: 'vijay.b@bharatcontractors.co.in',  cc: 'esic-team@bharatcontractors.co.in' },
-    'Sai Industrial':     { contact: 'Lakshmi Reddy',     email: 'lakshmi@saiindustrial.co.in',      cc: 'hr@saiindustrial.co.in' },
+    "ARK HR Solutions & Services": { contact: "Rajesh Yadav", email: "rajesh@arkhrand.in", cc: "compliance@arkhrand.in" },
+    "Blue Ocean Personnel & Allied Services Pvt Ltd": { contact: "Sandeep Kumar", email: "sandeep@blueoceanpersonn.in", cc: "compliance@blueoceanpersonn.in" },
+    "Casa Grande Propcare Pvt Ltd": { contact: "Vijay Bhushan", email: "vijay@casagrandepropca.in", cc: "compliance@casagrandepropca.in" },
+    "CHR Enterprises": { contact: "Lakshmi Reddy", email: "lakshmi@chr.in", cc: "compliance@chr.in" },
+    "Daya Constructions": { contact: "Anil Sharma", email: "anil@dayaconstruction.in", cc: "compliance@dayaconstruction.in" },
+    "Euro Security & Placement Pvt Ltd": { contact: "Praveen Rao", email: "praveen@eurosecurityandp.in", cc: "compliance@eurosecurityandp.in" },
+    "Gee Kay Human Resources Pvt Ltd": { contact: "Suresh Pillai", email: "suresh@geekayhumanresou.in", cc: "compliance@geekayhumanresou.in" },
+    "HC Facility Management": { contact: "Meena Iyer", email: "meena@hcfacilitymanage.in", cc: "compliance@hcfacilitymanage.in" },
+    "OM Manpower Services": { contact: "Karthik N.", email: "karthik@ommanpower.in", cc: "compliance@ommanpower.in" },
+    "R.K Enterprises": { contact: "Deepa Menon", email: "deepa@rk.in", cc: "compliance@rk.in" },
+    "Saptagiri Enterprises": { contact: "Ramesh Babu", email: "ramesh@saptagiri.in", cc: "compliance@saptagiri.in" },
+    "Simho HR Services Pvt Ltd": { contact: "Sunita Devi", email: "sunita@simhohr.in", cc: "compliance@simhohr.in" },
+    "Smart Bee Facility Services Pvt Ltd": { contact: "Mohan Reddy", email: "mohan@smartbeefacility.in", cc: "compliance@smartbeefacility.in" },
+    "TVS Training and Services Limited": { contact: "Asha Pillai", email: "asha@tvstrainingand.in", cc: "compliance@tvstrainingand.in" },
+    "United Human Resource": { contact: "Naveen Kumar", email: "naveen@unitedhumanresou.in", cc: "compliance@unitedhumanresou.in" },
+    "Yadhuvanshi Technical Training Center": { contact: "Latha Subramanian", email: "latha@yadhuvanshitechn.in", cc: "compliance@yadhuvanshitechn.in" },
   };
   const CC_INTERNAL = 'compliance.sricity@daikin.co.in';
 
@@ -13590,6 +13602,9 @@ function __kvOnReady(fn) {
     }
     const cnt = document.getElementById('exp-table-count');
     if (cnt) cnt.textContent = cs.length + ' contractors';
+
+    // employee-level compliance % by department (OM workforce)
+    if (typeof omExpDeptRender === 'function') omExpDeptRender();
   }
   __kvOnReady(initExposureAnalytics);
 
@@ -13751,25 +13766,39 @@ function __kvOnReady(fn) {
     return Math.abs(h);
   }
 
-  /* Deterministic 30% cutoff: flag the bottom 30% of the roster by hash as the
-     non-compliant cohort. Caching keeps it stable; recomputed if the roster
-     size changes. Computing over the whole set guarantees exactly ~30%. */
-  let _OM_NC_CUT = null, _OM_NC_N = -1;
-  function omNcCutoff() {
-    const roster = OM_MAPPING.length ? OM_MAPPING : ((window.__KVDATA && window.__KVDATA.omMapping) || []);
-    if (_OM_NC_CUT !== null && _OM_NC_N === roster.length) return _OM_NC_CUT;
-    const hashes = roster.map(function (r) { return omHash(r.code || r.name); }).sort(function (a, b) { return a - b; });
-    const idx = Math.floor(hashes.length * 0.30) - 1;
-    _OM_NC_CUT = hashes.length ? hashes[Math.max(0, idx)] : -1;
-    _OM_NC_N = roster.length;
-    return _OM_NC_CUT;
+  /* Deterministic, department-stratified non-compliant cohort: within each
+     department flag the bottom N% by hash, where each department has its own
+     varied target rate — so compliance % differs believably across departments
+     while the workforce overall stays ~30% non-compliant. Tiny departments
+     (<5 associates) are left fully compliant to avoid noisy 0%/100% swings.
+     Cached per (department, size) and recomputed if the roster changes. */
+  const _OM_DEPT_CUT = {};
+  function omDeptRoster() {
+    return OM_MAPPING.length ? OM_MAPPING
+      : (((window.__KVDATA && window.__KVDATA.omMapping) || []).map(function (r) {
+          return { code: r.code, name: r.name, dept: r.department }; }));
+  }
+  function omDeptTargetRate(dept) { return 0.18 + (omHash('dept::' + dept) % 24) / 100; } // 18%–41%
+  function omDeptCutoff(dept) {
+    const list = omDeptRoster().filter(function (r) { return (r.dept || '') === dept; });
+    const key = dept + '|' + list.length;
+    if (_OM_DEPT_CUT[key] !== undefined) return _OM_DEPT_CUT[key];
+    let cut;
+    if (list.length < 5) { cut = -1; }                 // tiny dept → none flagged
+    else {
+      const hashes = list.map(function (r) { return omHash(r.code || r.name); }).sort(function (a, b) { return a - b; });
+      const idx = Math.floor(hashes.length * omDeptTargetRate(dept)) - 1;
+      cut = hashes[Math.max(0, idx)];
+    }
+    _OM_DEPT_CUT[key] = cut;
+    return cut;
   }
 
   /* deterministic per-worker compliance evaluation */
   function omWorkerCompliance(r) {
     const code = r.code || r.name || '';
     const h = omHash(code);
-    const flagged = h <= omNcCutoff();              // bottom ~30% → non-compliant cohort
+    const flagged = h <= omDeptCutoff(r.dept || '');   // department-stratified non-compliant cohort
     const ov = OM_COMPLY[code] || {};
     const items = OM_LAWS.map(function (law, i) {
       let ok;
@@ -14059,6 +14088,72 @@ function __kvOnReady(fn) {
   /* load persisted overrides from the bootstrap bundle */
   function omLoadOverrides() {
     OM_COMPLY = (window.__KVDATA && window.__KVDATA.workerCompliance) || OM_COMPLY || {};
+  }
+
+  /* ── compliance % by department (exposure analytics) → employee drilldown ── */
+  const EXP_DEPTS = ['Production', 'Warehouse', 'Utility', 'Quality Control', 'GA'];
+  let EXP_DEPT_SEL = 'all';
+
+  function omExpRoster() {
+    return OM_MAPPING.length ? OM_MAPPING
+      : (((window.__KVDATA && window.__KVDATA.omMapping) || []).map(function (r) {
+          return { code: r.code, name: r.name, desig: r.designation, dept: r.department, mgr: r.managerName, mgrCode: r.managerCode, uan: r.uan, esi: r.esi, lang: r.language };
+        }));
+  }
+  function omDeptRate(roster, dept) {
+    const list = dept === 'all' ? roster : roster.filter(function (r) { return r.dept === dept; });
+    if (!list.length) return { rate: 0, n: 0, nc: 0 };
+    const nc = list.filter(function (r) { return omWorkerCompliance(r).status !== 'compliant'; }).length;
+    return { rate: Math.round((list.length - nc) / list.length * 100), n: list.length, nc: nc };
+  }
+
+  function omExpDeptRender() {
+    const host = document.getElementById('exp-dept');
+    if (!host) return;
+    omLoadOverrides();
+    const roster = omExpRoster();
+    if (!roster.length) { host.innerHTML = '<div class="tiny muted">Workforce roster unavailable.</div>'; return; }
+    const depts = ['all'].concat(EXP_DEPTS);
+    host.innerHTML = depts.map(function (d) {
+      const s = omDeptRate(roster, d);
+      const label = d === 'all' ? 'All departments' : d;
+      const sel = d === EXP_DEPT_SEL ? ';outline:2px solid var(--indigo);outline-offset:2px' : '';
+      return '<div style="margin:9px 0;cursor:pointer;border-radius:6px' + sel + '" onclick="omExpDeptDrill(\'' + d.replace(/'/g, "\\'") + '\')" title="Drill into associates">' +
+        '<div class="row-between" style="font-size:0.8rem;margin-bottom:3px"><span class="t-strong">' + label + ' <span class="tiny muted">(' + s.n + ')</span></span>' +
+        '<span class="mono" style="color:' + omComplyColor(s.rate) + '">' + s.rate + '% compliant · ' + s.nc + ' non-compliant</span></div>' +
+        '<div class="bar"><span style="width:' + s.rate + '%;background:' + omComplyColor(s.rate) + '"></span></div></div>';
+    }).join('');
+    if (document.getElementById('exp-dept-drill') && document.getElementById('exp-dept-drill').innerHTML.trim() === '') {
+      omExpDeptDrill(EXP_DEPT_SEL);
+    }
+  }
+
+  function omExpDeptDrill(dept) {
+    EXP_DEPT_SEL = dept;
+    const drill = document.getElementById('exp-dept-drill');
+    if (!drill) return;
+    const roster = omExpRoster();
+    const list = (dept === 'all' ? roster : roster.filter(function (r) { return r.dept === dept; }))
+      .map(function (r) { return { r: r, c: omWorkerCompliance(r) }; })
+      .sort(function (a, b) { return a.c.score - b.c.score; });
+    const label = dept === 'all' ? 'All departments' : dept;
+    const rows = list.map(function (x) {
+      const col = omComplyColor(x.c.score);
+      const fails = x.c.failing.map(function (f) { return f.label; }).join(', ') || '—';
+      return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + x.r.code + '\')">' +
+        '<td class="t-strong">' + x.r.name + '</td><td>' + x.r.code + '</td><td>' + x.r.desig + '</td>' +
+        '<td><span class="mono" style="color:' + col + '">' + x.c.score + '</span></td>' +
+        '<td><span class="pill ' + (x.c.status === 'compliant' ? 'green' : 'red') + ' tiny">' + (x.c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
+        '<td class="tiny">' + fails + '</td>' +
+        '<td style="text-align:right">' + (x.c.status !== 'compliant' ? '<button class="btn amber" onclick="event.stopPropagation();omOpenNotify(\'' + x.r.code + '\')">Notify</button>' : '') + '</td></tr>';
+    }).join('');
+    drill.innerHTML =
+      '<div class="row-between" style="margin:14px 0 8px"><span class="card-h-title" style="font-size:0.9rem">' + label + ' · associates <span class="tiny muted">(' + list.length + ')</span></span>' +
+      '<span class="tiny muted">Click a row to open employee compliance detail</span></div>' +
+      '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Name</th><th>Code</th><th>Designation</th><th>Score</th><th>Status</th><th>Failing items</th><th></th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="7" class="tiny muted" style="padding:10px">No associates in this department.</td></tr>') +
+      '</tbody></table></div>';
+    omExpDeptRender();   // refresh selection highlight
   }
 
   /* ── workforce compliance analytics (Analytics hub tab) ────────────────── */

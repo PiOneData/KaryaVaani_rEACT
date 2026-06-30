@@ -937,7 +937,7 @@
  "contractWorkers": [
   {
    "name": "Ravi Kumar",
-   "contractor": "Sri Lakshmi Engg",
+   "contractor": "Gee Kay Human Resources Pvt Ltd",
    "category": "Skilled",
    "esic": {
     "state": "ok",
@@ -953,7 +953,7 @@
   },
   {
    "name": "Mohan Das",
-   "contractor": "Pavan Manpower",
+   "contractor": "HC Facility Management",
    "category": "Semi-skilled",
    "esic": {
     "state": "pending",
@@ -969,7 +969,7 @@
   },
   {
    "name": "Suresh B.",
-   "contractor": "Sri Lakshmi Engg",
+   "contractor": "United Human Resource",
    "category": "Unskilled",
    "esic": {
     "state": "breach",
@@ -985,7 +985,7 @@
   },
   {
    "name": "Anil Kumar",
-   "contractor": "Bharat Contractors",
+   "contractor": "Smart Bee Facility Services Pvt Ltd",
    "category": "Highly skilled",
    "esic": {
     "state": "ok",
@@ -1001,7 +1001,7 @@
   },
   {
    "name": "Praveen N.",
-   "contractor": "Sri Lakshmi Engg",
+   "contractor": "HC Facility Management",
    "category": "Semi-skilled",
    "esic": {
     "state": "ok",
@@ -1017,7 +1017,7 @@
   },
   {
    "name": "Mahesh G.",
-   "contractor": "Bharat Contractors",
+   "contractor": "Blue Ocean Personnel & Allied Services Pvt Ltd",
    "category": "Skilled",
    "esic": {
     "state": "ok",
@@ -1033,7 +1033,7 @@
   },
   {
    "name": "Lalita Devi",
-   "contractor": "Pavan Manpower",
+   "contractor": "Simho HR Services Pvt Ltd",
    "category": "Unskilled",
    "esic": {
     "state": "pending",
@@ -1049,7 +1049,7 @@
   },
   {
    "name": "Vinod K.",
-   "contractor": "Sri Lakshmi Engg",
+   "contractor": "CHR Enterprises",
    "category": "Skilled",
    "esic": {
     "state": "ok",
@@ -1065,7 +1065,7 @@
   },
   {
    "name": "Naga Babu",
-   "contractor": "Sai Industrial",
+   "contractor": "Euro Security & Placement Pvt Ltd",
    "category": "Highly skilled",
    "esic": {
     "state": "ok",
@@ -1081,7 +1081,7 @@
   },
   {
    "name": "Devi Prasad",
-   "contractor": "Pavan Manpower",
+   "contractor": "CHR Enterprises",
    "category": "Semi-skilled",
    "esic": {
     "state": "breach",
@@ -1097,7 +1097,7 @@
   },
   {
    "name": "Sneha R.",
-   "contractor": "Bharat Contractors",
+   "contractor": "R.K Enterprises",
    "category": "Skilled",
    "esic": {
     "state": "ok",
@@ -1113,7 +1113,7 @@
   },
   {
    "name": "Manoj T.",
-   "contractor": "Sai Industrial",
+   "contractor": "Euro Security & Placement Pvt Ltd",
    "category": "Unskilled",
    "esic": {
     "state": "pending",
@@ -1129,7 +1129,7 @@
   },
   {
    "name": "Pradeep R.",
-   "contractor": "Sri Lakshmi Engg",
+   "contractor": "Blue Ocean Personnel & Allied Services Pvt Ltd",
    "category": "Semi-skilled",
    "esic": {
     "state": "ok",
@@ -1145,7 +1145,7 @@
   },
   {
    "name": "Karthik V.",
-   "contractor": "Bharat Contractors",
+   "contractor": "Saptagiri Enterprises",
    "category": "Highly skilled",
    "esic": {
     "state": "ok",
@@ -1161,7 +1161,7 @@
   },
   {
    "name": "Bharath Singh",
-   "contractor": "Pavan Manpower",
+   "contractor": "R.K Enterprises",
    "category": "Semi-skilled",
    "esic": {
     "state": "pending",
@@ -1286,366 +1286,834 @@
  "contractors": [
   {
    "id": "CT-001",
-   "name": "Sri Lakshmi Engg",
-   "area": "Compressor Line",
-   "deployed": 142,
-   "score": 58,
+   "name": "ARK HR Solutions & Services",
+   "area": "Compressor line",
+   "deployed": 139,
+   "score": 70,
    "clra": {
     "state": "expiring",
-    "label": "Expires 21d",
+    "label": "Expires 16d",
     "cls": "amber",
-    "expiresOn": "11 Jun 2026"
+    "expiresOn": "18 Jul 2026"
    },
    "esic": {
-    "state": "breach",
-    "label": "−4 on May",
-    "cls": "red",
-    "detail": "May challan covers 138 vs deployed 142"
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
    },
    "pf": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled · ₹3.84 L credited"
+    "detail": "PF reconciled · current"
    },
    "subscores": {
-    "clra": 65,
-    "esic": 32,
-    "pf": 88,
-    "minWage": 70,
-    "migrant": 100,
-    "safety": 76
+    "clra": 64,
+    "esic": 88,
+    "pf": 82,
+    "minWage": 88,
+    "migrant": 76,
+    "safety": 64
    },
-   "registered": "12 Aug 2022",
-   "panCin": "AAFFS3322K",
-   "gst": "37AAFFS3322K1ZQ",
-   "esicCode": "52-AP-2022-117",
-   "bankAck": "HDFC ****1102",
-   "complianceLead": "Rajesh Yadav · rajesh.yadav@srilakshmi-engg.in",
-   "avgPay": "₹16,800/mo",
-   "womenWorkers": 8,
-   "migrantWorkers": 0,
-   "trend": "red,amber,red,red,red,amber",
-   "liability": {
-    "statutoryLow": 4,
-    "statutoryMid": 10,
-    "statutoryHigh": 22,
-    "operationalDays": 1,
-    "operationalPerDay": 5,
-    "customerAudit": 3,
-    "contractValueRisk": 24
-   }
-  },
-  {
-   "id": "CT-002",
-   "name": "Pavan Manpower",
-   "area": "Packaging",
-   "deployed": 218,
-   "score": 71,
-   "clra": {
-    "state": "valid",
-    "label": "Valid",
-    "cls": "green",
-    "expiresOn": "14 Mar 2027"
-   },
-   "esic": {
-    "state": "pending",
-    "label": "Pending",
-    "cls": "amber",
-    "detail": "3 new joiners on Day 2 of 3-day window"
-   },
-   "pf": {
-    "state": "ok",
-    "label": "OK",
-    "cls": "green",
-    "detail": "May challan reconciled"
-   },
-   "subscores": {
-    "clra": 88,
-    "esic": 64,
-    "pf": 90,
-    "minWage": 72,
-    "migrant": 60,
-    "safety": 70
-   },
-   "registered": "03 Apr 2021",
-   "panCin": "AAACP4471L",
-   "gst": "37AAACP4471L1ZR",
-   "esicCode": "52-AP-2021-094",
-   "bankAck": "ICICI ****8821",
-   "complianceLead": "Sandeep Kumar · sandeep@pavanmanpower.in",
-   "avgPay": "₹14,200/mo",
-   "womenWorkers": 24,
-   "migrantWorkers": 6,
-   "trend": "amber,green,amber,amber,green,amber",
+   "registered": "27 Jul 2023",
+   "panCin": "AAQFS8338K",
+   "gst": "37AAQFS8338K1Z3",
+   "esicCode": "52-AP-2023-438",
+   "bankAck": "HDFC ****8338",
+   "complianceLead": "Rajesh Yadav · rajesh@arkhrand.in",
+   "avgPay": "₹19,338/mo",
+   "womenWorkers": 17,
+   "migrantWorkers": 25,
+   "trend": "green,amber,red,green,green,green",
    "liability": {
     "statutoryLow": 2,
     "statutoryMid": 5,
     "statutoryHigh": 12,
-    "operationalDays": 0.5,
-    "operationalPerDay": 4,
-    "customerAudit": 1,
+    "operationalDays": 1,
+    "operationalPerDay": 6,
+    "customerAudit": 3,
     "contractValueRisk": 8
    }
   },
   {
-   "id": "CT-003",
-   "name": "Bharat Contractors",
-   "area": "Logistics + warehouse",
-   "deployed": 356,
-   "score": 88,
+   "id": "CT-002",
+   "name": "Blue Ocean Personnel & Allied Services Pvt Ltd",
+   "area": "FG assembly",
+   "deployed": 241,
+   "score": 87,
    "clra": {
-    "state": "valid",
-    "label": "Valid",
-    "cls": "green",
-    "expiresOn": "22 Nov 2027"
+    "state": "expiring",
+    "label": "Expires 21d",
+    "cls": "amber",
+    "expiresOn": "11 Apr 2026"
    },
    "esic": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled · all workers covered"
+    "detail": "ESIC reconciled · current"
    },
    "pf": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled"
+    "detail": "PF reconciled · current"
    },
    "subscores": {
-    "clra": 95,
-    "esic": 92,
-    "pf": 94,
-    "minWage": 82,
-    "migrant": 78,
-    "safety": 86
+    "clra": 75,
+    "esic": 93,
+    "pf": 93,
+    "minWage": 99,
+    "migrant": 99,
+    "safety": 81
    },
-   "registered": "16 Jan 2019",
-   "panCin": "AABCB1148G",
-   "gst": "37AABCB1148G1Z2",
-   "esicCode": "52-AP-2019-041",
-   "bankAck": "SBI ****4490",
-   "complianceLead": "Vijay Bhushan · vijay.b@bharatcontractors.co.in",
-   "avgPay": "₹18,400/mo",
-   "womenWorkers": 18,
-   "migrantWorkers": 42,
-   "trend": "green,green,green,green,amber,green",
+   "registered": "21 Apr 2023",
+   "panCin": "AANFS2473Q",
+   "gst": "37AANFS2473Q1Z6",
+   "esicCode": "52-AP-2023-773",
+   "bankAck": "Axis ****2473",
+   "complianceLead": "Sandeep Kumar · sandeep@blueoceanpersonn.in",
+   "avgPay": "₹16,473/mo",
+   "womenWorkers": 17,
+   "migrantWorkers": 31,
+   "trend": "amber,red,red,red,green,amber",
    "liability": {
-    "statutoryLow": 0,
-    "statutoryMid": 0,
-    "statutoryHigh": 2,
-    "operationalDays": 0,
-    "operationalPerDay": 6,
-    "customerAudit": 0,
-    "contractValueRisk": 0
+    "statutoryLow": 2,
+    "statutoryMid": 5,
+    "statutoryHigh": 12,
+    "operationalDays": 1,
+    "operationalPerDay": 5,
+    "customerAudit": 2,
+    "contractValueRisk": 7
+   }
+  },
+  {
+   "id": "CT-003",
+   "name": "Casa Grande Propcare Pvt Ltd",
+   "area": "Device assembly",
+   "deployed": 140,
+   "score": 81,
+   "clra": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "CLRA reconciled · current"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "PF reconciled · current"
+   },
+   "subscores": {
+    "clra": 100,
+    "esic": 93,
+    "pf": 100,
+    "minWage": 81,
+    "migrant": 93,
+    "safety": 75
+   },
+   "registered": "11 Jan 2020",
+   "panCin": "AAXFS4215F",
+   "gst": "37AAXFS4215F1Z2",
+   "esicCode": "52-AP-2020-115",
+   "bankAck": "Canara ****4215",
+   "complianceLead": "Vijay Bhushan · vijay@casagrandepropca.in",
+   "avgPay": "₹18,215/mo",
+   "womenWorkers": 13,
+   "migrantWorkers": 21,
+   "trend": "green,green,green,amber,green,green",
+   "liability": {
+    "statutoryLow": 2,
+    "statutoryMid": 4,
+    "statutoryHigh": 10,
+    "operationalDays": 1,
+    "operationalPerDay": 7,
+    "customerAudit": 3,
+    "contractValueRisk": 6
    }
   },
   {
    "id": "CT-004",
-   "name": "Vijaya Services",
-   "area": "Cleaning + maintenance",
-   "deployed": 182,
-   "score": 82,
+   "name": "CHR Enterprises",
+   "area": "Packaging",
+   "deployed": 265,
+   "score": 63,
    "clra": {
-    "state": "valid",
-    "label": "Valid",
-    "cls": "green",
-    "expiresOn": "04 Sep 2026"
+    "state": "expired",
+    "label": "Expired",
+    "cls": "red",
+    "expiresOn": "14 Apr 2026"
    },
    "esic": {
-    "state": "ok",
-    "label": "OK",
-    "cls": "green",
-    "detail": "May challan reconciled"
+    "state": "breach",
+    "label": "−6 on May",
+    "cls": "red",
+    "detail": "ESIC challan short vs deployed 265"
    },
    "pf": {
-    "state": "delayed",
-    "label": "Delayed 3d",
-    "cls": "amber",
-    "detail": "Mar challan filed 03 May (3 days late) · resolved"
+    "state": "breach",
+    "label": "−6 on May",
+    "cls": "red",
+    "detail": "PF challan short vs deployed 265"
    },
    "subscores": {
-    "clra": 90,
-    "esic": 86,
-    "pf": 70,
-    "minWage": 88,
-    "migrant": 92,
-    "safety": 80
+    "clra": 51,
+    "esic": 45,
+    "pf": 45,
+    "minWage": 75,
+    "migrant": 75,
+    "safety": 51
    },
-   "registered": "22 Jul 2020",
-   "panCin": "AABCV9912N",
-   "gst": "37AABCV9912N1ZL",
-   "esicCode": "52-AP-2020-178",
-   "bankAck": "Axis ****6622",
-   "complianceLead": "Priya Reddy · priya@vijayaservices.co.in",
-   "avgPay": "₹13,800/mo",
-   "womenWorkers": 84,
-   "migrantWorkers": 12,
-   "trend": "green,green,green,amber,green,green",
+   "registered": "21 Apr 2024",
+   "panCin": "AAXFS2729M",
+   "gst": "37AAXFS2729M1Z1",
+   "esicCode": "52-AP-2024-229",
+   "bankAck": "ICICI ****2729",
+   "complianceLead": "Lakshmi Reddy · lakshmi@chr.in",
+   "avgPay": "₹16,729/mo",
+   "womenWorkers": 34,
+   "migrantWorkers": 24,
+   "trend": "amber,red,red,red,red,red",
    "liability": {
-    "statutoryLow": 1,
-    "statutoryMid": 2,
-    "statutoryHigh": 4,
-    "operationalDays": 0,
-    "operationalPerDay": 3,
-    "customerAudit": 0,
-    "contractValueRisk": 0
+    "statutoryLow": 4,
+    "statutoryMid": 10,
+    "statutoryHigh": 23,
+    "operationalDays": 2,
+    "operationalPerDay": 5,
+    "customerAudit": 4,
+    "contractValueRisk": 15
    }
   },
   {
    "id": "CT-005",
-   "name": "Coastal Logistics",
-   "area": "Inbound transport",
-   "deployed": 342,
-   "score": 68,
+   "name": "Daya Constructions",
+   "area": "Warehouse & logistics",
+   "deployed": 285,
+   "score": 77,
    "clra": {
-    "state": "expiring",
-    "label": "Expires 28d",
-    "cls": "amber",
-    "expiresOn": "18 Jun 2026"
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "CLRA reconciled · current"
    },
    "esic": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled"
+    "detail": "ESIC reconciled · current"
    },
    "pf": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled"
+    "detail": "PF reconciled · current"
    },
    "subscores": {
-    "clra": 60,
-    "esic": 78,
-    "pf": 82,
-    "minWage": 64,
-    "migrant": 65,
-    "safety": 58
+    "clra": 100,
+    "esic": 83,
+    "pf": 83,
+    "minWage": 95,
+    "migrant": 77,
+    "safety": 65
    },
-   "registered": "08 Feb 2023",
-   "panCin": "AAGCC4421H",
-   "gst": "37AAGCC4421H1Z8",
-   "esicCode": "52-AP-2023-022",
-   "bankAck": "Kotak ****7710",
-   "complianceLead": "Murali K. · murali@coastallog.in",
-   "avgPay": "₹15,600/mo",
-   "womenWorkers": 4,
-   "migrantWorkers": 78,
-   "trend": "amber,red,amber,amber,red,amber",
+   "registered": "11 Jan 2021",
+   "panCin": "AADFS3231N",
+   "gst": "37AADFS3231N1Z8",
+   "esicCode": "52-AP-2021-331",
+   "bankAck": "Canara ****3231",
+   "complianceLead": "Anil Sharma · anil@dayaconstruction.in",
+   "avgPay": "₹17,231/mo",
+   "womenWorkers": 14,
+   "migrantWorkers": 31,
+   "trend": "green,green,amber,red,green,amber",
    "liability": {
     "statutoryLow": 3,
     "statutoryMid": 7,
     "statutoryHigh": 16,
     "operationalDays": 1,
-    "operationalPerDay": 5,
-    "customerAudit": 2,
-    "contractValueRisk": 14
+    "operationalPerDay": 7,
+    "customerAudit": 3,
+    "contractValueRisk": 11
    }
   },
   {
    "id": "CT-006",
-   "name": "Sai Industrial",
-   "area": "Tool-room + maintenance",
-   "deployed": 96,
-   "score": 79,
+   "name": "Euro Security & Placement Pvt Ltd",
+   "area": "Utility & maintenance",
+   "deployed": 67,
+   "score": 60,
    "clra": {
-    "state": "valid",
-    "label": "Valid",
-    "cls": "green",
-    "expiresOn": "15 Dec 2026"
+    "state": "expired",
+    "label": "Expired",
+    "cls": "red",
+    "expiresOn": "03 Apr 2026"
    },
    "esic": {
-    "state": "pending",
-    "label": "Pending",
-    "cls": "amber",
-    "detail": "2 new joiners on Day 2"
-   },
-   "pf": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled"
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "breach",
+    "label": "−5 on May",
+    "cls": "red",
+    "detail": "PF challan short vs deployed 67"
    },
    "subscores": {
-    "clra": 85,
-    "esic": 70,
-    "pf": 86,
-    "minWage": 75,
-    "migrant": 80,
-    "safety": 78
+    "clra": 42,
+    "esic": 84,
+    "pf": 54,
+    "minWage": 66,
+    "migrant": 42,
+    "safety": 42
    },
-   "registered": "11 Oct 2022",
-   "panCin": "AAACS1009F",
-   "gst": "37AAACS1009F1ZK",
-   "esicCode": "52-AP-2022-203",
-   "bankAck": "HDFC ****3340",
-   "complianceLead": "Lakshmi Reddy · lakshmi@saiindustrial.co.in",
-   "avgPay": "₹17,100/mo",
-   "womenWorkers": 6,
-   "migrantWorkers": 4,
-   "trend": "green,amber,green,green,amber,green",
+   "registered": "18 Apr 2021",
+   "panCin": "AAQFS1936E",
+   "gst": "37AAQFS1936E1Z0",
+   "esicCode": "52-AP-2021-636",
+   "bankAck": "HDFC ****1936",
+   "complianceLead": "Praveen Rao · praveen@eurosecurityandp.in",
+   "avgPay": "₹15,936/mo",
+   "womenWorkers": 7,
+   "migrantWorkers": 11,
+   "trend": "red,red,green,green,green,amber",
    "liability": {
-    "statutoryLow": 1,
-    "statutoryMid": 2,
-    "statutoryHigh": 5,
-    "operationalDays": 0,
+    "statutoryLow": 2,
+    "statutoryMid": 4,
+    "statutoryHigh": 10,
+    "operationalDays": 2,
     "operationalPerDay": 4,
-    "customerAudit": 0,
-    "contractValueRisk": 0
+    "customerAudit": 4,
+    "contractValueRisk": 6
    }
   },
   {
    "id": "CT-007",
-   "name": "GreenWipe Hygiene",
-   "area": "Industrial cleaning",
-   "deployed": 64,
-   "score": 74,
+   "name": "Gee Kay Human Resources Pvt Ltd",
+   "area": "Quality & inspection",
+   "deployed": 99,
+   "score": 62,
    "clra": {
-    "state": "valid",
-    "label": "Valid",
-    "cls": "green",
-    "expiresOn": "20 Jan 2027"
+    "state": "expired",
+    "label": "Expired",
+    "cls": "red",
+    "expiresOn": "22 Jan 2026"
+   },
+   "esic": {
+    "state": "pending",
+    "label": "Watch",
+    "cls": "amber",
+    "detail": "ESIC partial cover this month"
+   },
+   "pf": {
+    "state": "breach",
+    "label": "−4 on May",
+    "cls": "red",
+    "detail": "PF challan short vs deployed 99"
+   },
+   "subscores": {
+    "clra": 56,
+    "esic": 62,
+    "pf": 56,
+    "minWage": 68,
+    "migrant": 62,
+    "safety": 44
+   },
+   "registered": "27 Jan 2022",
+   "panCin": "AAAFS7202G",
+   "gst": "37AAAFS7202G1Z1",
+   "esicCode": "52-AP-2022-702",
+   "bankAck": "Kotak ****7202",
+   "complianceLead": "Suresh Pillai · suresh@geekayhumanresou.in",
+   "avgPay": "₹15,202/mo",
+   "womenWorkers": 6,
+   "migrantWorkers": 2,
+   "trend": "green,amber,green,green,amber,red",
+   "liability": {
+    "statutoryLow": 2,
+    "statutoryMid": 5,
+    "statutoryHigh": 12,
+    "operationalDays": 2,
+    "operationalPerDay": 6,
+    "customerAudit": 4,
+    "contractValueRisk": 8
+   }
+  },
+  {
+   "id": "CT-008",
+   "name": "HC Facility Management",
+   "area": "Cleaning & facility",
+   "deployed": 25,
+   "score": 51,
+   "clra": {
+    "state": "expired",
+    "label": "Expired",
+    "cls": "red",
+    "expiresOn": "05 Apr 2026"
+   },
+   "esic": {
+    "state": "pending",
+    "label": "Watch",
+    "cls": "amber",
+    "detail": "ESIC partial cover this month"
+   },
+   "pf": {
+    "state": "breach",
+    "label": "−7 on May",
+    "cls": "red",
+    "detail": "PF challan short vs deployed 25"
+   },
+   "subscores": {
+    "clra": 51,
+    "esic": 75,
+    "pf": 57,
+    "minWage": 63,
+    "migrant": 39,
+    "safety": 69
+   },
+   "registered": "03 Mar 2020",
+   "panCin": "AARFS5715K",
+   "gst": "37AARFS5715K1Z8",
+   "esicCode": "52-AP-2020-415",
+   "bankAck": "Canara ****5715",
+   "complianceLead": "Meena Iyer · meena@hcfacilitymanage.in",
+   "avgPay": "₹19,715/mo",
+   "womenWorkers": 2,
+   "migrantWorkers": 4,
+   "trend": "green,amber,green,green,green,amber",
+   "liability": {
+    "statutoryLow": 1,
+    "statutoryMid": 3,
+    "statutoryHigh": 8,
+    "operationalDays": 1,
+    "operationalPerDay": 7,
+    "customerAudit": 5,
+    "contractValueRisk": 4
+   }
+  },
+  {
+   "id": "CT-009",
+   "name": "OM Manpower Services",
+   "area": "Tool room",
+   "deployed": 222,
+   "score": 77,
+   "clra": {
+    "state": "expiring",
+    "label": "Expires 19d",
+    "cls": "amber",
+    "expiresOn": "11 Jan 2026"
    },
    "esic": {
     "state": "ok",
     "label": "OK",
     "cls": "green",
-    "detail": "May challan reconciled"
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "PF reconciled · current"
+   },
+   "subscores": {
+    "clra": 65,
+    "esic": 95,
+    "pf": 83,
+    "minWage": 65,
+    "migrant": 100,
+    "safety": 71
+   },
+   "registered": "21 Jan 2021",
+   "panCin": "AAHFS7801I",
+   "gst": "37AAHFS7801I1Z6",
+   "esicCode": "52-AP-2021-501",
+   "bankAck": "Axis ****7801",
+   "complianceLead": "Karthik N. · karthik@ommanpower.in",
+   "avgPay": "₹15,801/mo",
+   "womenWorkers": 11,
+   "migrantWorkers": 2,
+   "trend": "amber,red,red,green,green,amber",
+   "liability": {
+    "statutoryLow": 2,
+    "statutoryMid": 6,
+    "statutoryHigh": 14,
+    "operationalDays": 1,
+    "operationalPerDay": 5,
+    "customerAudit": 3,
+    "contractValueRisk": 9
+   }
+  },
+  {
+   "id": "CT-010",
+   "name": "R.K Enterprises",
+   "area": "Inbound transport",
+   "deployed": 271,
+   "score": 57,
+   "clra": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "CLRA reconciled · current"
+   },
+   "esic": {
+    "state": "breach",
+    "label": "−2 on May",
+    "cls": "red",
+    "detail": "ESIC challan short vs deployed 271"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "PF reconciled · current"
+   },
+   "subscores": {
+    "clra": 81,
+    "esic": 57,
+    "pf": 81,
+    "minWage": 57,
+    "migrant": 63,
+    "safety": 51
+   },
+   "registered": "11 Feb 2024",
+   "panCin": "AAZFS1959Z",
+   "gst": "37AAZFS1959Z1Z5",
+   "esicCode": "52-AP-2024-259",
+   "bankAck": "Canara ****1959",
+   "complianceLead": "Deepa Menon · deepa@rk.in",
+   "avgPay": "₹15,959/mo",
+   "womenWorkers": 35,
+   "migrantWorkers": 51,
+   "trend": "green,green,green,green,amber,green",
+   "liability": {
+    "statutoryLow": 4,
+    "statutoryMid": 11,
+    "statutoryHigh": 25,
+    "operationalDays": 2,
+    "operationalPerDay": 7,
+    "customerAudit": 4,
+    "contractValueRisk": 17
+   }
+  },
+  {
+   "id": "CT-011",
+   "name": "Saptagiri Enterprises",
+   "area": "Paint shop",
+   "deployed": 329,
+   "score": 78,
+   "clra": {
+    "state": "expiring",
+    "label": "Expires 28d",
+    "cls": "amber",
+    "expiresOn": "18 Apr 2026"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "PF reconciled · current"
+   },
+   "subscores": {
+    "clra": 72,
+    "esic": 100,
+    "pf": 96,
+    "minWage": 72,
+    "migrant": 60,
+    "safety": 84
+   },
+   "registered": "27 Apr 2023",
+   "panCin": "AAWFS9018S",
+   "gst": "37AAWFS9018S1Z8",
+   "esicCode": "52-AP-2023-318",
+   "bankAck": "SBI ****9018",
+   "complianceLead": "Ramesh Babu · ramesh@saptagiri.in",
+   "avgPay": "₹20,018/mo",
+   "womenWorkers": 39,
+   "migrantWorkers": 59,
+   "trend": "green,amber,green,green,green,amber",
+   "liability": {
+    "statutoryLow": 3,
+    "statutoryMid": 8,
+    "statutoryHigh": 19,
+    "operationalDays": 1,
+    "operationalPerDay": 6,
+    "customerAudit": 3,
+    "contractValueRisk": 12
+   }
+  },
+  {
+   "id": "CT-012",
+   "name": "Simho HR Services Pvt Ltd",
+   "area": "Stores & dispatch",
+   "deployed": 247,
+   "score": 72,
+   "clra": {
+    "state": "expiring",
+    "label": "Expires 20d",
+    "cls": "amber",
+    "expiresOn": "27 Feb 2026"
+   },
+   "esic": {
+    "state": "breach",
+    "label": "−7 on May",
+    "cls": "red",
+    "detail": "ESIC challan short vs deployed 247"
    },
    "pf": {
     "state": "pending",
-    "label": "Pending",
+    "label": "Watch",
     "cls": "amber",
-    "detail": "May challan due in 3 days"
+    "detail": "PF partial cover this month"
    },
    "subscores": {
-    "clra": 80,
-    "esic": 84,
-    "pf": 60,
-    "minWage": 78,
-    "migrant": 90,
-    "safety": 72
+    "clra": 78,
+    "esic": 54,
+    "pf": 72,
+    "minWage": 66,
+    "migrant": 54,
+    "safety": 78
    },
-   "registered": "24 May 2022",
-   "panCin": "AAGCG7714P",
-   "gst": "37AAGCG7714P1ZN",
-   "esicCode": "52-AP-2022-141",
-   "bankAck": "ICICI ****0288",
-   "complianceLead": "Anita Sharma · anita@greenwipe.in",
-   "avgPay": "₹13,200/mo",
-   "womenWorkers": 38,
-   "migrantWorkers": 8,
-   "trend": "green,green,amber,green,green,amber",
+   "registered": "14 Feb 2021",
+   "panCin": "AAUFS5676F",
+   "gst": "37AAUFS5676F1Z5",
+   "esicCode": "52-AP-2021-776",
+   "bankAck": "SBI ****5676",
+   "complianceLead": "Sunita Devi · sunita@simhohr.in",
+   "avgPay": "₹19,676/mo",
+   "womenWorkers": 25,
+   "migrantWorkers": 40,
+   "trend": "red,green,amber,red,red,green",
    "liability": {
-    "statutoryLow": 0,
-    "statutoryMid": 1,
-    "statutoryHigh": 3,
-    "operationalDays": 0,
-    "operationalPerDay": 3,
-    "customerAudit": 0,
-    "contractValueRisk": 0
+    "statutoryLow": 3,
+    "statutoryMid": 8,
+    "statutoryHigh": 19,
+    "operationalDays": 1,
+    "operationalPerDay": 4,
+    "customerAudit": 3,
+    "contractValueRisk": 11
+   }
+  },
+  {
+   "id": "CT-013",
+   "name": "Smart Bee Facility Services Pvt Ltd",
+   "area": "Security & gate",
+   "deployed": 130,
+   "score": 72,
+   "clra": {
+    "state": "expired",
+    "label": "Expired",
+    "cls": "red",
+    "expiresOn": "03 Jan 2026"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "pending",
+    "label": "Watch",
+    "cls": "amber",
+    "detail": "PF partial cover this month"
+   },
+   "subscores": {
+    "clra": 54,
+    "esic": 90,
+    "pf": 66,
+    "minWage": 78,
+    "migrant": 78,
+    "safety": 60
+   },
+   "registered": "18 Jan 2021",
+   "panCin": "AAGFS5456I",
+   "gst": "37AAGFS5456I1Z1",
+   "esicCode": "52-AP-2021-756",
+   "bankAck": "Kotak ****5456",
+   "complianceLead": "Mohan Reddy · mohan@smartbeefacility.in",
+   "avgPay": "₹16,456/mo",
+   "womenWorkers": 13,
+   "migrantWorkers": 21,
+   "trend": "red,red,red,green,green,amber",
+   "liability": {
+    "statutoryLow": 2,
+    "statutoryMid": 5,
+    "statutoryHigh": 12,
+    "operationalDays": 1,
+    "operationalPerDay": 4,
+    "customerAudit": 3,
+    "contractValueRisk": 7
+   }
+  },
+  {
+   "id": "CT-014",
+   "name": "TVS Training and Services Limited",
+   "area": "Canteen & welfare",
+   "deployed": 149,
+   "score": 80,
+   "clra": {
+    "state": "expiring",
+    "label": "Expires 26d",
+    "cls": "amber",
+    "expiresOn": "05 Jul 2026"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "pending",
+    "label": "Watch",
+    "cls": "amber",
+    "detail": "PF partial cover this month"
+   },
+   "subscores": {
+    "clra": 62,
+    "esic": 80,
+    "pf": 74,
+    "minWage": 86,
+    "migrant": 100,
+    "safety": 74
+   },
+   "registered": "18 Jul 2023",
+   "panCin": "AAKFS2728W",
+   "gst": "37AAKFS2728W1Z0",
+   "esicCode": "52-AP-2023-828",
+   "bankAck": "HDFC ****2728",
+   "complianceLead": "Asha Pillai · asha@tvstrainingand.in",
+   "avgPay": "₹19,728/mo",
+   "womenWorkers": 18,
+   "migrantWorkers": 12,
+   "trend": "red,red,green,green,amber,red",
+   "liability": {
+    "statutoryLow": 2,
+    "statutoryMid": 4,
+    "statutoryHigh": 10,
+    "operationalDays": 1,
+    "operationalPerDay": 4,
+    "customerAudit": 3,
+    "contractValueRisk": 7
+   }
+  },
+  {
+   "id": "CT-015",
+   "name": "United Human Resource",
+   "area": "Civil & projects",
+   "deployed": 68,
+   "score": 90,
+   "clra": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "CLRA reconciled · current"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "PF reconciled · current"
+   },
+   "subscores": {
+    "clra": 84,
+    "esic": 96,
+    "pf": 100,
+    "minWage": 72,
+    "migrant": 100,
+    "safety": 100
+   },
+   "registered": "27 May 2022",
+   "panCin": "AAMFS2042W",
+   "gst": "37AAMFS2042W1Z7",
+   "esicCode": "52-AP-2022-742",
+   "bankAck": "Kotak ****2042",
+   "complianceLead": "Naveen Kumar · naveen@unitedhumanresou.in",
+   "avgPay": "₹16,042/mo",
+   "womenWorkers": 4,
+   "migrantWorkers": 1,
+   "trend": "green,amber,red,red,green,amber",
+   "liability": {
+    "statutoryLow": 1,
+    "statutoryMid": 3,
+    "statutoryHigh": 8,
+    "operationalDays": 1,
+    "operationalPerDay": 6,
+    "customerAudit": 2,
+    "contractValueRisk": 4
+   }
+  },
+  {
+   "id": "CT-016",
+   "name": "Yadhuvanshi Technical Training Center",
+   "area": "Helper pool",
+   "deployed": 80,
+   "score": 94,
+   "clra": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "CLRA reconciled · current"
+   },
+   "esic": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "ESIC reconciled · current"
+   },
+   "pf": {
+    "state": "ok",
+    "label": "OK",
+    "cls": "green",
+    "detail": "PF reconciled · current"
+   },
+   "subscores": {
+    "clra": 100,
+    "esic": 100,
+    "pf": 94,
+    "minWage": 100,
+    "migrant": 82,
+    "safety": 100
+   },
+   "registered": "05 Feb 2022",
+   "panCin": "AAUFS5782L",
+   "gst": "37AAUFS5782L1Z3",
+   "esicCode": "52-AP-2022-882",
+   "bankAck": "HDFC ****5782",
+   "complianceLead": "Latha Subramanian · latha@yadhuvanshitechn.in",
+   "avgPay": "₹19,782/mo",
+   "womenWorkers": 5,
+   "migrantWorkers": 2,
+   "trend": "green,green,green,amber,green,green",
+   "liability": {
+    "statutoryLow": 1,
+    "statutoryMid": 2,
+    "statutoryHigh": 5,
+    "operationalDays": 1,
+    "operationalPerDay": 6,
+    "customerAudit": 1,
+    "contractValueRisk": 4
    }
   }
  ],
@@ -2498,7 +2966,7 @@
    "dept": "Production",
    "sup": "Anitha Rao",
    "type": "Contract",
-   "contractor": "Pavan Manpower",
+   "contractor": "Simho HR Services Pvt Ltd",
    "lang": "HI",
    "phone": "••• ••• 8290"
   },
@@ -2521,7 +2989,7 @@
    "dept": "Logistics",
    "sup": "Vikram Shah",
    "type": "Contract",
-   "contractor": "Sri Lakshmi Engg",
+   "contractor": "R.K Enterprises",
    "lang": "HI",
    "phone": "••• ••• 6657"
   },
@@ -3079,25 +3547,25 @@
  "captureWorkorders": [
   {
    "id": "WO-2026-211",
-   "contractor": "Sri Lakshmi Engineering",
+   "contractor": "Daya Constructions",
    "clra": "CLRA/AP/0231-2026",
    "category": "Semi-skilled"
   },
   {
    "id": "WO-2026-218",
-   "contractor": "Venkateswara Manpower",
+   "contractor": "TVS Training and Services Limited",
    "clra": "CLRA/AP/0188-2026",
    "category": "Unskilled"
   },
   {
    "id": "WO-2026-224",
-   "contractor": "Coastal Facility Services",
+   "contractor": "Casa Grande Propcare Pvt Ltd",
    "clra": "CLRA/AP/0297-2026",
    "category": "Skilled"
   },
   {
    "id": "WO-2026-229",
-   "contractor": "Annapurna Staffing",
+   "contractor": "TVS Training and Services Limited",
    "clra": "CLRA/AP/0312-2026",
    "category": "Semi-skilled"
   }

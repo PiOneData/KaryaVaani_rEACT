@@ -168,6 +168,18 @@ export default function SecAnalytics() {
             <tbody id="exp-table-body" />
           </table>
         </div>
+        {' '}
+        {/* compliance % by department → employee-level drilldown */}
+        <div className="card" style={{ marginTop: "16px" }}>
+          <div className="card-h">
+            <div>
+              <div className="card-h-title">Compliance % by department</div>
+              <div className="card-h-sub">Employee-level compliance across the OM Manpower workforce — click a department to drill into its associates</div>
+            </div>
+          </div>
+          <div id="exp-dept" />
+          <div id="exp-dept-drill" />
+        </div>
       </div>
       {' '}
       {/* ── READINESS TREND PANE (Labour Code Readiness Survey history) ── */}
