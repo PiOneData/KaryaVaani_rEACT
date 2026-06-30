@@ -11604,7 +11604,30 @@ function __kvOnReady(fn) {
     'High-visibility vest', 'Anti-vibration gloves'
   ];
 
-  const CAP_STATE = { mode: 'single', type: 'direct', lang: 'TE', ppe: [], photo: null, recent: [], bulk: [], aadhaarVerified: false };
+  const CAP_STATE = { mode: 'single', type: 'direct', lang: 'TE', ppe: [], photo: null, recent: [], bulk: [], aadhaarVerified: false, docs: [] };
+
+  /* stage a document on the capture form (uploaded to the worker after submit) */
+  function capAddDoc() {
+    const fi = document.getElementById('cap-doc-file');
+    const file = fi && fi.files && fi.files[0]; if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast('File too large (max 3MB)', 'red'); fi.value = ''; return; }
+    const docType = (document.getElementById('cap-doc-type') || {}).value || 'Other';
+    const reader = new FileReader();
+    reader.onload = function () {
+      CAP_STATE.docs = CAP_STATE.docs || [];
+      CAP_STATE.docs.push({ name: file.name, docType: docType, dataUrl: reader.result });
+      capRenderDocs(); toast('Document attached · ' + docType, 'green'); fi.value = '';
+    };
+    reader.readAsDataURL(file);
+  }
+  function capRenderDocs() {
+    const host = document.getElementById('cap-docs-list'); if (!host) return;
+    const docs = CAP_STATE.docs || [];
+    host.innerHTML = docs.length
+      ? docs.map(function (d, i) { return '<div class="row-between" style="padding:5px 0;border-bottom:1px solid var(--line);font-size:0.8rem"><span><strong>' + d.docType + '</strong> · ' + d.name + '</span><span class="cap-recent-link" onclick="capRemoveDoc(' + i + ')">Remove</span></div>'; }).join('')
+      : '<div class="tiny muted">No documents attached yet.</div>';
+  }
+  function capRemoveDoc(i) { (CAP_STATE.docs || []).splice(i, 1); capRenderDocs(); }
 
   /* ── mode: single vs bulk ── */
   function capSetMode(m) {
@@ -11750,7 +11773,18 @@ function __kvOnReady(fn) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign({ aadhaar: aadhaar }, rec, { photo: undefined }))
     }).then(function (r) { return r.json().catch(function () { return {}; }); })
-      .then(function (j) { if (j && j.ok && j.capture) rec.backendId = j.capture.id; })
+      .then(function (j) {
+        if (j && j.ok && j.capture) {
+          rec.backendId = j.capture.id;
+          // upload any documents attached on the form, now that we have a worker id
+          (CAP_STATE.docs || []).forEach(function (d) {
+            fetch((window.__KV_API_BASE || '') + '/api/onboarding-documents', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ workerId: j.capture.id, name: d.name, docType: d.docType, dataUrl: d.dataUrl })
+            }).catch(function () {});
+          });
+        }
+      })
       .catch(function () { /* offline — kept in session */ });
 
     /* real WhatsApp confirmation link via the communication gateway */
@@ -11760,6 +11794,8 @@ function __kvOnReady(fn) {
         'https://karyavaani.app/confirm/' + wid);
     }
     CAP_STATE.aadhaarVerified = false;
+    CAP_STATE.docs = [];
+    capRenderDocs();
     capReset(true);
   }
 
@@ -12037,6 +12073,7 @@ function __kvOnReady(fn) {
     capRenderLangs();
     capRenderPpe();
     capRenderRecent();
+    capRenderDocs();
     capInitDrop();
     capPopulateRecords();
     capSync();
@@ -12340,7 +12377,7 @@ function __kvOnReady(fn) {
   /* filter (search + department) then sort the full roster */
   function omFiltered() {
     const q = OM_QUERY.trim().toLowerCase();
-    let rows = OM_MAPPING.filter(function (r) {
+    let rows = omRosterAll().filter(function (r) {
       if (OM_DEPT !== 'all' && r.dept !== OM_DEPT) return false;
       if (!q) return true;
       return (r.code + ' ' + r.name + ' ' + r.desig + ' ' + r.dept + ' ' +
@@ -12390,19 +12427,23 @@ function __kvOnReady(fn) {
     const pageRows = rows.slice(start, start + OM_PER_PAGE);
 
     body.innerHTML = pageRows.map(function (r) {
-      const c = omWorkerCompliance(r);
+      const c = omRowComp(r);
       const band = omComplyBand(c.score);
       const compCell = '<span class="pill ' + band + ' tiny">' +
         c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span>' +
         (!c.aadhaarVerified ? ' <span class="tiny" style="color:var(--red-dk)" title="Aadhaar not verified">⚠</span>' : '');
+      const openFn = r._onboarded ? ('obOpenCapture(' + r._ci + ')') : ('omOpenWorker(\'' + r.code + '\')');
+      const codeCell = r._onboarded
+        ? r.code + ' <span class="pill amber tiny">onboarded</span>'
+        : r.code;
       // whole row opens the tabbed worker modal; the UAN/ESI cells stop propagation
       // so they still open the verifiable document viewer instead.
-      return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + r.code + '\')" title="Open worker details">' +
-        '<td class="t-strong">' + r.code + '</td>' +
+      return '<tr style="cursor:pointer" onclick="' + openFn + '" title="Open worker details">' +
+        '<td class="t-strong">' + codeCell + '</td>' +
         '<td>' + r.name + '</td>' +
         '<td>' + r.desig + '</td>' +
         '<td>' + r.dept + '</td>' +
-        '<td>' + r.mgr + ' <span style="color:var(--ink-3,#8a8f98)">· ' + r.mgrCode + '</span></td>' +
+        '<td>' + r.mgr + (r.mgrCode ? ' <span style="color:var(--ink-3,#8a8f98)">· ' + r.mgrCode + '</span>' : '') + '</td>' +
         '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + omIdCell('UAN', r.uan, r) + '</td>' +
         '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + omIdCell('ESI', r.esi, r) + '</td>' +
         '<td><span class="pill outline">' + r.lang + '</span></td>' +
@@ -12412,8 +12453,8 @@ function __kvOnReady(fn) {
 
     const cnt = document.getElementById('om-count');
     if (cnt) cnt.textContent = (OM_QUERY.trim() || OM_DEPT !== 'all')
-      ? total + ' of ' + OM_MAPPING.length
-      : OM_MAPPING.length + ' associates';
+      ? total + ' of ' + omRosterAll().length
+      : omRosterAll().length + ' associates';
     const nr = document.getElementById('om-noresults');
     if (nr) nr.style.display = total ? 'none' : 'block';
 
@@ -12497,15 +12538,16 @@ function __kvOnReady(fn) {
   }
   function omComputeKpis() {
     const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
-    const n = OM_MAPPING.length || 1;
-    set('om-kpi-assoc', OM_MAPPING.length);
-    const cs = OM_MAPPING.map(omWorkerCompliance);
+    const roster = omRosterAll();
+    const n = roster.length || 1;
+    set('om-kpi-assoc', roster.length);
+    const cs = roster.map(omRowComp);
     const nonComp = cs.filter(function (c) { return c.status !== 'compliant'; }).length;
     const aadhaarPending = cs.filter(function (c) { return !c.aadhaarVerified; }).length;
     const avg = Math.round(cs.reduce(function (s, c) { return s + c.score; }, 0) / n);
-    set('om-kpi-compliant', OM_MAPPING.length - nonComp);
+    set('om-kpi-compliant', roster.length - nonComp);
     const csub = document.getElementById('om-kpi-compliant-sub');
-    if (csub) csub.textContent = Math.round((OM_MAPPING.length - nonComp) / n * 100) + '% · avg score ' + avg + '/100';
+    if (csub) csub.textContent = Math.round((roster.length - nonComp) / n * 100) + '% · avg score ' + avg + '/100';
     set('om-kpi-noncompliant', nonComp);
     const nsub = document.getElementById('om-kpi-noncompliant-sub');
     if (nsub) nsub.textContent = Math.round(nonComp / n * 100) + '% of workforce';
@@ -14524,6 +14566,22 @@ function __kvOnReady(fn) {
       })
       .catch(function () {});
   }
+
+  /* onboarded DIRECT employees, mapped into the OM roster row shape so they
+     appear in the OM Manpower grid alongside the master roster (clickable into
+     their onboarding modal). Analytics stay on the pure 181-row master. */
+  function omOnboardedDirects() {
+    return (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).map(function (r, i) { return { r: r, i: i }; })
+      .filter(function (x) { return x.r.type === 'direct'; })
+      .map(function (x) {
+        const e = x.r.employment || {};
+        return { code: x.r.id, name: x.r.name, desig: x.r.category || 'Worker', dept: e.dept || '—',
+                 mgr: '—', mgrCode: '', uan: '—', esi: '—', lang: x.r.lang || '—',
+                 _onboarded: true, _ci: x.i, _rec: x.r };
+      });
+  }
+  function omRosterAll() { return (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []).concat(omOnboardedDirects()); }
+  function omRowComp(r) { return r._onboarded ? obWorkerCompliance(r._rec) : omWorkerCompliance(r); }
 
   /* ── onboarded-workers directory grid (trackable + CRUD) ───────────────── */
   function obRenderDirectory() {

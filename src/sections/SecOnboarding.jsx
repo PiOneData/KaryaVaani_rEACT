@@ -906,6 +906,31 @@ export default function SecOnboarding() {
                 </div>
               </div>
               {' '}
+              {/*  documents  */}
+              {' '}
+              <div className="card">
+                <div className="cap-sec-h">
+                  <span className="cap-sec-n">5</span>
+                  {" Documents"}
+                </div>
+                <div className="cap-hint" style={{ marginBottom: "10px" }}>
+                  Attach PAN, bank proof, education or prior-employment documents. They are stored against the worker and viewable later from the directory drilldown.
+                </div>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                  <select className="sel" id="cap-doc-type" style={{ width: "auto" }}>
+                    <option>PAN card</option>
+                    <option>Bank proof</option>
+                    <option>Education certificate</option>
+                    <option>Prior employment</option>
+                    <option>Address proof</option>
+                    <option>Other</option>
+                  </select>
+                  <input type="file" id="cap-doc-file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={(event) => { window.capAddDoc() }} />
+                  <button type="button" className="btn" onClick={(event) => { document.getElementById('cap-doc-file').click() }} data-onclick="document.getElementById('cap-doc-file').click()">Add document</button>
+                </div>
+                <div id="cap-docs-list" style={{ marginTop: "10px" }} />
+              </div>
+              {' '}
               {/*  action footer  */}
               {' '}
               <div className="card sunken cap-action">
