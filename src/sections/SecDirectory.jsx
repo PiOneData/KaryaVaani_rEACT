@@ -1,4 +1,8 @@
-/* SecDirectory — converted 1:1 from karya-vaani_v3.html · <section id="sec-directory"> */
+/* SecDirectory — Directory · Worker directory.
+   Trimmed to show ONLY the OM Manpower · manager mapping (the real roster from
+   the attendance / mapping sheet) — the demo "Worker directory" grid, its KPI
+   strip and compliance drill-down were removed since that data was illustrative
+   only. The OM roster is the single real dataset here. */
 export default function SecDirectory() {
   return (
     <section id="sec-directory" className="section">
@@ -12,134 +16,30 @@ export default function SecDirectory() {
       {' '}
       <div className="page-h">
         <div className="page-h-left">
-          <div className="page-eyebrow">Directory · every worker in one searchable view</div>
+          <div className="page-eyebrow">Directory · OM Manpower manager mapping</div>
           {' '}
           <h1 className="page-title">
-            {"Find any worker, "}
-            <em>drill into</em>
-            {" their compliance"}
+            {"OM Manpower · "}
+            <em>manager mapping</em>
           </h1>
           {' '}
           <p className="page-sub">
-            One searchable grid across all direct employees and contract workers. Filter by track or compliance status, search by name, ID, role or contractor — then open any worker to drill into their full compliance detail.
+            The live roster from the OM Manpower attendance / mapping sheet — every associate with
+            their designation, department, reporting manager and statutory IDs (UAN / ESI). Search,
+            sort, or filter by department.
           </p>
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn" onClick={(event) => { window.dirExport() }} data-onclick="dirExport()">
-            Export directory
+          <button className="btn" onClick={(event) => { window.omExport() }} data-onclick="omExport()">
+            Export roster
           </button>
         </div>
       </div>
       {' '}
-      {/*  KPI strip  */}
-      {' '}
-      <div className="g4" style={{ marginBottom: "18px" }}>
-        <div className="kpi">
-          <div className="kpi-eye">Total workforce</div>
-          <div className="kpi-val" id="dir-kpi-total">—</div>
-          <div className="kpi-sub" id="dir-kpi-split">—</div>
-        </div>
-        {' '}
-        <div className="kpi">
-          <div className="kpi-eye">Compliant</div>
-          <div className="kpi-val" id="dir-kpi-ok" style={{ color: "var(--green-dk)" }}>—</div>
-          <div className="kpi-sub">no open compliance issue</div>
-        </div>
-        {' '}
-        <div className="kpi">
-          <div className="kpi-eye">Needs attention</div>
-          <div className="kpi-val" id="dir-kpi-watch" style={{ color: "var(--amber-dk)" }}>—</div>
-          <div className="kpi-sub">pending or expiring items</div>
-        </div>
-        {' '}
-        <div className="kpi">
-          <div className="kpi-eye">Critical</div>
-          <div className="kpi-val" id="dir-kpi-crit" style={{ color: "var(--red-dk)" }}>—</div>
-          <div className="kpi-sub">breach · blocked from push</div>
-        </div>
-      </div>
-      {' '}
-      <div className="card">
-        <div className="card-h">
-          <div>
-            <div className="card-h-title">Worker directory</div>
-            {' '}
-            <div className="card-h-sub">Search, filter, then click any worker to drill into compliance detail</div>
-          </div>
-          {' '}
-          <span className="pill outline" id="dir-count">—</span>
-        </div>
-        {' '}
-        {/*  search + filters  */}
-        {' '}
-        <div className="dir-controls">
-          <div className="wk-search dir-search">
-            <span className="wk-search-ico">⌕</span>
-            {' '}
-            <input type="text" id="dir-search" className="wk-search-in" autoComplete="off" placeholder="Search by name, worker ID, role or contractor…" onInput={(event) => { window.dirRender() }} />
-            {' '}
-            <span className="wk-search-clear" id="dir-search-clear" onClick={(event) => { window.dirSearchClear() }} data-onclick="dirSearchClear()" style={{ display: "none" }}>
-              ✕
-            </span>
-          </div>
-          {' '}
-          <div className="dir-filters" id="dir-filter-track">
-            <button className="dir-fbtn on" onClick={(event) => { window.dirFilter('track','all') }} data-onclick="dirFilter('track','all')">
-              All workers
-            </button>
-            {' '}
-            <button className="dir-fbtn" onClick={(event) => { window.dirFilter('track','direct') }} data-onclick="dirFilter('track','direct')">
-              Direct
-            </button>
-            {' '}
-            <button className="dir-fbtn" onClick={(event) => { window.dirFilter('track','contract') }} data-onclick="dirFilter('track','contract')">
-              Contract
-            </button>
-          </div>
-          {' '}
-          <div className="dir-filters" id="dir-filter-status">
-            <button className="dir-fbtn on" onClick={(event) => { window.dirFilter('status','all') }} data-onclick="dirFilter('status','all')">
-              Any status
-            </button>
-            {' '}
-            <button className="dir-fbtn" onClick={(event) => { window.dirFilter('status','ok') }} data-onclick="dirFilter('status','ok')">
-              Compliant
-            </button>
-            {' '}
-            <button className="dir-fbtn" onClick={(event) => { window.dirFilter('status','watch') }} data-onclick="dirFilter('status','watch')">
-              Attention
-            </button>
-            {' '}
-            <button className="dir-fbtn" onClick={(event) => { window.dirFilter('status','critical') }} data-onclick="dirFilter('status','critical')">
-              Critical
-            </button>
-          </div>
-        </div>
-        {' '}
-        <table className="t" id="dir-grid">
-          <thead>
-            <tr>
-              <th>Worker</th>
-              <th>Track</th>
-              <th>Role / Category</th>
-              <th>Department / Contractor</th>
-              <th>Compliance</th>
-              <th style={{ textAlign: "right" }}>Detail</th>
-            </tr>
-          </thead>
-          <tbody id="dir-grid-body" />
-        </table>
-        {' '}
-        <div id="dir-noresults" className="wk-noresults" style={{ display: "none" }}>
-          No workers match your search and filters.
-        </div>
-      </div>
-      {' '}
-      {' '}
       {/*  ─── OM Manpower · manager mapping (real roster from the .ods) ───  */}
       {' '}
-      <div className="g4" style={{ margin: "22px 0 18px" }}>
+      <div className="g4" style={{ margin: "4px 0 18px" }}>
         <div className="kpi">
           <div className="kpi-eye">OM Manpower associates</div>
           <div className="kpi-val" id="om-kpi-assoc">—</div>
@@ -225,27 +125,6 @@ export default function SecDirectory() {
         </div>
         {' '}
         <div id="om-pagination" className="om-pagination" />
-      </div>
-      {/*  ─── compliance drill-down ───  */}
-      {' '}
-      <div className="drill" id="dir-drill" style={{ display: "none" }}>
-        <div className="drill-h">
-          <div className="drill-h-left">
-            <span className="drill-h-eye" id="dir-drill-eye">Compliance detail</span>
-            {' '}
-            <span className="drill-h-title" id="dir-drill-title">—</span>
-            {' '}
-            <span className="drill-h-sub" id="dir-drill-sub">—</span>
-          </div>
-          {' '}
-          <div className="drill-h-stats" id="dir-drill-stats" />
-          {' '}
-          <span className="drill-h-close" onClick={(event) => { window.dirCloseDrill() }} data-onclick="dirCloseDrill()">
-            Close ✕
-          </span>
-        </div>
-        {' '}
-        <div className="dir-drill-body" id="dir-drill-body" />
       </div>
     </section>
   );

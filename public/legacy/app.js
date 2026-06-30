@@ -12280,6 +12280,18 @@ function __kvOnReady(fn) {
     return rows;
   }
 
+  /* export the (filtered) OM Manpower roster to Excel */
+  function omExport() {
+    const headers = ['Associate code', 'Name', 'Designation', 'Department',
+                     'Reporting manager', 'Manager code', 'UAN no', 'ESI no', 'Language'];
+    const rows = omFiltered().map(function (r) {
+      return [r.code, r.name, r.desig, r.dept, r.mgr, r.mgrCode, r.uan, r.esi, r.lang];
+    });
+    if (!rows.length) { toast('No associates to export', 'amber'); return; }
+    downloadWorkbook('OM Manpower mapping', headers, rows,
+      'plant-vaani_om-manpower-mapping_' + todayStamp() + '.xlsx');
+  }
+
   /* render a UAN / ESI value as a clickable, verifiable identification cell */
   function omIdCell(kind, val, r) {
     if (!val || val === '—') return '<span style="color:var(--ink-3,#8a8f98)">—</span>';
