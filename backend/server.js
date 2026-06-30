@@ -222,6 +222,44 @@ app.get('/api/readiness-surveys', (req, res) => {
   res.json({ ok: true, surveys: store.data.readinessSurveys || [] });
 });
 
+/* ── Worker compliance overrides ───────────────────────────────────────────
+   Per-worker (OM Manpower roster) state that must persist: Aadhaar eKYC
+   verification and the last notification sent. Base compliance is computed
+   deterministically on the client from the roster; these overrides are merged
+   on top (e.g. a verified Aadhaar flips that item to OK).
+   GET  /api/worker-compliance              → { ok, overrides: { code: {...} } }
+   POST /api/worker-compliance  { code, ... } merge → { ok, override }
+   ──────────────────────────────────────────────────────────────────────── */
+app.get('/api/worker-compliance', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  res.json({ ok: true, overrides: store.data.workerCompliance || {} });
+});
+
+app.post('/api/worker-compliance', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const p = req.body || {};
+  if (!p.code) return res.status(400).json({ ok: false, error: 'worker code is required' });
+
+  store.data.workerCompliance = store.data.workerCompliance || {};
+  const prev = store.data.workerCompliance[p.code] || {};
+  const merged = { ...prev };
+  if (typeof p.aadhaarVerified === 'boolean') merged.aadhaarVerified = p.aadhaarVerified;
+  if (p.aadhaarLast4) merged.aadhaarLast4 = String(p.aadhaarLast4).slice(-4);
+  if (p.notifiedAt) merged.notifiedAt = p.notifiedAt;
+  if (Array.isArray(p.channels)) merged.channels = p.channels;
+  merged.updatedAt = new Date().toISOString();
+  store.data.workerCompliance[p.code] = merged;
+  try {
+    writeStore(store);
+    res.json({ ok: true, override: merged });
+  } catch (err) {
+    console.error('worker-compliance save error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 /* ── VAANI translation proxy ──────────────────────────────────────────────
    POST /api/translate
    Body: { text, source, target }  — NLLB-style codes, e.g. eng_Latn → tam_Taml

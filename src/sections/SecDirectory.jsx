@@ -43,25 +43,25 @@ export default function SecDirectory() {
         <div className="kpi">
           <div className="kpi-eye">OM Manpower associates</div>
           <div className="kpi-val" id="om-kpi-assoc">—</div>
-          <div className="kpi-sub">contract workforce · SRICITY-FG</div>
+          <div className="kpi-sub">workforce · SRICITY-FG</div>
         </div>
         {' '}
         <div className="kpi">
-          <div className="kpi-eye">Reporting managers</div>
-          <div className="kpi-val" id="om-kpi-mgr">—</div>
-          <div className="kpi-sub">across the roster</div>
+          <div className="kpi-eye">Compliant</div>
+          <div className="kpi-val" id="om-kpi-compliant" style={{ color: "var(--green-dk)" }}>—</div>
+          <div className="kpi-sub" id="om-kpi-compliant-sub">—</div>
         </div>
         {' '}
         <div className="kpi">
-          <div className="kpi-eye">Departments</div>
-          <div className="kpi-val" id="om-kpi-dept">—</div>
-          <div className="kpi-sub" id="om-kpi-dept-sub">—</div>
+          <div className="kpi-eye">Non-compliant</div>
+          <div className="kpi-val" id="om-kpi-noncompliant" style={{ color: "var(--red-dk)" }}>—</div>
+          <div className="kpi-sub" id="om-kpi-noncompliant-sub">—</div>
         </div>
         {' '}
         <div className="kpi">
-          <div className="kpi-eye">Languages</div>
-          <div className="kpi-val" id="om-kpi-lang">—</div>
-          <div className="kpi-sub">preferred for broadcasts</div>
+          <div className="kpi-eye">Aadhaar pending</div>
+          <div className="kpi-val" id="om-kpi-aadhaar" style={{ color: "var(--amber-dk)" }}>—</div>
+          <div className="kpi-sub">eKYC not verified · click a row</div>
         </div>
       </div>
       {' '}
@@ -114,6 +114,7 @@ export default function SecDirectory() {
                 <th className="om-th-sort" data-omcol="uan" onClick={(event) => { window.omSort('uan') }}>UAN no <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="esi" onClick={(event) => { window.omSort('esi') }}>ESI no <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="lang" onClick={(event) => { window.omSort('lang') }}>Language <span className="om-caret">⇅</span></th>
+                <th>Compliance</th>
               </tr>
             </thead>
             <tbody id="om-grid-body" />

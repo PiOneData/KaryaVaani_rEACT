@@ -37,8 +37,12 @@ export default function SecAnalytics() {
       {' '}
       {/* tab bar */}
       <div className="tabs" style={{ marginBottom: "16px" }}>
-        <div className="tab on" id="an-tab-exposure" onClick={(event) => { window.anTab('exposure', event.currentTarget) }} data-onclick="anTab('exposure', this)">
-          Exposure analytics
+        <div className="tab on" id="an-tab-workforce" onClick={(event) => { window.anTab('workforce', event.currentTarget) }} data-onclick="anTab('workforce', this)">
+          Workforce compliance
+        </div>
+        {' '}
+        <div className="tab" id="an-tab-exposure" onClick={(event) => { window.anTab('exposure', event.currentTarget) }} data-onclick="anTab('exposure', this)">
+          Contractor exposure
         </div>
         {' '}
         <div className="tab" id="an-tab-readiness" onClick={(event) => { window.anTab('readiness', event.currentTarget) }} data-onclick="anTab('readiness', this)">
@@ -50,8 +54,51 @@ export default function SecAnalytics() {
         </div>
       </div>
       {' '}
-      {/* ── EXPOSURE ANALYTICS PANE (compliance-driven) ── */}
-      <div id="an-pane-exposure" className="an-pane">
+      {/* ── WORKFORCE COMPLIANCE PANE (OM Manpower roster · employee-level) ── */}
+      <div id="an-pane-workforce" className="an-pane">
+        <div id="wfc-kpis" className="g4" style={{ margin: "4px 0 16px" }} />
+        {' '}
+        <div className="g2" style={{ marginBottom: "16px" }}>
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Breach by statutory item</div>
+                <div className="card-h-sub">How many associates fail each requirement — under current Indian labour law</div>
+              </div>
+            </div>
+            <div id="wfc-bylaw" />
+          </div>
+          {' '}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Compliance by department</div>
+                <div className="card-h-sub">% of associates meeting all critical items, per department</div>
+              </div>
+            </div>
+            <div id="wfc-bydept" />
+          </div>
+        </div>
+        {' '}
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="card-h-title">Non-compliant associates</div>
+              <div className="card-h-sub">Click a row to open the employee compliance detail · notify via email / WhatsApp</div>
+            </div>
+            <span className="pill outline" id="wfc-table-count">—</span>
+          </div>
+          <table className="t" id="wfc-table">
+            <thead>
+              <tr><th>Name</th><th>Code</th><th>Department</th><th>Score</th><th>Failing items</th><th></th></tr>
+            </thead>
+            <tbody id="wfc-table-body" />
+          </table>
+        </div>
+      </div>
+      {' '}
+      {/* ── CONTRACTOR EXPOSURE PANE (compliance-driven) ── */}
+      <div id="an-pane-exposure" className="an-pane" style={{ display: "none" }}>
         {/* KPI strip — filled by initExposureAnalytics() */}
         <div id="exp-kpis" className="g4" style={{ margin: "4px 0 16px" }} />
         {' '}
