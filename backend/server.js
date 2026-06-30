@@ -29,7 +29,10 @@ app.get('/api/health', (req, res) => {
 app.get('/api/bootstrap', (req, res) => {
   const s = readStore();
   if (!s) return res.status(503).json({ error: 'Not seeded. Run `npm run seed` first.' });
-  res.json(s.data);
+  // Exclude onboardingDocuments (base64 file blobs) from the bundle every client
+  // loads — they are fetched on demand per worker via /api/onboarding-documents.
+  const { onboardingDocuments, ...rest } = s.data;
+  res.json(rest);
 });
 
 /* kept for compatibility — the OM roster card */
@@ -327,6 +330,65 @@ app.delete('/api/onboarding-captures/:id', (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('onboarding-capture delete error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ── Onboarding documents ──────────────────────────────────────────────────
+   Per-worker uploaded documents (PAN, bank proof, education, prior employment,
+   …) stored as data-URLs keyed by worker id, so they can be retrieved and
+   viewed later from the worker drilldown. Kept OUT of /api/bootstrap (fetched on
+   demand) so the base64 blobs are not shipped to every client.
+   POST   /api/onboarding-documents              { workerId, name, docType, dataUrl } → { ok, doc }
+   GET    /api/onboarding-documents/:workerId     → { ok, documents }
+   DELETE /api/onboarding-documents/:workerId/:docId → { ok }
+   ──────────────────────────────────────────────────────────────────────── */
+app.post('/api/onboarding-documents', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const { workerId, name, docType, dataUrl } = req.body || {};
+  if (!workerId || !dataUrl) return res.status(400).json({ ok: false, error: 'workerId and dataUrl are required' });
+  if (String(dataUrl).length > 5 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'document too large (max ~3.5MB)' });
+
+  store.data.onboardingDocuments = store.data.onboardingDocuments || {};
+  const list = store.data.onboardingDocuments[workerId] = store.data.onboardingDocuments[workerId] || [];
+  const doc = {
+    id: 'doc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    name: name || 'document', docType: docType || 'Other', dataUrl: dataUrl,
+    uploadedAt: new Date().toISOString()
+  };
+  list.push(doc);
+  try {
+    writeStore(store);
+    res.json({ ok: true, doc: doc });
+  } catch (err) {
+    console.error('onboarding-document save error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/onboarding-documents/:workerId', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const docs = (store.data.onboardingDocuments || {})[req.params.workerId] || [];
+  res.json({ ok: true, documents: docs });
+});
+
+app.delete('/api/onboarding-documents/:workerId/:docId', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const map = store.data.onboardingDocuments || {};
+  const list = map[req.params.workerId] || [];
+  const idx = list.findIndex(d => d.id === req.params.docId);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'document not found' });
+  list.splice(idx, 1);
+  map[req.params.workerId] = list;
+  store.data.onboardingDocuments = map;
+  try {
+    writeStore(store);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('onboarding-document delete error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

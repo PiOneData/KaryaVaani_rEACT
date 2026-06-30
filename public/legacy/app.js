@@ -1916,6 +1916,18 @@ function __kvOnReady(fn) {
     }
     /* deployed workers under this contractor */
     const workers = ctdWorkers(c.name);
+    /* newly onboarded contract workers tagged to this contractor (live, clickable) */
+    const obList = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).map(function (r, i) { return { r: r, i: i }; })
+      .filter(function (x) { return x.r.type === 'contract' && (((x.r.employment && x.r.employment.contractor) || '') === c.name); });
+    const obRows = obList.length
+      ? '<div class="dir-dd-note" style="margin-top:8px"><strong>Newly onboarded · this contractor</strong> — click to open</div>' +
+        obList.map(function (x) {
+          return '<div class="dir-dd-check" style="cursor:pointer" onclick="obOpenCapture(' + x.i + ')">' +
+            '<span class="dir-dd-check-ico ' + (x.r.aadhaarVerified ? 'ok' : 'warn') + '">' + (x.r.aadhaarVerified ? '✓' : '!') + '</span>' +
+            '<div class="dir-dd-check-main"><div class="dir-dd-check-l">' + x.r.name + ' · ' + (x.r.category || '—') + ' <span class="tiny muted">(' + x.r.id + ')</span></div>' +
+            '<div class="dir-dd-check-s">Aadhaar ' + (x.r.aadhaarVerified ? 'verified' : 'pending') + ' · ' + (x.r.status === 'confirmed' ? 'confirmed' : 'awaiting confirmation') + '</div></div></div>';
+        }).join('')
+      : '';
     const wRows = workers.length
       ? workers.map(function (w) {
           return '<div class="dir-dd-check">' +
@@ -1988,8 +2000,8 @@ function __kvOnReady(fn) {
       /* deployed workers */
       '<div class="dir-dd-card dir-dd-full">' +
         '<div class="dir-dd-card-h">Workers deployed by this contractor' +
-          '<span class="pill outline tiny">' + workers.length + ' in onboarding set</span></div>' +
-        wRows +
+          '<span class="pill outline tiny">' + workers.length + ' in onboarding set' + (obList.length ? ' · ' + obList.length + ' newly onboarded' : '') + '</span></div>' +
+        wRows + obRows +
       '</div>' +
     '</div>';
   }
@@ -3099,10 +3111,13 @@ function __kvOnReady(fn) {
 
   function renderCtPaneWorkers(c) {
     const workers = CONTRACT_WORKERS.filter(w => w.contractor === c.name);
+    // newly onboarded contract workers tagged to this contractor (live, clickable)
+    const onboarded = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).map(function (r, i) { return { r: r, i: i }; })
+      .filter(function (x) { return x.r.type === 'contract' && (((x.r.employment && x.r.employment.contractor) || '') === c.name); });
     let html = '';
-    if (workers.length === 0) {
+    if (workers.length === 0 && onboarded.length === 0) {
       html = '<div class="muted tiny">No matching contract workers in current dataset. Workers may be deployed but not appear in the in-progress onboarding ledger if already pushed to HRIS.</div>';
-    } else {
+    } else if (workers.length) {
       html += '<div class="card-h" style="padding:0;margin-bottom:10px">' +
               '<div class="card-h-title" style="font-size:0.85rem">Workers in onboarding</div>' +
               '<div class="card-h-sub">' + workers.length + ' of ' + c.deployed + ' deployed shown · Module 2 cross-reference</div></div>';
@@ -3123,6 +3138,19 @@ function __kvOnReady(fn) {
       });
       html += '</tbody></table>';
       html += '<div class="tiny muted" style="margin-top:8px">For the remaining ' + (c.deployed - workers.length) + ' workers already past onboarding, see Daikin HRIS or the master worker register. Click <strong>Induction training</strong> in the nav to drill into per-module progress.</div>';
+    }
+    if (onboarded.length) {
+      html += '<div class="card-h" style="padding:0;margin:14px 0 8px"><div class="card-h-title" style="font-size:0.85rem">Newly onboarded · this contractor</div>' +
+              '<div class="card-h-sub">' + onboarded.length + ' captured in Onboarding · click a row to open the worker</div></div>';
+      html += '<table class="t"><thead><tr><th>Worker</th><th>Category</th><th>Aadhaar</th><th>Status</th></tr></thead><tbody>';
+      onboarded.forEach(function (x) {
+        html += '<tr style="cursor:pointer" onclick="obOpenCapture(' + x.i + ')">' +
+          '<td class="t-strong">' + x.r.name + ' <span class="tiny muted">(' + x.r.id + ')</span></td>' +
+          '<td>' + (x.r.category || '—') + '</td>' +
+          '<td>' + (x.r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+          '<td>' + (x.r.status === 'confirmed' ? 'Confirmed' : 'Awaiting') + '</td></tr>';
+      });
+      html += '</tbody></table>';
     }
     document.getElementById('ct-pane-workers').innerHTML = html;
   }
@@ -14328,6 +14356,7 @@ function __kvOnReady(fn) {
   function obOpenCapture(i) {
     const rec = CAP_STATE.recent[i];
     if (!rec) return;
+    const docKey = rec.backendId || rec.id;
     const a = rec.address || {};
     const e = rec.employment || {};
     const ppe = rec.ppe || {};
@@ -14349,7 +14378,18 @@ function __kvOnReady(fn) {
         ? kvKV('Position ID', e.posId) + kvKV('Department', e.dept)
         : kvKV('Work order', e.workorder) + kvKV('Contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
       kvKV('Date of joining', e.doj) +
-      '<div class="tiny muted" style="margin-top:10px">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained.</div>';
+      '<div class="tiny muted" style="margin:10px 0">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained.</div>' +
+      // ── worker documents (uploaded, stored in DB, retrievable) ──
+      '<div class="card-h-title" style="font-size:0.85rem;margin-top:14px">Worker documents</div>' +
+      '<div class="cap-hint" style="margin:4px 0 8px">Upload PAN, bank proof, education or prior-employment documents — stored against this worker and retrievable any time.</div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        '<select class="sel" id="ob-doc-type" style="width:auto">' +
+          ['PAN card', 'Bank proof', 'Education certificate', 'Prior employment', 'Address proof', 'Other'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+        '</select>' +
+        '<input type="file" id="ob-doc-file" accept="image/*,application/pdf" style="display:none" onchange="obUploadDoc(\'' + docKey + '\')">' +
+        '<button class="btn" onclick="document.getElementById(\'ob-doc-file\').click()">Upload document</button>' +
+      '</div>' +
+      '<div id="ob-docs-list" class="tiny muted" style="margin-top:10px">Loading documents…</div>';
     const c = obWorkerCompliance(rec);
     const itemsHtml = c.items.map(function (it) {
       const ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
@@ -14382,6 +14422,67 @@ function __kvOnReady(fn) {
         (c.status !== 'compliant' && rec.mobile ? '<button class="btn amber" onclick="obNotifyCapture(' + i + ')">Notify (WhatsApp)</button>' : '') +
         '<button class="btn" onclick="omCloseModal()">Close</button></div>'
     });
+    obLoadDocs(docKey);   // fill the documents list once the modal DOM exists
+  }
+
+  /* ── worker documents · upload / list / view / delete (stored in DB) ───── */
+  let OB_DOCS = {};
+  function obLoadDocs(workerKey) {
+    const host = document.getElementById('ob-docs-list');
+    if (!host) return;
+    fetch((window.__KV_API_BASE || '') + '/api/onboarding-documents/' + encodeURIComponent(workerKey))
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        const docs = (j && j.documents) || [];
+        OB_DOCS[workerKey] = docs;
+        if (!docs.length) { host.innerHTML = '<div class="tiny muted">No documents uploaded yet.</div>'; return; }
+        host.innerHTML = docs.map(function (d) {
+          return '<div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:0.82rem">' +
+            '<span><strong>' + d.docType + '</strong> · ' + d.name + ' <span class="tiny muted">· ' + new Date(d.uploadedAt).toLocaleDateString('en-IN') + '</span></span>' +
+            '<span style="white-space:nowrap"><button class="btn" onclick="obViewDoc(\'' + workerKey + '\',\'' + d.id + '\')">View</button> ' +
+            '<button class="btn danger" onclick="obDeleteDoc(\'' + workerKey + '\',\'' + d.id + '\')">Delete</button></span></div>';
+        }).join('');
+      })
+      .catch(function () { host.innerHTML = '<div class="tiny muted">Could not load documents.</div>'; });
+  }
+  function obUploadDoc(workerKey) {
+    const fileInput = document.getElementById('ob-doc-file');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast('File too large (max 3MB)', 'red'); return; }
+    const docType = (document.getElementById('ob-doc-type') || {}).value || 'Other';
+    const host = document.getElementById('ob-docs-list'); if (host) host.innerHTML = '<div class="tiny muted">Uploading…</div>';
+    const reader = new FileReader();
+    reader.onload = function () {
+      fetch((window.__KV_API_BASE || '') + '/api/onboarding-documents', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workerId: workerKey, name: file.name, docType: docType, dataUrl: reader.result })
+      }).then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) {
+          if (j && j.ok) { toast('Document uploaded · ' + docType, 'green'); obLoadDocs(workerKey); }
+          else { toast('Upload failed: ' + ((j && j.error) || 'unknown'), 'red'); obLoadDocs(workerKey); }
+        })
+        .catch(function (e) { toast('Upload failed: ' + e.message, 'red'); });
+    };
+    reader.readAsDataURL(file);
+  }
+  function obViewDoc(workerKey, docId) {
+    const docs = OB_DOCS[workerKey] || [];
+    const d = docs.find(function (x) { return x.id === docId; });
+    if (!d) return;
+    const isPdf = /^data:application\/pdf/i.test(d.dataUrl) || /\.pdf$/i.test(d.name);
+    const w = window.open('', '_blank');
+    if (!w) { toast('Popup blocked — allow popups to view the document', 'red'); return; }
+    w.document.write('<title>' + d.name + '</title><body style="margin:0;background:#222">' +
+      (isPdf ? '<iframe src="' + d.dataUrl + '" style="width:100%;height:100vh;border:0"></iframe>'
+             : '<img src="' + d.dataUrl + '" style="max-width:100%;display:block;margin:0 auto">') + '</body>');
+  }
+  function obDeleteDoc(workerKey, docId) {
+    if (!window.confirm('Delete this document?')) return;
+    fetch((window.__KV_API_BASE || '') + '/api/onboarding-documents/' + encodeURIComponent(workerKey) + '/' + docId, { method: 'DELETE' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { if (j && j.ok) { toast('Document deleted', 'green'); obLoadDocs(workerKey); } else toast('Delete failed', 'red'); })
+      .catch(function (e) { toast('Delete failed: ' + e.message, 'red'); });
   }
   function obVerifyCaptureAadhaar(i) {
     const rec = CAP_STATE.recent[i]; if (!rec) return;
