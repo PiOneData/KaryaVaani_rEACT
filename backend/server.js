@@ -314,6 +314,23 @@ app.get('/api/onboarding-captures', (req, res) => {
   res.json({ ok: true, captures: store.data.onboardingCaptures || [] });
 });
 
+app.delete('/api/onboarding-captures/:id', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  const list = store.data.onboardingCaptures || [];
+  const idx = list.findIndex(c => c.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'capture not found' });
+  list.splice(idx, 1);
+  store.data.onboardingCaptures = list;
+  try {
+    writeStore(store);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('onboarding-capture delete error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 /* ── VAANI translation proxy ──────────────────────────────────────────────
    POST /api/translate
    Body: { text, source, target }  — NLLB-style codes, e.g. eng_Latn → tam_Taml

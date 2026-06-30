@@ -127,6 +127,38 @@ export default function SecDirectory() {
         {' '}
         <div id="om-pagination" className="om-pagination" />
       </div>
+      {' '}
+      {/* ─── Onboarded workers (from the Onboarding module · stored in the DB) ─── */}
+      <div className="card" style={{ marginTop: "18px" }}>
+        <div className="card-h">
+          <div>
+            <div className="card-h-title">Onboarded workers</div>
+            <div className="card-h-sub">Profiles captured in Onboarding — tracked here with compliance · click a row for full details · edit or remove</div>
+          </div>
+          <span className="pill outline" id="ob-count">—</span>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="t" id="ob-grid">
+            <thead>
+              <tr>
+                <th>Worker ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Contractor / Position</th>
+                <th>Aadhaar</th>
+                <th>Status</th>
+                <th>Compliance</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ob-grid-body" />
+          </table>
+        </div>
+        <div id="ob-noresults" className="wk-noresults">
+          No workers onboarded yet — capture a profile in Onboarding (Operational Pillars).
+        </div>
+      </div>
     </section>
   );
 }

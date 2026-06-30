@@ -11714,6 +11714,7 @@ function __kvOnReady(fn) {
     };
     CAP_STATE.recent.unshift(rec);
     capRenderRecent();
+    if (typeof obRenderDirectory === 'function') obRenderDirectory();
     toast('Profile saved · confirmation link sent to ' + name + ' on WhatsApp (' + capLangName() + ')', 'green');
 
     /* persist the full onboarding profile to the backend (Aadhaar privacy-gated) */
@@ -12509,6 +12510,8 @@ function __kvOnReady(fn) {
   function initOmMapping() {
     if (!document.getElementById('om-grid-body')) return;
     omLoad();
+    if (typeof obRenderDirectory === 'function') obRenderDirectory();
+    if (typeof obLoadCaptures === 'function') obLoadCaptures();
   }
   __kvOnReady(initOmMapping);
 
@@ -13628,7 +13631,7 @@ function __kvOnReady(fn) {
       tb.innerHTML = rows.map(function (r) {
         const wd = expWorstDim(r.c);
         const col = expColor(r.c.score);
-        return '<tr>' +
+        return '<tr style="cursor:pointer" onclick="ctOpenContractor(\'' + r.c.id + '\')" title="Open contractor · workers drilldown">' +
           '<td class="t-strong">' + r.c.name + '</td>' +
           '<td>' + (r.c.area || '—') + '</td>' +
           '<td>' + (r.c.deployed || 0) + '</td>' +
@@ -14356,7 +14359,7 @@ function __kvOnReady(fn) {
         '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div></div></div>';
     }).join('');
     const ctLink = c.contractor
-      ? '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Linked contractor <strong>' + c.contractor.name + '</strong> · compliance score ' + c.contractor.score + '/100 — ESIC/PF status flows from the contractor master.</div>'
+      ? '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Linked contractor <span class="cap-recent-link" onclick="ctOpenContractor(\'' + c.contractor.id + '\')"><strong>' + c.contractor.name + '</strong></span> · compliance score ' + c.contractor.score + '/100 — click to drill into the contractor. ESIC / PF status flows from the contractor master.</div>'
       : '';
     const compliance =
       '<div class="g2" style="gap:10px;margin-bottom:12px">' +
@@ -14374,7 +14377,9 @@ function __kvOnReady(fn) {
       ],
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + (rec.mobile ? 'Worker mobile ' + rec.mobile : '') + '</span></div>' +
         '<div class="modal-footer-right">' +
-        (c.status !== 'compliant' && rec.mobile ? '<button class="btn amber" onclick="obNotifyCapture(' + i + ')">Notify worker (WhatsApp)</button>' : '') +
+        '<button class="btn" onclick="obEditCapture(' + i + ')">Edit</button>' +
+        '<button class="btn danger" onclick="obDeleteCapture(' + i + ')">Delete</button>' +
+        (c.status !== 'compliant' && rec.mobile ? '<button class="btn amber" onclick="obNotifyCapture(' + i + ')">Notify (WhatsApp)</button>' : '') +
         '<button class="btn" onclick="omCloseModal()">Close</button></div>'
     });
   }
@@ -14414,8 +14419,140 @@ function __kvOnReady(fn) {
           .filter(function (c) { return !have[c.id]; })
           .map(function (c) { return Object.assign({}, c, { backendId: c.id, status: c.status || 'sent' }); });
         if (loaded.length) { CAP_STATE.recent = CAP_STATE.recent.concat(loaded); capRenderRecent(); }
+        obRenderDirectory();
       })
       .catch(function () {});
+  }
+
+  /* ── onboarded-workers directory grid (trackable + CRUD) ───────────────── */
+  function obRenderDirectory() {
+    const body = document.getElementById('ob-grid-body');
+    if (!body) return;
+    const list = CAP_STATE.recent || [];
+    const cnt = document.getElementById('ob-count'); if (cnt) cnt.textContent = list.length + ' onboarded';
+    const nr = document.getElementById('ob-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
+    body.innerHTML = list.map(function (r, i) {
+      const c = obWorkerCompliance(r);
+      const link = (r.type === 'contract' && r.employment && r.employment.contractor)
+        ? '<span class="cap-recent-link" onclick="event.stopPropagation();ctOpenContractorByName(\'' + (r.employment.contractor).replace(/'/g, "\\'") + '\')">' + r.employment.contractor + '</span>'
+        : ((r.employment && r.employment.posId) ? r.employment.posId : '—');
+      return '<tr style="cursor:pointer" onclick="obOpenCapture(' + i + ')">' +
+        '<td class="t-strong">' + r.id + '</td><td>' + r.name + '</td>' +
+        '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
+        '<td>' + (r.category || '—') + '</td><td>' + link + '</td>' +
+        '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+        '<td>' + (r.status === 'confirmed' ? '<span class="pill green tiny">Confirmed</span>' : '<span class="pill amber tiny">Awaiting</span>') + '</td>' +
+        '<td><span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
+        '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
+          '<button class="btn" onclick="obEditCapture(' + i + ')">Edit</button> ' +
+          '<button class="btn danger" onclick="obDeleteCapture(' + i + ')">Delete</button></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  /* delete a captured worker (DB + session) */
+  function obDeleteCapture(i) {
+    const r = CAP_STATE.recent[i]; if (!r) return;
+    if (!window.confirm('Remove ' + r.name + ' (' + r.id + ') from onboarding records?')) return;
+    const finish = function () { CAP_STATE.recent.splice(i, 1); capRenderRecent(); obRenderDirectory(); toast('Removed ' + r.name, 'green'); };
+    if (r.backendId) {
+      fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures/' + r.backendId, { method: 'DELETE' })
+        .then(function (x) { return x.json().catch(function () { return {}; }); })
+        .then(function (j) { if (j && j.ok) finish(); else toast('Delete failed: ' + (j.error || 'unknown'), 'red'); })
+        .catch(function (e) { toast('Delete failed: ' + e.message, 'red'); });
+    } else finish();
+  }
+
+  /* edit a captured worker's details (DB + session) */
+  function obEditCapture(i) {
+    const r = CAP_STATE.recent[i]; if (!r) return;
+    const e = r.employment || {};
+    const opt = function (v, sel) { return '<option' + (v === sel ? ' selected' : '') + '>' + v + '</option>'; };
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Edit worker · ' + r.id + '</span><span class="modal-h-title">' + r.name + '</span></div><span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body"><div class="g2" style="gap:10px">' +
+        '<div class="field"><label class="field-l">Name</label><input class="input" id="obe-name" value="' + (r.name || '') + '"></div>' +
+        '<div class="field"><label class="field-l">Mobile</label><input class="input" id="obe-mobile" value="' + (r.mobile || '') + '"></div>' +
+        '<div class="field"><label class="field-l">Category</label><select class="sel" id="obe-category">' + ['Unskilled', 'Semi-skilled', 'Skilled', 'Highly skilled'].map(function (x) { return opt(x, r.category); }).join('') + '</select></div>' +
+        '<div class="field"><label class="field-l">Status</label><select class="sel" id="obe-status">' + ['sent', 'confirmed'].map(function (x) { return opt(x, r.status); }).join('') + '</select></div>' +
+        (r.type === 'contract'
+          ? '<div class="field"><label class="field-l">Contractor</label><select class="sel" id="obe-contractor"><option value="">—</option>' + (CONTRACTORS || []).map(function (c) { return '<option' + (c.name === e.contractor ? ' selected' : '') + '>' + c.name + '</option>'; }).join('') + '</select></div>'
+          : '<div class="field"><label class="field-l">Position ID</label><input class="input" id="obe-posid" value="' + (e.posId || '') + '"></div>') +
+        '<div class="field"><label class="field-l">Date of joining</label><input class="input" id="obe-doj" type="date" value="' + (e.doj || '') + '"></div>' +
+      '</div></div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Updates the stored record</span></div><div class="modal-footer-right"><button class="btn primary" onclick="obSaveEdit(' + i + ')">Save changes</button><button class="btn" onclick="omCloseModal()">Cancel</button></div></div>'
+    );
+  }
+  function obSaveEdit(i) {
+    const r = CAP_STATE.recent[i]; if (!r) return;
+    const v = function (id) { const el = document.getElementById(id); return el ? el.value : ''; };
+    r.name = v('obe-name') || r.name; r.mobile = v('obe-mobile'); r.category = v('obe-category'); r.status = v('obe-status');
+    r.employment = r.employment || {};
+    if (r.type === 'contract') r.employment.contractor = v('obe-contractor'); else r.employment.posId = v('obe-posid');
+    r.employment.doj = v('obe-doj');
+    capRenderRecent(); obRenderDirectory();
+    if (r.backendId) {
+      fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: r.backendId, name: r.name, mobile: r.mobile, category: r.category, status: r.status, employment: r.employment })
+      }).then(function (x) { return x.json().catch(function () { return {}; }); })
+        .then(function (j) { toast(j && j.ok ? 'Saved' : ('Save failed: ' + ((j && j.error) || 'unknown')), j && j.ok ? 'green' : 'red'); })
+        .catch(function (e) { toast('Save failed: ' + e.message, 'red'); });
+    } else toast('Saved (session)', 'green');
+    omCloseModal();
+  }
+
+  /* ── contractor detail modal (reachable everywhere) · workers ↔ contractor ── */
+  function ctAllWorkers(name) {
+    const n = (name || '').trim().toLowerCase();
+    const cw = (typeof CONTRACT_WORKERS !== 'undefined' ? CONTRACT_WORKERS : []).filter(function (w) { return (w.contractor || '').trim().toLowerCase() === n; })
+      .map(function (w) { return { name: w.name, category: w.category, kind: 'contract-worker', esic: w.esic, captureIndex: -1 }; });
+    const caps = (CAP_STATE.recent || []).map(function (r, i) { return { r: r, i: i }; })
+      .filter(function (x) { return x.r.type === 'contract' && (((x.r.employment && x.r.employment.contractor) || '').trim().toLowerCase() === n); })
+      .map(function (x) { return { name: x.r.name, category: x.r.category, kind: 'onboarded', aadhaarVerified: x.r.aadhaarVerified, captureIndex: x.i }; });
+    return caps.concat(cw);
+  }
+  function ctOpenContractorByName(name) {
+    const c = (CONTRACTORS || []).find(function (x) { return x.name === name; });
+    if (c) ctOpenContractor(c.id); else toast('Contractor record not found', 'red');
+  }
+  function ctOpenContractor(id) {
+    const c = (CONTRACTORS || []).find(function (x) { return x.id === id; });
+    if (!c) return;
+    const overview = kvKV('Contractor', c.name) + kvKV('Code', c.id) + kvKV('Deployment area', c.area) +
+      kvKV('Workers deployed', c.deployed) + kvKV('Compliance score', '<span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + '/100</span>') +
+      kvKV('Compliance lead', c.complianceLead) +
+      kvKV('CLRA', '<span class="pill ' + c.clra.cls + ' tiny">' + c.clra.label + '</span>') +
+      kvKV('ESIC', '<span class="pill ' + c.esic.cls + ' tiny">' + c.esic.label + '</span>') +
+      kvKV('PF', '<span class="pill ' + c.pf.cls + ' tiny">' + c.pf.label + '</span>') +
+      kvKV('Avg pay', c.avgPay) + kvKV('Women / migrant', c.womenWorkers + ' / ' + c.migrantWorkers);
+    const dims = [['clra', 'CLRA'], ['esic', 'ESIC'], ['pf', 'PF'], ['minWage', 'Min wage'], ['migrant', 'Migrant'], ['safety', 'Safety']];
+    const L = c.liability || {};
+    const expMid = (L.statutoryMid || 0) + ((L.operationalDays || 0) * (L.operationalPerDay || 0)) + (L.customerAudit || 0) + (L.contractValueRisk || 0);
+    const compliance = dims.map(function (d) {
+      const vv = (c.subscores || {})[d[0]] || 0; const col = omComplyColor(vv);
+      return '<div style="margin:9px 0"><div class="row-between" style="font-size:0.8rem;margin-bottom:3px"><span>' + d[1] + '</span><span class="mono" style="color:' + col + '">' + vv + '/100</span></div><div class="bar"><span style="width:' + vv + '%;background:' + col + '"></span></div></div>';
+    }).join('') + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Estimated statutory exposure (mid-case) ≈ ₹' + expMid + ' L · joint liability with the principal employer (Daikin).</div>';
+    const wk = ctAllWorkers(c.name);
+    const wkRows = wk.length ? wk.map(function (w) {
+      const click = w.captureIndex >= 0 ? ' style="cursor:pointer" onclick="obOpenCapture(' + w.captureIndex + ')"' : '';
+      const badge = w.kind === 'onboarded'
+        ? '<span class="pill amber tiny">onboarded</span>' + (w.aadhaarVerified ? ' <span class="pill green tiny">Aadhaar ✓</span>' : '')
+        : (w.esic ? '<span class="pill ' + w.esic.cls + ' tiny">ESIC ' + w.esic.label + '</span>' : '—');
+      return '<tr' + click + '><td class="t-strong">' + w.name + (w.captureIndex >= 0 ? ' <span class="tiny muted">(click)</span>' : '') + '</td><td>' + (w.category || '—') + '</td><td>' + badge + '</td></tr>';
+    }).join('') : '<tr><td colspan="3" class="tiny muted" style="padding:10px">No workers linked to this contractor yet.</td></tr>';
+    const workers = '<div class="tiny muted" style="margin-bottom:6px">' + wk.length + ' worker(s) linked · onboarded profiles are clickable</div>' +
+      '<table class="t"><thead><tr><th>Name</th><th>Category</th><th>Status</th></tr></thead><tbody>' + wkRows + '</tbody></table>';
+    kvTabModal({
+      eyebrow: 'Contractor · ' + c.id + ' · ' + c.deployed + ' deployed',
+      title: c.name,
+      tabs: [
+        { id: 'overview', label: 'Overview', html: overview },
+        { id: 'compliance', label: 'Compliance', html: compliance },
+        { id: 'workers', label: 'Workers (' + wk.length + ')', html: workers }
+      ],
+      footer: '<div class="modal-footer-left"><span class="tiny muted">Joint-liability compliance flows to the principal employer</span></div><div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div>'
+    });
   }
 
   /* ── workforce compliance analytics (Analytics hub tab) ────────────────── */
