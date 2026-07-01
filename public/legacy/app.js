@@ -11658,6 +11658,18 @@ function __kvOnReady(fn) {
     sel.dataset.filled = '1';
   }
 
+  /* populate the department dropdown from the current OM roster's departments */
+  function capPopulateDepartments() {
+    const sel = document.getElementById('cap-department');
+    if (!sel || sel.dataset.filled) return;
+    const roster = (window.__KVDATA && window.__KVDATA.omMapping) || [];
+    const depts = Array.from(new Set(roster.map(function (r) { return r.department; }).filter(Boolean))).sort();
+    if (!depts.length) return;
+    sel.innerHTML = '<option value="">Select department…</option>' +
+      depts.map(function (d) { return '<option>' + d + '</option>'; }).join('');
+    sel.dataset.filled = '1';
+  }
+
   /* ── mode: single vs bulk ── */
   function capSetMode(m) {
     CAP_STATE.mode = m;
@@ -11783,6 +11795,7 @@ function __kvOnReady(fn) {
     const rec = {
       id: wid, name: name, type: CAP_STATE.type, status: 'sent',
       lang: capLangName(), category: capVal('cap-category') || 'Unskilled',
+      designation: capVal('cap-designation'),
       photo: CAP_STATE.photo, mobile: mobile,
       manager: mgrParts[0] || '', managerCode: mgrParts[1] || '',
       uan: capVal('cap-uan'), esi: capVal('cap-esi'),
@@ -11791,7 +11804,7 @@ function __kvOnReady(fn) {
       gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
       address: { addr1: capVal('cap-addr1'), addr2: capVal('cap-addr2'), city: capVal('cap-city'), district: capVal('cap-district'), pin: capVal('cap-pin'), state: capVal('cap-homestate') },
       migrant: getC('cap-migrant'),
-      employment: { posId: capVal('cap-posid'), dept: capVal('cap-dept'), workorder: capVal('cap-workorder'), contractor: capVal('cap-contractor'), clra: capVal('cap-clra'), shift: capVal('cap-shift'), doj: capVal('cap-doj') },
+      employment: { posId: capVal('cap-posid'), dept: capVal('cap-department') || capVal('cap-dept'), workorder: capVal('cap-workorder'), contractor: capVal('cap-contractor'), clra: capVal('cap-clra'), shift: capVal('cap-shift'), doj: capVal('cap-doj') },
       ppe: { uniform: capVal('cap-uniform'), shoe: capVal('cap-shoe'), helmet: capVal('cap-helmet'), glove: capVal('cap-glove'), eyewear: capVal('cap-eyewear'), hearing: capVal('cap-hearing'), extra: (CAP_STATE.ppe || []).slice() },
       ppeAckAt: new Date().toISOString()
     };
@@ -11876,10 +11889,10 @@ function __kvOnReady(fn) {
   function capReset(keep) {
     ['cap-name','cap-dob','cap-mobile','cap-aadhaar','cap-emergency',
      'cap-addr1','cap-addr2','cap-city','cap-district','cap-pin',
-     'cap-spoken','cap-clra','cap-doj','cap-uan','cap-esi'].forEach(function (id) {
+     'cap-spoken','cap-clra','cap-doj','cap-uan','cap-esi','cap-designation'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['cap-posid','cap-workorder','cap-manager','cap-vendor'].forEach(function (id) {
+    ['cap-posid','cap-workorder','cap-manager','cap-vendor','cap-department'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     const mig = document.getElementById('cap-migrant'); if (mig) mig.checked = false;
@@ -12081,7 +12094,12 @@ function __kvOnReady(fn) {
     if (dept) dept.value = p.dept;
     const cat = document.getElementById('cap-category');
     if (cat) cat.value = p.category;
-    toast('Tagged to ' + p.id + ' · ' + p.role + ' — department and category pulled from the approved record', 'green');
+    // sync the roster-sourced department / designation fields from the position
+    const dep2 = document.getElementById('cap-department');
+    if (dep2 && p.dept) { if (![].some.call(dep2.options, function (o) { return o.value === p.dept || o.text === p.dept; })) dep2.add(new Option(p.dept, p.dept)); dep2.value = p.dept; }
+    const des = document.getElementById('cap-designation');
+    if (des && p.role && !des.value) des.value = p.role;
+    toast('Tagged to ' + p.id + ' · ' + p.role + ' — department, designation and category pulled from the approved record', 'green');
     capSync();
   }
 
@@ -12110,6 +12128,7 @@ function __kvOnReady(fn) {
     capPopulateRecords();
     capPopulateManagers();
     capPopulateVendors();
+    capPopulateDepartments();
     capSync();
     if (typeof obLoadCaptures === 'function') obLoadCaptures();
   }
@@ -14440,6 +14459,8 @@ function __kvOnReady(fn) {
     const general =
       kvKV('Worker ID', rec.id) + kvKV('Name', rec.name) +
       kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
+      kvKV('Designation', rec.designation) +
+      kvKV('Department', (rec.employment || {}).dept) +
       kvKV('Category', rec.category) + kvKV('Gender', rec.gender) + kvKV('Date of birth', rec.dob) +
       kvKV('Mobile', rec.mobile) + kvKV('Emergency contact', rec.emergency) +
       kvKV('Reporting manager', rec.manager ? rec.manager + (rec.managerCode ? ' · ' + rec.managerCode : '') : '—') +
@@ -14612,7 +14633,7 @@ function __kvOnReady(fn) {
       .filter(function (x) { return x.r.type === 'direct'; })
       .map(function (x) {
         const e = x.r.employment || {};
-        return { code: x.r.id, name: x.r.name, desig: x.r.category || 'Worker', dept: e.dept || '—',
+        return { code: x.r.id, name: x.r.name, desig: x.r.designation || x.r.category || 'Worker', dept: e.dept || '—',
                  mgr: x.r.manager || '—', mgrCode: x.r.managerCode || '',
                  uan: x.r.uan || '—', esi: x.r.esi || '—', lang: x.r.lang || '—',
                  _onboarded: true, _ci: x.i, _rec: x.r };

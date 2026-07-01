@@ -792,6 +792,19 @@ export default function SecOnboarding() {
                   </div>
                   {' '}
                   <div className="field">
+                    <label className="field-l">Designation</label>
+                    <input className="input" id="cap-designation" placeholder="e.g. Machine operator, Helper, Welder" onInput={(event) => { window.capSync() }} />
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">Department</label>
+                    {' '}
+                    <select className="sel" id="cap-department" onChange={(event) => { window.capSync() }}>
+                      <option value="">Select department…</option>
+                    </select>
+                  </div>
+                  {' '}
+                  <div className="field">
                     <label className="field-l">Date of joining</label>
                     <input className="input" id="cap-doj" type="date" />
                   </div>
