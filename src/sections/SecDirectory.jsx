@@ -114,7 +114,7 @@ export default function SecDirectory() {
                 <th className="om-th-sort" data-omcol="uan" onClick={(event) => { window.omSort('uan') }}>UAN no <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="esi" onClick={(event) => { window.omSort('esi') }}>ESI no <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="lang" onClick={(event) => { window.omSort('lang') }}>Language <span className="om-caret">⇅</span></th>
-                <th>Compliance</th>
+                <th className="om-th-sort" data-omcol="compliance" onClick={(event) => { window.omSort('compliance') }}>Compliance <span className="om-caret">⇅</span></th>
               </tr>
             </thead>
             <tbody id="om-grid-body" />

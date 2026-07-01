@@ -12371,7 +12371,8 @@ function __kvOnReady(fn) {
     mgr:   function (r) { return (r.mgr   || '').toLowerCase(); },
     uan:   function (r) { return r.uan; },
     esi:   function (r) { return r.esi; },
-    lang:  function (r) { return (r.lang  || '').toLowerCase(); }
+    lang:  function (r) { return (r.lang  || '').toLowerCase(); },
+    compliance: function (r) { return omRowComp(r).score; }
   };
 
   /* filter (search + department) then sort the full roster */
