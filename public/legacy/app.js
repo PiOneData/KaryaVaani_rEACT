@@ -11629,6 +11629,35 @@ function __kvOnReady(fn) {
   }
   function capRemoveDoc(i) { (CAP_STATE.docs || []).splice(i, 1); capRenderDocs(); }
 
+  /* populate the reporting-manager dropdown from the current OM roster */
+  function capPopulateManagers() {
+    const sel = document.getElementById('cap-manager');
+    if (!sel || sel.dataset.filled) return;
+    const roster = (window.__KVDATA && window.__KVDATA.omMapping) || [];
+    const seen = {}; const mgrs = [];
+    roster.forEach(function (r) {
+      const name = r.managerName || ''; const code = r.managerCode || '';
+      const key = name + '|' + code;
+      if (name && !seen[key]) { seen[key] = 1; mgrs.push({ name: name, code: code }); }
+    });
+    mgrs.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    if (!mgrs.length) return;   // roster not loaded yet
+    sel.innerHTML = '<option value="">Select reporting manager…</option>' +
+      mgrs.map(function (m) { return '<option value="' + m.name + '|' + m.code + '">' + m.name + (m.code ? ' · ' + m.code : '') + '</option>'; }).join('');
+    sel.dataset.filled = '1';
+  }
+
+  /* populate the vendor / contractor dropdown from the real contractor master */
+  function capPopulateVendors() {
+    const sel = document.getElementById('cap-contractor');
+    if (!sel || sel.dataset.filled) return;
+    const cons = (window.__KVDATA && window.__KVDATA.contractors) || [];
+    if (!cons.length) return;
+    sel.innerHTML = '<option value="">Select vendor…</option>' +
+      cons.map(function (c) { return '<option>' + c.name + '</option>'; }).join('');
+    sel.dataset.filled = '1';
+  }
+
   /* ── mode: single vs bulk ── */
   function capSetMode(m) {
     CAP_STATE.mode = m;
@@ -11742,18 +11771,21 @@ function __kvOnReady(fn) {
     if (CAP_STATE.type === 'direct' && !capVal('cap-posid')) {
       toast('Tag this worker to an approved Position ID', 'red'); return;
     }
-    if (CAP_STATE.type === 'contract' && !capVal('cap-workorder')) {
-      toast('Tag this worker to an approved work order', 'red'); return;
+    if (CAP_STATE.type === 'contract' && !capVal('cap-contractor')) {
+      toast('Select the vendor / contractor for this worker', 'red'); return;
     }
     const ack = document.getElementById('cap-ppe-ack');
     if (!ack || !ack.checked) { toast('Confirm the PPE briefing acknowledgement', 'red'); return; }
 
     const wid = (CAP_STATE.type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
     const getC = function (id) { const e = document.getElementById(id); return e ? e.checked : false; };
+    const mgrParts = (capVal('cap-manager') || '').split('|');
     const rec = {
       id: wid, name: name, type: CAP_STATE.type, status: 'sent',
       lang: capLangName(), category: capVal('cap-category') || 'Unskilled',
       photo: CAP_STATE.photo, mobile: mobile,
+      manager: mgrParts[0] || '', managerCode: mgrParts[1] || '',
+      uan: capVal('cap-uan'), esi: capVal('cap-esi'),
       aadhaarVerified: !!CAP_STATE.aadhaarVerified,
       aadhaarLast4: aadhaar.replace(/\D/g, '').slice(-4),
       gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
@@ -11844,10 +11876,10 @@ function __kvOnReady(fn) {
   function capReset(keep) {
     ['cap-name','cap-dob','cap-mobile','cap-aadhaar','cap-emergency',
      'cap-addr1','cap-addr2','cap-city','cap-district','cap-pin',
-     'cap-spoken','cap-clra','cap-doj'].forEach(function (id) {
+     'cap-spoken','cap-clra','cap-doj','cap-uan','cap-esi'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['cap-posid','cap-workorder'].forEach(function (id) {
+    ['cap-posid','cap-workorder','cap-manager','cap-vendor'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     const mig = document.getElementById('cap-migrant'); if (mig) mig.checked = false;
@@ -12076,6 +12108,8 @@ function __kvOnReady(fn) {
     capRenderDocs();
     capInitDrop();
     capPopulateRecords();
+    capPopulateManagers();
+    capPopulateVendors();
     capSync();
     if (typeof obLoadCaptures === 'function') obLoadCaptures();
   }
@@ -14408,6 +14442,7 @@ function __kvOnReady(fn) {
       kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
       kvKV('Category', rec.category) + kvKV('Gender', rec.gender) + kvKV('Date of birth', rec.dob) +
       kvKV('Mobile', rec.mobile) + kvKV('Emergency contact', rec.emergency) +
+      kvKV('Reporting manager', rec.manager ? rec.manager + (rec.managerCode ? ' · ' + rec.managerCode : '') : '—') +
       kvKV('Preferred language', '<span class="pill outline">' + (rec.lang || '—') + '</span>') +
       kvKV('Inter-state migrant', rec.migrant ? 'Yes (ISMW / OSHC)' : 'No') +
       kvKV('Address', [a.addr1, a.addr2, a.city, a.district, a.pin, a.state].filter(Boolean).join(', ')) +
@@ -14417,9 +14452,10 @@ function __kvOnReady(fn) {
       : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
     const identification =
       kvKV('Aadhaar eKYC', aadhaarRow) +
+      kvKV('UAN (EPFO)', rec.uan) + kvKV('ESI (IP number)', rec.esi) +
       (rec.type === 'direct'
         ? kvKV('Position ID', e.posId) + kvKV('Department', e.dept)
-        : kvKV('Work order', e.workorder) + kvKV('Contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
+        : kvKV('Work order', e.workorder) + kvKV('Vendor / contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
       kvKV('Date of joining', e.doj) +
       '<div class="tiny muted" style="margin:10px 0">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained.</div>' +
       // ── worker documents (uploaded, stored in DB, retrievable) ──
@@ -14577,7 +14613,8 @@ function __kvOnReady(fn) {
       .map(function (x) {
         const e = x.r.employment || {};
         return { code: x.r.id, name: x.r.name, desig: x.r.category || 'Worker', dept: e.dept || '—',
-                 mgr: '—', mgrCode: '', uan: '—', esi: '—', lang: x.r.lang || '—',
+                 mgr: x.r.manager || '—', mgrCode: x.r.managerCode || '',
+                 uan: x.r.uan || '—', esi: x.r.esi || '—', lang: x.r.lang || '—',
                  _onboarded: true, _ci: x.i, _rec: x.r };
       });
   }

@@ -762,13 +762,13 @@ export default function SecOnboarding() {
                   </div>
                   {' '}
                   <div className="field cap-only-contract" style={{ display: "none" }}>
-                    <label className="field-l">Contractor</label>
+                    <label className="field-l">
+                      {"Vendor / contractor "}
+                      <span className="cap-req">*</span>
+                    </label>
                     {' '}
-                    <select className="sel" id="cap-contractor" disabled>
-                      <option>ARK HR Solutions &amp; Services</option>
-                      <option>OM Manpower Services</option>
-                      <option>Saptagiri Enterprises</option>
-                      <option>CHR Enterprises</option>
+                    <select className="sel" id="cap-contractor" onChange={(event) => { window.capSync() }}>
+                      <option value="">Select vendor…</option>
                     </select>
                   </div>
                   {' '}
@@ -794,6 +794,24 @@ export default function SecOnboarding() {
                   <div className="field">
                     <label className="field-l">Date of joining</label>
                     <input className="input" id="cap-doj" type="date" />
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">Reporting manager</label>
+                    {' '}
+                    <select className="sel" id="cap-manager">
+                      <option value="">Select reporting manager…</option>
+                    </select>
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">UAN no (EPFO)</label>
+                    <input className="input" id="cap-uan" placeholder="12-digit UAN" onInput={(event) => { window.capSync() }} />
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">ESI no (IP number)</label>
+                    <input className="input" id="cap-esi" placeholder="ESIC insurance number" onInput={(event) => { window.capSync() }} />
                   </div>
                   {' '}
                   <div className="field cap-only-contract" style={{ display: "none" }}>
