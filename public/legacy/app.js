@@ -14045,11 +14045,15 @@ function __kvOnReady(fn) {
   }
 
   /* ── modal host (reuses .modal-overlay / .modal styling) ───────────────── */
-  function omModal(html) {
+  function omModal(html, width) {
     let host = document.getElementById('om-modal-host');
     if (!host) { host = document.createElement('div'); host.id = 'om-modal-host'; document.body.appendChild(host); }
     host.innerHTML = '<div class="modal-overlay on" onclick="if(event.target===this)omCloseModal()">' +
-      '<div class="modal" style="max-width:680px">' + html + '</div></div>';
+      '<div class="modal" style="max-width:' + (width || 680) + 'px">' + html + '</div></div>';
+  }
+  /* lay a set of kvKV rows out in two columns so tall detail lists fit without scrolling */
+  function kv2col(html) {
+    return '<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:28px;align-items:start">' + html + '</div>';
   }
   function omCloseModal() { const h = document.getElementById('om-modal-host'); if (h) h.innerHTML = ''; }
 
@@ -14070,7 +14074,8 @@ function __kvOnReady(fn) {
         '<span class="modal-h-title">' + (opts.title || '') + '</span>' +
       '</div><span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
       '<div class="modal-body"><div class="tabs" style="margin-bottom:14px">' + btns + '</div>' + panes + '</div>' +
-      (opts.footer ? '<div class="modal-footer">' + opts.footer + '</div>' : '')
+      (opts.footer ? '<div class="modal-footer">' + opts.footer + '</div>' : ''),
+      opts.width || 940
     );
   }
   function kvTabSwitch(btn, id) {
@@ -14093,18 +14098,22 @@ function __kvOnReady(fn) {
     const c = omWorkerCompliance(r);
 
     const general =
-      kvKV('Associate code', r.code) + kvKV('Name', r.name) + kvKV('Designation', r.desig) +
-      kvKV('Department', r.dept) + kvKV('Reporting manager', r.mgr + (r.mgrCode ? ' · ' + r.mgrCode : '')) +
-      kvKV('Preferred language', '<span class="pill outline">' + (r.lang || '—') + '</span>') +
+      kv2col(
+        kvKV('Associate code', r.code) + kvKV('Name', r.name) + kvKV('Designation', r.desig) +
+        kvKV('Department', r.dept) + kvKV('Reporting manager', r.mgr + (r.mgrCode ? ' · ' + r.mgrCode : '')) +
+        kvKV('Preferred language', '<span class="pill outline">' + (r.lang || '—') + '</span>')
+      ) +
       '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">From the OM Manpower attendance / mapping roster — the real workforce dataset.</div>';
 
     const aadhaarRow = c.aadhaarVerified
       ? '<span class="pill green tiny">Verified' + (c.aadhaarLast4 ? ' · XXXX XXXX ' + c.aadhaarLast4 : '') + '</span>'
       : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="omOpenAadhaar(\'' + code + '\')">Upload &amp; verify</button>';
     const identification =
-      kvKV('UAN (EPFO)', omIdCell('UAN', r.uan, r)) +
-      kvKV('ESI (IP number)', omIdCell('ESI', r.esi, r)) +
-      kvKV('Aadhaar eKYC', aadhaarRow) +
+      kv2col(
+        kvKV('UAN (EPFO)', omIdCell('UAN', r.uan, r)) +
+        kvKV('ESI (IP number)', omIdCell('ESI', r.esi, r)) +
+        kvKV('Aadhaar eKYC', aadhaarRow)
+      ) +
       '<div class="tiny muted" style="margin-top:10px">Click UAN / ESI to open the verifiable document viewer. Aadhaar is verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained (DPDP Act 2023).</div>';
 
     const itemsHtml = c.items.map(function (it) {
@@ -14437,8 +14446,10 @@ function __kvOnReady(fn) {
       if (law.key === 'aadhaarKyc') ok = !!rec.aadhaarVerified;
       else if (law.key === 'appointmentLetter') ok = !!(rec.employment && (rec.employment.posId || rec.employment.workorder));
       else if (law.key === 'inductionSafety') ok = !!rec.ppeAckAt;
-      else if (law.key === 'esic') ok = ct ? (ct.esic && ct.esic.cls !== 'red') : (((h >> i) & 1) === 1);
-      else if (law.key === 'uanEpfo') ok = ct ? (!ct.subscores || ct.subscores.pf >= 60) : (((h >> i) & 1) === 1);
+      // UAN/EPFO seeded → the worker must actually have a UAN on record (12-digit).
+      else if (law.key === 'uanEpfo') ok = String(rec.uan || '').replace(/\D/g, '').length >= 10;
+      // ESIC registered → must have an ESI/IP number; contractor must not be in ESIC breach.
+      else if (law.key === 'esic') { const hasEsi = String(rec.esi || '').replace(/\D/g, '').length >= 6; ok = hasEsi && (ct ? (!ct.esic || ct.esic.cls !== 'red') : true); }
       else if (law.key === 'minWages') ok = ct ? (!ct.subscores || ct.subscores.minWage >= 60) : (((h >> (i + 2)) & 1) === 1);
       else ok = ((h >> i) & 1) === 1;
       return { key: law.key, label: law.label, law: law.law, severity: law.severity, weight: law.weight, ok: ok };
@@ -14456,7 +14467,7 @@ function __kvOnReady(fn) {
     const a = rec.address || {};
     const e = rec.employment || {};
     const ppe = rec.ppe || {};
-    const general =
+    const general = kv2col(
       kvKV('Worker ID', rec.id) + kvKV('Name', rec.name) +
       kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
       kvKV('Designation', rec.designation) +
@@ -14467,17 +14478,20 @@ function __kvOnReady(fn) {
       kvKV('Preferred language', '<span class="pill outline">' + (rec.lang || '—') + '</span>') +
       kvKV('Inter-state migrant', rec.migrant ? 'Yes (ISMW / OSHC)' : 'No') +
       kvKV('Address', [a.addr1, a.addr2, a.city, a.district, a.pin, a.state].filter(Boolean).join(', ')) +
-      kvKV('PPE issued', [ppe.uniform && ('Uniform ' + ppe.uniform), ppe.shoe && ('Shoe ' + ppe.shoe), ppe.helmet, ppe.glove].filter(Boolean).join(' · '));
+      kvKV('PPE issued', [ppe.uniform && ('Uniform ' + ppe.uniform), ppe.shoe && ('Shoe ' + ppe.shoe), ppe.helmet, ppe.glove].filter(Boolean).join(' · '))
+    );
     const aadhaarRow = rec.aadhaarVerified
       ? '<span class="pill green tiny">Verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
       : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
     const identification =
-      kvKV('Aadhaar eKYC', aadhaarRow) +
-      kvKV('UAN (EPFO)', rec.uan) + kvKV('ESI (IP number)', rec.esi) +
-      (rec.type === 'direct'
-        ? kvKV('Position ID', e.posId) + kvKV('Department', e.dept)
-        : kvKV('Work order', e.workorder) + kvKV('Vendor / contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
-      kvKV('Date of joining', e.doj) +
+      kv2col(
+        kvKV('Aadhaar eKYC', aadhaarRow) +
+        kvKV('UAN (EPFO)', rec.uan) + kvKV('ESI (IP number)', rec.esi) +
+        (rec.type === 'direct'
+          ? kvKV('Position ID', e.posId) + kvKV('Department', e.dept)
+          : kvKV('Work order', e.workorder) + kvKV('Vendor / contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
+        kvKV('Date of joining', e.doj)
+      ) +
       '<div class="tiny muted" style="margin:10px 0">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained.</div>' +
       // ── worker documents (uploaded, stored in DB, retrievable) ──
       '<div class="card-h-title" style="font-size:0.85rem;margin-top:14px">Worker documents</div>' +
@@ -14681,40 +14695,75 @@ function __kvOnReady(fn) {
     } else finish();
   }
 
-  /* edit a captured worker's details (DB + session) */
+  /* edit ALL of a captured worker's details (DB + session) — wide, grouped form */
   function obEditCapture(i) {
     const r = CAP_STATE.recent[i]; if (!r) return;
-    const e = r.employment || {};
+    const e = r.employment || {}; const a = r.address || {};
+    const esc = function (s) { return String(s == null ? '' : s).replace(/"/g, '&quot;'); };
     const opt = function (v, sel) { return '<option' + (v === sel ? ' selected' : '') + '>' + v + '</option>'; };
+    const F = function (label, id, val, type) { return '<div class="field"><label class="field-l">' + label + '</label><input class="input" id="' + id + '"' + (type ? ' type="' + type + '"' : '') + ' value="' + esc(val) + '"></div>'; };
+    const S = function (label, id, html) { return '<div class="field"><label class="field-l">' + label + '</label><select class="sel" id="' + id + '">' + html + '</select></div>'; };
+    const roster = (window.__KVDATA && window.__KVDATA.omMapping) || [];
+    const depts = Array.from(new Set(roster.map(function (x) { return x.department; }).filter(Boolean))).sort();
+    const deptOpts = '<option value="">—</option>' + depts.map(function (d) { return opt(d, e.dept); }).join('');
+    const seen = {}; const mgrs = [];
+    roster.forEach(function (x) { const k = (x.managerName || '') + '|' + (x.managerCode || ''); if (x.managerName && !seen[k]) { seen[k] = 1; mgrs.push({ name: x.managerName, code: x.managerCode || '' }); } });
+    mgrs.sort(function (p, q) { return p.name < q.name ? -1 : 1; });
+    const curMgr = (r.manager || '') + '|' + (r.managerCode || '');
+    const mgrOpts = '<option value="">—</option>' + mgrs.map(function (m) { const val = m.name + '|' + m.code; return '<option value="' + val + '"' + (val === curMgr ? ' selected' : '') + '>' + m.name + (m.code ? ' · ' + m.code : '') + '</option>'; }).join('');
+    const vendorOpts = '<option value="">—</option>' + ((window.__KVDATA && window.__KVDATA.contractors) || []).map(function (c) { return '<option' + (c.name === e.contractor ? ' selected' : '') + '>' + c.name + '</option>'; }).join('');
+    const grp = function (title) { return '<div class="card-h-title" style="font-size:0.85rem;margin:12px 0 6px">' + title + '</div>'; };
     omModal(
       '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Edit worker · ' + r.id + '</span><span class="modal-h-title">' + r.name + '</span></div><span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
-      '<div class="modal-body"><div class="g2" style="gap:10px">' +
-        '<div class="field"><label class="field-l">Name</label><input class="input" id="obe-name" value="' + (r.name || '') + '"></div>' +
-        '<div class="field"><label class="field-l">Mobile</label><input class="input" id="obe-mobile" value="' + (r.mobile || '') + '"></div>' +
-        '<div class="field"><label class="field-l">Category</label><select class="sel" id="obe-category">' + ['Unskilled', 'Semi-skilled', 'Skilled', 'Highly skilled'].map(function (x) { return opt(x, r.category); }).join('') + '</select></div>' +
-        '<div class="field"><label class="field-l">Status</label><select class="sel" id="obe-status">' + ['sent', 'confirmed'].map(function (x) { return opt(x, r.status); }).join('') + '</select></div>' +
-        (r.type === 'contract'
-          ? '<div class="field"><label class="field-l">Contractor</label><select class="sel" id="obe-contractor"><option value="">—</option>' + (CONTRACTORS || []).map(function (c) { return '<option' + (c.name === e.contractor ? ' selected' : '') + '>' + c.name + '</option>'; }).join('') + '</select></div>'
-          : '<div class="field"><label class="field-l">Position ID</label><input class="input" id="obe-posid" value="' + (e.posId || '') + '"></div>') +
-        '<div class="field"><label class="field-l">Date of joining</label><input class="input" id="obe-doj" type="date" value="' + (e.doj || '') + '"></div>' +
-      '</div></div>' +
-      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Updates the stored record</span></div><div class="modal-footer-right"><button class="btn primary" onclick="obSaveEdit(' + i + ')">Save changes</button><button class="btn" onclick="omCloseModal()">Cancel</button></div></div>'
+      '<div class="modal-body">' +
+        grp('Personal') +
+        '<div class="g3" style="gap:10px 14px">' +
+          F('Name', 'obe-name', r.name) + F('Mobile', 'obe-mobile', r.mobile) +
+          S('Gender', 'obe-gender', ['Male', 'Female', 'Other', 'Prefer not to say'].map(function (x) { return opt(x, r.gender); }).join('')) +
+          F('Date of birth', 'obe-dob', r.dob, 'date') + F('Emergency contact', 'obe-emergency', r.emergency) + F('Preferred language', 'obe-lang', r.lang) +
+        '</div>' +
+        '<label class="cap-check" style="display:inline-flex;margin:8px 0"><input type="checkbox" id="obe-migrant"' + (r.migrant ? ' checked' : '') + '> Inter-state migrant (ISMW / OSHC)</label>' +
+        grp('Role & employment') +
+        '<div class="g3" style="gap:10px 14px">' +
+          F('Designation', 'obe-designation', r.designation) + S('Department', 'obe-department', deptOpts) +
+          S('Category', 'obe-category', ['Unskilled', 'Semi-skilled', 'Skilled', 'Highly skilled'].map(function (x) { return opt(x, r.category); }).join('')) +
+          S('Reporting manager', 'obe-manager', mgrOpts) +
+          (r.type === 'contract'
+            ? S('Vendor / contractor', 'obe-contractor', vendorOpts) + F('Work order', 'obe-workorder', e.workorder) + F('CLRA licence', 'obe-clra', e.clra) + S('Shift', 'obe-shift', ['Morning', 'General', 'Night'].map(function (x) { return opt(x, e.shift); }).join(''))
+            : F('Position ID', 'obe-posid', e.posId)) +
+          F('Date of joining', 'obe-doj', e.doj, 'date') +
+          S('Status', 'obe-status', ['sent', 'confirmed'].map(function (x) { return opt(x, r.status); }).join('')) +
+        '</div>' +
+        grp('Identification') +
+        '<div class="g3" style="gap:10px 14px">' + F('UAN (EPFO)', 'obe-uan', r.uan) + F('ESI (IP number)', 'obe-esi', r.esi) + '</div>' +
+        grp('Address') +
+        '<div class="g3" style="gap:10px 14px">' + F('Address line 1', 'obe-addr1', a.addr1) + F('Address line 2', 'obe-addr2', a.addr2) + F('City', 'obe-city', a.city) + F('District', 'obe-district', a.district) + F('PIN', 'obe-pin', a.pin) + F('State', 'obe-state', a.state) + '</div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Updates the stored record — all fields editable</span></div><div class="modal-footer-right"><button class="btn primary" onclick="obSaveEdit(' + i + ')">Save changes</button><button class="btn" onclick="omCloseModal()">Cancel</button></div></div>',
+      920
     );
   }
   function obSaveEdit(i) {
     const r = CAP_STATE.recent[i]; if (!r) return;
     const v = function (id) { const el = document.getElementById(id); return el ? el.value : ''; };
-    r.name = v('obe-name') || r.name; r.mobile = v('obe-mobile'); r.category = v('obe-category'); r.status = v('obe-status');
+    const ck = function (id) { const el = document.getElementById(id); return el ? el.checked : false; };
+    r.name = v('obe-name') || r.name; r.mobile = v('obe-mobile'); r.gender = v('obe-gender'); r.dob = v('obe-dob');
+    r.emergency = v('obe-emergency'); r.lang = v('obe-lang') || r.lang; r.migrant = ck('obe-migrant');
+    r.designation = v('obe-designation'); r.category = v('obe-category'); r.status = v('obe-status');
+    r.uan = v('obe-uan'); r.esi = v('obe-esi');
+    const mgrParts = (v('obe-manager') || '').split('|'); r.manager = mgrParts[0] || ''; r.managerCode = mgrParts[1] || '';
+    r.address = { addr1: v('obe-addr1'), addr2: v('obe-addr2'), city: v('obe-city'), district: v('obe-district'), pin: v('obe-pin'), state: v('obe-state') };
     r.employment = r.employment || {};
-    if (r.type === 'contract') r.employment.contractor = v('obe-contractor'); else r.employment.posId = v('obe-posid');
-    r.employment.doj = v('obe-doj');
+    r.employment.dept = v('obe-department'); r.employment.doj = v('obe-doj');
+    if (r.type === 'contract') { r.employment.contractor = v('obe-contractor'); r.employment.workorder = v('obe-workorder'); r.employment.clra = v('obe-clra'); r.employment.shift = v('obe-shift'); }
+    else { r.employment.posId = v('obe-posid'); }
     capRenderRecent(); obRenderDirectory();
     if (r.backendId) {
       fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: r.backendId, name: r.name, mobile: r.mobile, category: r.category, status: r.status, employment: r.employment })
+        body: JSON.stringify({ id: r.backendId, name: r.name, mobile: r.mobile, gender: r.gender, dob: r.dob, emergency: r.emergency, lang: r.lang, migrant: r.migrant, designation: r.designation, category: r.category, status: r.status, uan: r.uan, esi: r.esi, manager: r.manager, managerCode: r.managerCode, address: r.address, employment: r.employment })
       }).then(function (x) { return x.json().catch(function () { return {}; }); })
-        .then(function (j) { toast(j && j.ok ? 'Saved' : ('Save failed: ' + ((j && j.error) || 'unknown')), j && j.ok ? 'green' : 'red'); })
+        .then(function (j) { toast(j && j.ok ? 'Saved · all fields updated' : ('Save failed: ' + ((j && j.error) || 'unknown')), j && j.ok ? 'green' : 'red'); })
         .catch(function (e) { toast('Save failed: ' + e.message, 'red'); });
     } else toast('Saved (session)', 'green');
     omCloseModal();
