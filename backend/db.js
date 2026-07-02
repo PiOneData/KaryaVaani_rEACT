@@ -11,6 +11,10 @@ const STORE_PATH   = process.env.OM_STORE_PATH || path.join(__dirname, 'data', '
 // In-memory cache — keeps the public API synchronous.
 let _cache = null;
 let _pool  = null;
+// Write serialisation: at most one flush in flight; coalesce concurrent writes
+// and always persist the LATEST cache so an older snapshot can never win.
+let _flushing = false;
+let _dirty    = false;
 
 /* ── Postgres helpers ──────────────────────────────────────────────────── */
 
@@ -44,12 +48,25 @@ async function pgRead() {
   return rows.length ? rows[0].document : null;
 }
 
-function pgWrite(obj) {
-  getPool().query(
+/* Persist the current cache to Postgres. Serialised + coalesced: if writes
+   arrive while one is in flight, exactly one more flush runs afterwards with the
+   latest cache, so writes are ordered and the newest state always wins. On a DB
+   error we mirror to the file so a write is never silently lost. */
+function flushPg() {
+  if (!DATABASE_URL) return Promise.resolve();
+  if (_flushing) { _dirty = true; return Promise.resolve(); }
+  _flushing = true;
+  return getPool().query(
     `INSERT INTO kv_store(id, document) VALUES($1, $2)
      ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document`,
-    ['main', obj]
-  ).catch((err) => console.error('[db] postgres write error:', err.message));
+    ['main', _cache]
+  ).catch((err) => {
+    console.error('[db] postgres write error:', err.message);
+    try { fileWrite(_cache); } catch (e) { console.error('[db] file mirror failed:', e.message); }
+  }).finally(() => {
+    _flushing = false;
+    if (_dirty) { _dirty = false; return flushPg(); }
+  });
 }
 
 /* ── File-backed helpers (fallback) ────────────────────────────────────── */
@@ -87,8 +104,8 @@ async function initDb() {
       // First run: migrate existing JSON file into postgres so no data is lost.
       const legacy = fileRead();
       if (legacy) {
-        pgWrite(legacy);
         _cache = legacy;
+        await flushPg();
         console.log('[db] Migrated existing om.db.json into postgres (kv_store).');
       }
     }
@@ -113,10 +130,10 @@ function readStore() {
 function writeStore(obj) {
   _cache = obj;
   if (DATABASE_URL) {
-    pgWrite(obj);
-  } else {
-    fileWrite(obj);
+    return flushPg();
   }
+  fileWrite(obj);
+  return Promise.resolve();
 }
 
 module.exports = { STORE_PATH, readStore, writeStore, initDb };
