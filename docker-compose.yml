@@ -1,6 +1,24 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: karyavaani-postgres
+    ports:
+      - "3242:5432"
+    environment:
+      - POSTGRES_DB=karyavaani
+      - POSTGRES_USER=karyavaani
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-karyavaani-dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U karyavaani -d karyavaani"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -11,6 +29,7 @@ services:
       - "3241:3241"
     environment:
       - PORT=3241
+      - DATABASE_URL=postgresql://karyavaani:${POSTGRES_PASSWORD:-karyavaani-dev}@postgres:5432/karyavaani
       - MAIL_HOST=smtp.office365.com
       - EMAIL_PORT=587
       - EMAIL_HOST_USER=support@pionedata.com
@@ -19,7 +38,10 @@ services:
       - COMMS_BASE_URL=http://comms-server:4100
       - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}
     depends_on:
-      - comms-server
+      postgres:
+        condition: service_healthy
+      comms-server:
+        condition: service_started
     restart: unless-stopped
 
   # Standalone, reusable communication server (WhatsApp via Meta Cloud API).
@@ -60,3 +82,6 @@ services:
       - backend
       - comms-server
     restart: unless-stopped
+
+volumes:
+  postgres_data:
