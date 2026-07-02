@@ -49,6 +49,10 @@ export default function SecAnalytics() {
           Readiness trend
         </div>
         {' '}
+        <div className="tab" id="an-tab-comms" onClick={(event) => { window.anTab('comms', event.currentTarget) }} data-onclick="anTab('comms', this)">
+          Communications
+        </div>
+        {' '}
         <div className="tab" id="an-tab-chat" onClick={(event) => { window.anTab('chat', event.currentTarget) }} data-onclick="anTab('chat', this)">
           Chat engagement analytics
         </div>
@@ -227,6 +231,50 @@ export default function SecAnalytics() {
               <tbody id="rdz-history-body" />
             </table>
           </div>
+        </div>
+      </div>
+      {' '}
+      {/* ── COMMUNICATIONS PANE (live log of every email / WhatsApp sent) ── */}
+      <div id="an-pane-comms" className="an-pane" style={{ display: "none" }}>
+        <div id="comm-kpis" className="g4" style={{ margin: "4px 0 16px" }} />
+        {' '}
+        <div className="g2" style={{ marginBottom: "16px" }}>
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">By channel &amp; delivery</div>
+                <div className="card-h-sub">Every email / WhatsApp send is logged as it happens — sent, mock (gateway in test mode) or failed</div>
+              </div>
+              <button className="btn" onClick={(event) => { window.initCommsAnalytics() }} data-onclick="initCommsAnalytics()">↻ Refresh</button>
+            </div>
+            <div id="comm-breakdown" />
+          </div>
+          {' '}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Activity over time</div>
+                <div className="card-h-sub">Messages sent per day</div>
+              </div>
+            </div>
+            <div id="comm-timeline" />
+          </div>
+        </div>
+        {' '}
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="card-h-title">Recent communications</div>
+              <div className="card-h-sub">The live audit trail — most recent first</div>
+            </div>
+            <span className="pill outline" id="comm-log-count">—</span>
+          </div>
+          <table className="t" id="comm-log">
+            <thead>
+              <tr><th>Time</th><th>Channel</th><th>To</th><th>Subject / message</th><th>Status</th></tr>
+            </thead>
+            <tbody id="comm-log-body" />
+          </table>
         </div>
       </div>
       {' '}

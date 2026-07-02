@@ -7446,6 +7446,7 @@ function __kvOnReady(fn) {
         if (typeof initWorkforceCompliance === 'function') initWorkforceCompliance();
         if (typeof initExposureAnalytics === 'function') initExposureAnalytics();
         if (typeof initReadinessAnalytics === 'function') initReadinessAnalytics();
+        if (typeof initCommsAnalytics === 'function') initCommsAnalytics();
         initChatAnalytics();
       }
       if (id === 'chat') {
@@ -13590,6 +13591,8 @@ function __kvOnReady(fn) {
       initExposureAnalytics();
     } else if (name === 'readiness') {
       initReadinessAnalytics();
+    } else if (name === 'comms') {
+      initCommsAnalytics();
     } else if (name === 'chat') {
       // Render now that the pane is visible (width-dependent charts need layout).
       try { initChatAnalytics(); } catch (e) {}
@@ -14888,4 +14891,80 @@ function __kvOnReady(fn) {
     }
   }
   __kvOnReady(initWorkforceCompliance);
+
+  /* ════════════════════════════════════════════════════════════════════════
+     COMMUNICATION ANALYTICS · live log of every email / WhatsApp sent
+     Driven by /api/communications (persisted in the DB) so the analytics reflect
+     real usage as comms are used — sent, mock (gateway test mode) or failed.
+     ════════════════════════════════════════════════════════════════════════ */
+  function initCommsAnalytics() {
+    const host = document.getElementById('comm-kpis');
+    if (!host) return;
+    fetch((window.__KV_API_BASE || '') + '/api/communications')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { commRender((j && j.communications) || []); })
+      .catch(function () { commRender([]); });
+  }
+  function commBar(label, n, total, color) {
+    const pct = total ? Math.round(n / total * 100) : 0;
+    return '<div style="margin:9px 0"><div class="row-between" style="font-size:0.8rem;margin-bottom:3px"><span>' + label + '</span><span class="mono">' + n + ' · ' + pct + '%</span></div>' +
+      '<div class="bar"><span style="width:' + pct + '%;background:' + color + '"></span></div></div>';
+  }
+  function commRender(list) {
+    const host = document.getElementById('comm-kpis');
+    if (!host) return;
+    const total = list.length;
+    if (!total) {
+      host.innerHTML = '<div class="tiny muted" style="grid-column:span 4">No communications sent yet. Send a broadcast, notify a worker or vendor, or message a worker in Chat — every send is logged here.</div>';
+      ['comm-breakdown', 'comm-timeline', 'comm-log-body'].forEach(function (id) { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+      const c = document.getElementById('comm-log-count'); if (c) c.textContent = '0';
+      return;
+    }
+    const email = list.filter(function (x) { return x.channel === 'email'; }).length;
+    const wa = list.filter(function (x) { return x.channel === 'whatsapp'; }).length;
+    const sent = list.filter(function (x) { return x.status === 'sent'; }).length;
+    const mock = list.filter(function (x) { return x.status === 'mock'; }).length;
+    const failed = list.filter(function (x) { return x.status === 'failed'; }).length;
+    const recips = list.reduce(function (s, x) { return s + (x.recipients || 1); }, 0);
+
+    host.innerHTML =
+      '<div class="kpi"><div class="kpi-eye">Total communications</div><div class="kpi-val">' + total + '</div><div class="kpi-sub">' + recips + ' recipient message(s)</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Email</div><div class="kpi-val" style="color:var(--indigo)">' + email + '</div><div class="kpi-sub">via the VAANI mailer</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">WhatsApp</div><div class="kpi-val" style="color:var(--green-dk)">' + wa + '</div><div class="kpi-sub">via the gateway</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Delivery</div><div class="kpi-val" style="font-size:1.05rem">' + sent + ' <small>sent · ' + mock + ' mock · ' + failed + ' failed</small></div><div class="kpi-sub">mock = gateway in test mode</div></div>';
+
+    const bd = document.getElementById('comm-breakdown');
+    if (bd) bd.innerHTML =
+      '<div class="card-h-title" style="font-size:0.82rem;margin-bottom:2px">By channel</div>' +
+      commBar('Email', email, total, 'var(--indigo)') + commBar('WhatsApp', wa, total, 'var(--green)') +
+      '<div class="card-h-title" style="font-size:0.82rem;margin:12px 0 2px">By delivery status</div>' +
+      commBar('Sent', sent, total, 'var(--green)') + commBar('Mock (test mode)', mock, total, 'var(--amber)') + commBar('Failed', failed, total, 'var(--red)');
+
+    // timeline by day
+    const byDay = {};
+    list.forEach(function (x) { const d = String(x.at || '').slice(0, 10) || '—'; byDay[d] = (byDay[d] || 0) + 1; });
+    const days = Object.keys(byDay).sort();
+    const maxDay = Math.max.apply(null, days.map(function (d) { return byDay[d]; }).concat([1]));
+    const tl = document.getElementById('comm-timeline');
+    if (tl) tl.innerHTML = days.map(function (d) {
+      return '<div style="margin:8px 0"><div class="row-between" style="font-size:0.78rem;margin-bottom:3px"><span>' + d + '</span><span class="mono">' + byDay[d] + '</span></div>' +
+        '<div class="bar"><span style="width:' + Math.round(byDay[d] / maxDay * 100) + '%;background:var(--indigo)"></span></div></div>';
+    }).join('');
+
+    // recent log (newest first)
+    const tb = document.getElementById('comm-log-body');
+    if (tb) tb.innerHTML = list.slice().reverse().slice(0, 40).map(function (x) {
+      const to = Array.isArray(x.to) ? (x.to.length > 1 ? x.to[0] + ' +' + (x.to.length - 1) : (x.to[0] || '—')) : (x.to || '—');
+      const statusCls = x.status === 'sent' ? 'green' : x.status === 'mock' ? 'amber' : 'red';
+      const desc = x.subject || x.template || x.preview || '—';
+      const when = x.at ? new Date(x.at).toLocaleString('en-IN') : '—';
+      return '<tr><td class="tiny">' + when + '</td>' +
+        '<td><span class="pill ' + (x.channel === 'email' ? 'blue' : 'green') + ' tiny">' + (x.channel || '—') + '</span></td>' +
+        '<td class="tiny">' + to + (x.recipients > 1 ? ' <span class="muted">(' + x.recipients + ')</span>' : '') + '</td>' +
+        '<td class="tiny">' + String(desc).slice(0, 70) + '</td>' +
+        '<td><span class="pill ' + statusCls + ' tiny">' + (x.status || '—') + '</span></td></tr>';
+    }).join('');
+    const cc = document.getElementById('comm-log-count'); if (cc) cc.textContent = total + ' logged';
+  }
+  __kvOnReady(initCommsAnalytics);
 

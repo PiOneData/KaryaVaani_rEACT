@@ -29,9 +29,10 @@ app.get('/api/health', (req, res) => {
 app.get('/api/bootstrap', (req, res) => {
   const s = readStore();
   if (!s) return res.status(503).json({ error: 'Not seeded. Run `npm run seed` first.' });
-  // Exclude onboardingDocuments (base64 file blobs) from the bundle every client
-  // loads — they are fetched on demand per worker via /api/onboarding-documents.
-  const { onboardingDocuments, ...rest } = s.data;
+  // Exclude the big/growing collections from the bundle every client loads —
+  // documents are fetched per worker (/api/onboarding-documents) and the
+  // communication log via /api/communications.
+  const { onboardingDocuments, communications, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -48,11 +49,30 @@ app.get('/api/om-mapping', (req, res) => {
    POST /api/send-email
    Body: { to: string[], subject: string, message: string, attachments: [{filename, data}] }
    ──────────────────────────────────────────────────────────────────────── */
+/* ── Communication log ─────────────────────────────────────────────────────
+   Every email / WhatsApp send (real OR mocked) is appended to
+   data.communications so the communication analytics reflect real usage,
+   persisted like the rest of the store (Postgres). Capped to the last 2000. */
+function logComm(entry) {
+  const store = readStore();
+  if (!store || !store.data) return;
+  store.data.communications = store.data.communications || [];
+  store.data.communications.push(Object.assign(
+    { id: 'cm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString() },
+    entry
+  ));
+  if (store.data.communications.length > 2000) {
+    store.data.communications = store.data.communications.slice(-2000);
+  }
+  writeStore(store);
+}
+
 app.post('/api/send-email', async (req, res) => {
   const { to, cc, subject, message, attachments = [] } = req.body || {};
   if (!to || !subject || !message) {
     return res.status(400).json({ ok: false, error: 'to, subject and message are required' });
   }
+  const recipients = Array.isArray(to) ? to : [to];
 
   const transporter = nodemailer.createTransport({
     host:   process.env.MAIL_HOST  || 'smtp.office365.com',
@@ -82,9 +102,11 @@ app.post('/api/send-email', async (req, res) => {
       text:        message,
       attachments: mailAttachments
     });
+    logComm({ channel: 'email', to: recipients, recipients: recipients.length, subject: subject, preview: String(message).slice(0, 140), attachments: mailAttachments.length, status: 'sent' });
     res.json({ ok: true });
   } catch (err) {
     console.error('send-email error:', err.message);
+    logComm({ channel: 'email', to: recipients, recipients: recipients.length, subject: subject, attachments: mailAttachments.length, status: 'failed', error: err.message });
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -537,30 +559,52 @@ app.get('/api/whatsapp/health', async (req, res) => {
   }
 });
 
+/* classify a comms-server result into sent / mock / failed for the log */
+function waStatus(json) {
+  if (!json || json.ok === false) return 'failed';
+  if (json.testMode || json.provider === 'mock') return 'mock';
+  return 'sent';
+}
+
 /* send a free-form text message to one or many recipients */
 app.post('/api/whatsapp/send', async (req, res) => {
+  const body = req.body || {};
+  const recips = Array.isArray(body.to) ? body.to : (body.to ? [body.to] : []);
   try {
     const { status, json } = await commsFetch('/v1/whatsapp/send', {
       method: 'POST',
-      body: JSON.stringify(req.body || {})
+      body: JSON.stringify(body)
     });
+    logComm({ channel: 'whatsapp', kind: 'message', to: recips, recipients: recips.length, preview: String(body.message || '').slice(0, 140), status: waStatus(json), provider: json && json.provider });
     res.status(status).json(json);
   } catch (err) {
+    logComm({ channel: 'whatsapp', kind: 'message', to: recips, recipients: recips.length, preview: String(body.message || '').slice(0, 140), status: 'failed', error: err.message });
     res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
   }
 });
 
 /* send an approved template message */
 app.post('/api/whatsapp/send-template', async (req, res) => {
+  const body = req.body || {};
+  const recips = Array.isArray(body.to) ? body.to : (body.to ? [body.to] : []);
   try {
     const { status, json } = await commsFetch('/v1/whatsapp/send-template', {
       method: 'POST',
-      body: JSON.stringify(req.body || {})
+      body: JSON.stringify(body)
     });
+    logComm({ channel: 'whatsapp', kind: 'template', to: recips, recipients: recips.length, template: body.template, status: waStatus(json), provider: json && json.provider });
     res.status(status).json(json);
   } catch (err) {
+    logComm({ channel: 'whatsapp', kind: 'template', to: recips, recipients: recips.length, template: body.template, status: 'failed', error: err.message });
     res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
   }
+});
+
+/* the logged communication history (drives the communication analytics) */
+app.get('/api/communications', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded. Run `npm run seed` first.' });
+  res.json({ ok: true, communications: store.data.communications || [] });
 });
 
 /* poll the inbound/outbound message log (for the two-way chat surface) */
