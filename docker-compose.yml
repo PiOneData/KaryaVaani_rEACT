@@ -33,7 +33,8 @@ services:
       - MAIL_HOST=smtp.office365.com
       - EMAIL_PORT=587
       - EMAIL_HOST_USER=support@pionedata.com
-      - EMAIL_HOST_PASSWORD=yxfczkkwrqdtsrcz
+      # Supplied via the runtime .env (GitHub secret) — not hard-coded.
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
       # WhatsApp gateway (standalone comms server, shared across apps)
       - COMMS_BASE_URL=http://comms-server:4100
       - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}

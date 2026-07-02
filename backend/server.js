@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const { readStore, writeStore } = require('./db');
+const { readStore, writeStore, initDb } = require('./db');
 
 const app = express();
 app.use(cors());
@@ -577,4 +577,11 @@ app.get('/api/whatsapp/messages', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));
+/* Connect to Postgres and warm the store cache (creates the table + migrates
+   the file store on first run) before accepting requests. Falls back to the
+   file store inside initDb() if the DB is unreachable, so this never blocks boot. */
+Promise.resolve(initDb())
+  .catch((err) => console.error('Store init error:', err.message))
+  .finally(() => {
+    app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));
+  });
