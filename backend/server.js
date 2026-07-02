@@ -307,16 +307,18 @@ app.post('/api/onboarding-captures', (req, res) => {
   store.data.onboardingCaptures = store.data.onboardingCaptures || [];
   const list = store.data.onboardingCaptures;
   const nowIso = new Date().toISOString();
+  // Upsert by id: the frontend supplies its own worker id (WRK-/CWK-…). If it
+  // already exists, update in place; otherwise create it (with the given id, or
+  // a generated one if none was supplied). This is what persists onboarding.
   let capture;
-  if (p.id) {
-    const idx = list.findIndex(c => c.id === p.id);
-    if (idx === -1) return res.status(404).json({ ok: false, error: 'capture not found' });
+  const idx = p.id ? list.findIndex(c => c.id === p.id) : -1;
+  if (idx !== -1) {
     capture = { ...list[idx], ...p, aadhaarLast4: aadhaarLast4, updatedAt: nowIso };
     list[idx] = capture;
   } else {
     capture = {
       ...p,
-      id: 'ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      id: p.id || ('ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
       aadhaarLast4: aadhaarLast4,
       status: p.status || 'sent',
       createdAt: nowIso,
