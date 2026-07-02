@@ -308,6 +308,23 @@ app.post('/api/onboarding-captures', (req, res) => {
 
   store.data.onboardingCaptures = store.data.onboardingCaptures || [];
   const list = store.data.onboardingCaptures;
+
+  // Reject duplicate mobile / WhatsApp numbers — one number, one worker. Compare
+  // on the last 10 digits so formatting differences don't slip a duplicate past.
+  if (p.mobile) {
+    const md = String(p.mobile).replace(/\D/g, '').slice(-10);
+    if (md.length === 10) {
+      const clash = list.find(c => c.id !== p.id && c.mobile &&
+        String(c.mobile).replace(/\D/g, '').slice(-10) === md);
+      if (clash) {
+        return res.status(409).json({
+          ok: false, code: 'DUP_MOBILE',
+          error: 'This mobile / WhatsApp number is already onboarded to ' + clash.name + ' (' + clash.id + '). Numbers must be unique.'
+        });
+      }
+    }
+  }
+
   const nowIso = new Date().toISOString();
   // Upsert by id: the frontend supplies its own worker id (WRK-/CWK-…). If it
   // already exists, update in place; otherwise create it (with the given id, or

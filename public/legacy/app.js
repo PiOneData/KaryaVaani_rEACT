@@ -11781,6 +11781,17 @@ function __kvOnReady(fn) {
     if (!name) { toast('Enter the worker\u2019s full name', 'red'); return; }
     if (mobile.replace(/\D/g, '').length < 10) { toast('Enter a valid 10-digit mobile number', 'red'); return; }
     if (aadhaar.replace(/\D/g, '').length !== 12) { toast('Aadhaar must be 12 digits', 'red'); return; }
+    /* no duplicate WhatsApp / mobile numbers \u2014 one number, one worker. CAP_STATE.recent
+       is hydrated from the DB on init, so this catches both this-session and persisted
+       workers; the backend repeats the check authoritatively. */
+    const mobDigits = mobile.replace(/\D/g, '').slice(-10);
+    const dupWorker = (CAP_STATE.recent || []).find(function (x) {
+      return x.mobile && String(x.mobile).replace(/\D/g, '').slice(-10) === mobDigits;
+    });
+    if (dupWorker) {
+      toast('This WhatsApp number is already onboarded to ' + dupWorker.name + ' (' + dupWorker.id + '). Numbers must be unique.', 'red');
+      return;
+    }
     if (CAP_STATE.type === 'direct' && !capVal('cap-posid')) {
       toast('Tag this worker to an approved Position ID', 'red'); return;
     }
@@ -11829,6 +11840,14 @@ function __kvOnReady(fn) {
               body: JSON.stringify({ workerId: j.capture.id, name: d.name, docType: d.docType, dataUrl: d.dataUrl })
             }).catch(function () {});
           });
+        } else if (j && j.error) {
+          // backend rejected the save (e.g. duplicate mobile) — roll back the
+          // optimistically-added record so the UI matches the DB.
+          const ix = CAP_STATE.recent.indexOf(rec);
+          if (ix !== -1) CAP_STATE.recent.splice(ix, 1);
+          capRenderRecent();
+          if (typeof obRenderDirectory === 'function') obRenderDirectory();
+          toast(j.error, 'red');
         }
       })
       .catch(function () { /* offline — kept in session */ });
