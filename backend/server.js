@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const { readStore, writeStore, initDb } = require('./db');
+const { readStore, writeStore, initDb, dbPut, dbDel } = require('./db');
 
 const app = express();
 app.use(cors());
@@ -57,14 +57,16 @@ function logComm(entry) {
   const store = readStore();
   if (!store || !store.data) return;
   store.data.communications = store.data.communications || [];
-  store.data.communications.push(Object.assign(
+  const rec = Object.assign(
     { id: 'cm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString() },
     entry
-  ));
+  );
+  store.data.communications.push(rec);
+  dbPut('communications', rec.id, rec);
   if (store.data.communications.length > 2000) {
-    store.data.communications = store.data.communications.slice(-2000);
+    const removed = store.data.communications.shift();
+    if (removed && removed.id) dbDel('communications', removed.id);
   }
-  writeStore(store);
 }
 
 app.post('/api/send-email', async (req, res) => {
@@ -165,7 +167,7 @@ app.post('/api/appointment-orders', (req, res) => {
   }
 
   try {
-    writeStore(store);
+    dbPut('appointmentOrders', order.id, order);
     res.json({ ok: true, order });
   } catch (err) {
     console.error('appointment-order save error:', err.message);
@@ -196,7 +198,7 @@ app.delete('/api/appointment-orders/:id', (req, res) => {
   orders.splice(idx, 1);
   store.data.appointmentOrders = orders;
   try {
-    writeStore(store);
+    dbDel('appointmentOrders', req.params.id);
     res.json({ ok: true });
   } catch (err) {
     console.error('appointment-order delete error:', err.message);
@@ -234,7 +236,7 @@ app.post('/api/readiness-surveys', (req, res) => {
   };
   store.data.readinessSurveys.push(survey);
   try {
-    writeStore(store);
+    dbPut('readinessSurveys', survey.id, survey);
     res.json({ ok: true, survey });
   } catch (err) {
     console.error('readiness-survey save error:', err.message);
@@ -278,7 +280,7 @@ app.post('/api/worker-compliance', (req, res) => {
   merged.updatedAt = new Date().toISOString();
   store.data.workerCompliance[p.code] = merged;
   try {
-    writeStore(store);
+    dbPut('workerCompliance', p.code, merged);
     res.json({ ok: true, override: merged });
   } catch (err) {
     console.error('worker-compliance save error:', err.message);
@@ -327,7 +329,7 @@ app.post('/api/onboarding-captures', (req, res) => {
     list.push(capture);
   }
   try {
-    writeStore(store);
+    dbPut('onboardingCaptures', capture.id, capture);
     res.json({ ok: true, capture });
   } catch (err) {
     console.error('onboarding-capture save error:', err.message);
@@ -350,7 +352,7 @@ app.delete('/api/onboarding-captures/:id', (req, res) => {
   list.splice(idx, 1);
   store.data.onboardingCaptures = list;
   try {
-    writeStore(store);
+    dbDel('onboardingCaptures', req.params.id);
     res.json({ ok: true });
   } catch (err) {
     console.error('onboarding-capture delete error:', err.message);
@@ -383,7 +385,7 @@ app.post('/api/onboarding-documents', (req, res) => {
   };
   list.push(doc);
   try {
-    writeStore(store);
+    dbPut('onboardingDocuments', workerId, list);
     res.json({ ok: true, doc: doc });
   } catch (err) {
     console.error('onboarding-document save error:', err.message);
@@ -409,7 +411,7 @@ app.delete('/api/onboarding-documents/:workerId/:docId', (req, res) => {
   map[req.params.workerId] = list;
   store.data.onboardingDocuments = map;
   try {
-    writeStore(store);
+    dbPut('onboardingDocuments', req.params.workerId, list);
     res.json({ ok: true });
   } catch (err) {
     console.error('onboarding-document delete error:', err.message);
