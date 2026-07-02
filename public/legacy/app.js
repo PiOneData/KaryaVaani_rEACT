@@ -14075,7 +14075,7 @@ function __kvOnReady(fn) {
       '</div><span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
       '<div class="modal-body"><div class="tabs" style="margin-bottom:14px">' + btns + '</div>' + panes + '</div>' +
       (opts.footer ? '<div class="modal-footer">' + opts.footer + '</div>' : ''),
-      opts.width || 940
+      opts.width || 1040
     );
   }
   function kvTabSwitch(btn, id) {
@@ -14130,7 +14130,7 @@ function __kvOnReady(fn) {
         '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
         '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
       '</div>' +
-      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + itemsHtml +
+      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) +
       '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">' + OM_LAW_FACTS[0] + ' ' + OM_LAW_FACTS[2] + '</div>';
 
     const notifyBtn = (c.status !== 'compliant' || !c.aadhaarVerified)
@@ -14520,7 +14520,7 @@ function __kvOnReady(fn) {
         '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
         '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
       '</div>' +
-      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + itemsHtml + ctLink;
+      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) + ctLink;
     kvTabModal({
       eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract'),
       title: rec.name + ' · ' + rec.category,
