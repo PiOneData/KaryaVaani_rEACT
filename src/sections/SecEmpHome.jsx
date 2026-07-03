@@ -18,6 +18,10 @@ export default function SecEmpHome() {
         <select id="emp-picker-sel" className="sel" onChange={(event) => { window.empSetWorker(event.currentTarget.value) }} style={{ minWidth: "240px" }} />
         {' '}
         <span className="tiny muted">demo · switch employee to preview their personal home</span>
+        {' '}
+        <button className="btn" style={{ marginLeft: "auto" }} onClick={() => { window.exitPersona() }} data-onclick="exitPersona()">
+          ← Exit employee view
+        </button>
       </div>
       {' '}
       {/*  ── HERO · identity + compliance hero ──  */}

@@ -74,6 +74,16 @@ function __kvOnReady(fn) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
+  /* ── exit the employee / contractor persona lock back to the admin app ──
+     The persona lock disables every other top-nav group (pointer-events:none),
+     so a button inside the locked page is the way back. Navigate to the
+     dashboard, which clears emp-mode / ct-mode. */
+  function exitPersona() {
+    const home = document.querySelector('.sb-item[data-onclick="nav(\'dashboard\', this)"]');
+    nav('dashboard', home || null);
+  }
+  window.exitPersona = exitPersona;
+
   /* ── inline tabs (used in onboarding) ── */
   function subTab(evt, group, name) {
     const tabs = evt.target.parentElement.querySelectorAll('.tab');
@@ -12972,6 +12982,19 @@ function __kvOnReady(fn) {
     terminationBody: function (d) {
       const np = d.notice || 'the notice period stipulated in the Company policy';
       return 'This appointment may be terminated by either party by giving ' + np + ' written notice or salary in lieu thereof. The Company reserves the right to terminate your services without notice in the event of misconduct, breach of terms, or unsatisfactory performance, in accordance with the applicable standing orders and law.';
+    },
+    medicalFitness: 'This appointment is subject to your being and remaining medically fit for the duties assigned. The Company may require you to undergo medical examination by a registered medical practitioner nominated by it, at any time during your employment, and your continued employment is conditional upon such fitness.',
+    verification: 'This appointment is subject to verification of the particulars, testimonials, certificates and antecedents furnished by you. Should any information be found false, misleading or suppressed at any stage, your services are liable to be terminated forthwith without notice or compensation, without prejudice to any other action under law.',
+    deductions: 'Your remuneration is subject to deduction of income-tax at source and all statutory deductions and contributions as applicable, including Provident Fund (EPFO), Employees’ State Insurance (ESIC), Professional Tax and any other levy required under the Labour Codes and applicable law from time to time.',
+    retirement: 'You shall retire from the services of the Company on attaining the age of superannuation as prescribed under the Company’s policy and the applicable standing orders. Your date of birth as recorded in these records shall be conclusive for this purpose.',
+    ip: 'All inventions, designs, works, data, reports and intellectual property conceived or developed by you, whether alone or with others, in the course of or arising out of your employment shall be the sole and exclusive property of the Company. You shall execute all documents and do all acts necessary to vest such rights in the Company.',
+    exclusivity: 'During your employment you shall devote your whole time and attention to the Company’s business and shall not, without the Company’s prior written consent, engage directly or indirectly in any other trade, business or employment. You shall not, during employment and for the period stipulated in Company policy thereafter, solicit the Company’s employees, customers or vendors to its detriment.',
+    safety: 'You shall comply with all safety, health, environment and occupational-safety requirements, the Company’s standing orders, and all statutory rules made under the Occupational Safety, Health and Working Conditions Code, 2020, and shall use the personal protective equipment provided. Any wilful breach of safety norms shall constitute misconduct.',
+    property: 'All documents, records, tools, equipment, devices and other property of the Company entrusted to you shall remain the Company’s property and shall be returned by you in good condition on separation or on demand. The Company may recover the value of any Company property not so returned.',
+    dataPrivacy: 'You consent to the Company collecting, storing, processing and, where necessary, sharing your personal and sensitive personal data (including statutory identifiers) for employment, payroll, statutory compliance and administrative purposes, in accordance with applicable data-protection law. Aadhaar and other identifiers are used only for permitted, consented purposes.',
+    amendment: 'The Company reserves the right to amend, modify, add to or withdraw any of its rules, policies, benefits and terms of employment from time to time, and such changes, when notified, shall be binding on you. Matters not expressly covered herein shall be governed by the Company’s policies and the applicable law.',
+    governingLaw: function (C) {
+      return 'This appointment and your employment shall be governed by and construed in accordance with the laws of India. The courts and statutory authorities having jurisdiction over the place of posting shall have exclusive jurisdiction over any dispute arising out of or relating to this appointment.';
     }
   };
 
@@ -13357,6 +13380,17 @@ function __kvOnReady(fn) {
     content.push.apply(content, sec(n++, 'Confidentiality', AO_CLAUSES.confidentiality));
     content.push.apply(content, sec(n++, 'Code of Conduct', AO_CLAUSES.conduct));
     content.push.apply(content, sec(n++, 'Termination', AO_CLAUSES.terminationBody(d)));
+    content.push.apply(content, sec(n++, 'Medical Fitness', AO_CLAUSES.medicalFitness));
+    content.push.apply(content, sec(n++, 'Verification of Antecedents', AO_CLAUSES.verification));
+    content.push.apply(content, sec(n++, 'Statutory Deductions', AO_CLAUSES.deductions));
+    content.push.apply(content, sec(n++, 'Retirement', AO_CLAUSES.retirement));
+    content.push.apply(content, sec(n++, 'Intellectual Property', AO_CLAUSES.ip));
+    content.push.apply(content, sec(n++, 'Exclusivity & Non-Solicitation', AO_CLAUSES.exclusivity));
+    content.push.apply(content, sec(n++, 'Safety, Health & Standing Orders', AO_CLAUSES.safety));
+    content.push.apply(content, sec(n++, 'Return of Company Property', AO_CLAUSES.property));
+    content.push.apply(content, sec(n++, 'Data Privacy & Consent', AO_CLAUSES.dataPrivacy));
+    content.push.apply(content, sec(n++, 'Amendment of Terms', AO_CLAUSES.amendment));
+    content.push.apply(content, sec(n++, 'Governing Law & Jurisdiction', AO_CLAUSES.governingLaw(C)));
     if (d.gender === 'Female' && d.maternity) {
       content.push.apply(content, sec(n++, 'Maternity Benefit', 'You shall be entitled to maternity benefits under Chapter VI of the Code on Social Security, 2020. ' + d.maternity));
     }

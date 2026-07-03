@@ -51,7 +51,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14.5px; scroll-behavior: smooth; }
+html { font-size: 16.5px; scroll-behavior: smooth; }
 body {
   font-family: var(--sans);
   background: var(--paper);

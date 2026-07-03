@@ -18,6 +18,10 @@ export default function SecCtHome() {
         <select id="ct-picker-sel" className="sel" onChange={(event) => { window.ctSetActive(event.currentTarget.value) }} style={{ minWidth: "320px" }} />
         {' '}
         <span className="tiny muted">demo · switch contractor to preview their firm home</span>
+        {' '}
+        <button className="btn" style={{ marginLeft: "auto" }} onClick={() => { window.exitPersona() }} data-onclick="exitPersona()">
+          ← Exit contractor view
+        </button>
       </div>
       {' '}
       {/*  ── HERO · firm identity + compliance score ──  */}
