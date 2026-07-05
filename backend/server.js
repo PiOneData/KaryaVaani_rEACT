@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const { readStore, writeStore, initDb, dbPut, dbDel } = require('./db');
 const { hashPassword, verifyPassword, DEMO_ACCOUNTS } = require('./auth');
 
@@ -653,38 +654,135 @@ app.get('/api/whatsapp/messages', async (req, res) => {
 function publicUser(u) {
   if (!u) return null;
   return {
-    username: u.username, role: u.role, name: u.name, title: u.title,
+    username: u.username, role: u.role, name: u.name, title: u.title, email: u.email || '',
     linkedType: u.linkedType, linkedId: u.linkedId || '', linkedName: u.linkedName || ''
   };
 }
 
-/* Create the demo accounts if none exist yet (idempotent, runs each boot). */
+/* Create the demo accounts if missing (idempotent). Also backfills the email
+   field onto already-seeded accounts without touching their password. */
 function ensureDemoUsers() {
   const store = readStore();
   if (!store || !store.data) return;
   store.data.users = store.data.users || [];
-  if (store.data.users.length) return; // already seeded
+  const byName = {};
+  store.data.users.forEach((u) => { byName[u.username] = u; });
 
   const worker = (store.data.chatContacts || [])[0] || (store.data.broadcastWorkers || [])[0] || null;
   const firm   = (store.data.contractors || [])[0] || null;
   const nowIso = new Date().toISOString();
+  const seeded = [];
 
   DEMO_ACCOUNTS.forEach((a) => {
-    const u = {
-      username: a.username, role: a.role, title: a.title,
-      name: a.name, linkedType: a.linkedType, linkedId: '', linkedName: '',
-      passwordHash: hashPassword(a.password), createdAt: nowIso
-    };
-    if (a.linkedType === 'employee' && worker) {
-      u.linkedId = worker.id; u.linkedName = worker.name; u.name = worker.name;
-    } else if (a.linkedType === 'contractor' && firm) {
-      u.linkedId = firm.id; u.linkedName = firm.name; u.name = firm.name;
+    let u = byName[a.username];
+    let touched = false;
+    if (!u) {
+      u = {
+        username: a.username, role: a.role, title: a.title, email: a.email || '',
+        name: a.name, linkedType: a.linkedType, linkedId: '', linkedName: '',
+        passwordHash: hashPassword(a.password), createdAt: nowIso
+      };
+      if (a.linkedType === 'employee' && worker) { u.linkedId = worker.id; u.linkedName = worker.name; u.name = worker.name; }
+      else if (a.linkedType === 'contractor' && firm) { u.linkedId = firm.id; u.linkedName = firm.name; u.name = firm.name; }
+      store.data.users.push(u); byName[a.username] = u; seeded.push(a.username); touched = true;
     }
-    store.data.users.push(u);
-    dbPut('users', u.username, u);
+    if (!u.email && a.email) { u.email = a.email; touched = true; } // backfill for older seeds
+    if (touched) dbPut('users', u.username, u);
   });
-  console.log('[auth] Seeded demo accounts: ' + DEMO_ACCOUNTS.map((a) => a.username).join(', '));
+  if (seeded.length) console.log('[auth] Seeded demo accounts: ' + seeded.join(', '));
 }
+
+/* Send a plain-text email via the same Office365 transport as /api/send-email,
+   logging it to the comms audit trail. Returns true on send, false on failure. */
+function mailerConfigured() { return !!(process.env.EMAIL_HOST_USER && process.env.EMAIL_HOST_PASSWORD); }
+async function sendMail(to, subject, message) {
+  const transporter = nodemailer.createTransport({
+    host: process.env.MAIL_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.EMAIL_PORT || '587', 10),
+    secure: false,
+    auth: { user: process.env.EMAIL_HOST_USER, pass: process.env.EMAIL_HOST_PASSWORD },
+    tls: { ciphers: 'SSLv3' }
+  });
+  try {
+    await transporter.sendMail({ from: process.env.EMAIL_HOST_USER, to, subject, text: message });
+    logComm({ channel: 'email', to: [to], recipients: 1, subject, preview: String(message).slice(0, 140), status: 'sent' });
+    return true;
+  } catch (err) {
+    logComm({ channel: 'email', to: [to], recipients: 1, subject, status: 'failed', error: err.message });
+    return false;
+  }
+}
+
+const MIN_PW = 6;
+function findUser(store, username) {
+  return (store.data.users || []).find((x) => x.username.toLowerCase() === String(username || '').trim().toLowerCase());
+}
+function persistUser(store, u) {
+  const list = store.data.users;
+  const idx = list.findIndex((x) => x.username === u.username);
+  if (idx !== -1) list[idx] = u;
+  dbPut('users', u.username, u);
+}
+
+/* Change password for a signed-in user — requires the current password. */
+app.post('/api/change-password', async (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting — try again shortly.' });
+  const { username, currentPassword, newPassword } = req.body || {};
+  if (!username || !currentPassword || !newPassword) return res.status(400).json({ ok: false, error: 'All fields are required.' });
+  if (String(newPassword).length < MIN_PW) return res.status(400).json({ ok: false, error: `New password must be at least ${MIN_PW} characters.` });
+  const u = findUser(store, username);
+  if (!u || !verifyPassword(currentPassword, u.passwordHash)) return res.status(401).json({ ok: false, error: 'Current password is incorrect.' });
+  u.passwordHash = hashPassword(newPassword);
+  u.updatedAt = new Date().toISOString();
+  persistUser(store, u);
+  res.json({ ok: true });
+});
+
+/* Forgot password — email a short-lived reset code. To avoid account
+   enumeration the response is always generic. The code is returned in the
+   response ONLY when the mailer is unconfigured (demo/mock mode), so the demo
+   remains usable; with real SMTP the code goes solely to the user's inbox. */
+app.post('/api/forgot-password', async (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting — try again shortly.' });
+  const { username } = req.body || {};
+  if (!username) return res.status(400).json({ ok: false, error: 'Enter your username.' });
+  const u = findUser(store, username);
+  const generic = { ok: true, message: 'If that account exists, a reset code has been sent to its registered email.' };
+  if (!u) return res.json(generic);
+
+  const code = String(crypto.randomInt(100000, 1000000)); // 6-digit
+  u.resetHash = hashPassword(code);
+  u.resetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+  persistUser(store, u);
+
+  if (u.email) {
+    await sendMail(u.email, 'Karya Vaani — your password reset code',
+      'Your password reset code is ' + code + '. It expires in 15 minutes. If you did not request this, ignore this email.');
+  }
+  // demo/mock convenience only
+  if (!mailerConfigured()) return res.json({ ...generic, devCode: code, devNote: 'Mailer not configured — code shown for demo only.' });
+  return res.json(generic);
+});
+
+/* Reset password using the emailed code. */
+app.post('/api/reset-password', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting — try again shortly.' });
+  const { username, code, newPassword } = req.body || {};
+  if (!username || !code || !newPassword) return res.status(400).json({ ok: false, error: 'All fields are required.' });
+  if (String(newPassword).length < MIN_PW) return res.status(400).json({ ok: false, error: `New password must be at least ${MIN_PW} characters.` });
+  const u = findUser(store, username);
+  if (!u || !u.resetHash || !u.resetExpires) return res.status(400).json({ ok: false, error: 'No reset was requested for this account.' });
+  if (Date.now() > u.resetExpires) { delete u.resetHash; delete u.resetExpires; persistUser(store, u); return res.status(400).json({ ok: false, error: 'That code has expired. Please request a new one.' }); }
+  if (!verifyPassword(code, u.resetHash)) return res.status(401).json({ ok: false, error: 'Incorrect reset code.' });
+  u.passwordHash = hashPassword(newPassword);
+  delete u.resetHash; delete u.resetExpires;
+  u.updatedAt = new Date().toISOString();
+  persistUser(store, u);
+  res.json({ ok: true });
+});
 
 app.post('/api/login', (req, res) => {
   const store = readStore();

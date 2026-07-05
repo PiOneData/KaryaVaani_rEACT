@@ -6631,3 +6631,38 @@ body.role-employee .navbar,
 body.role-contractor .navbar { display: none; }
 body.role-employee .emp-picker,
 body.role-contractor .emp-picker { display: none; }
+
+/* ── forgot/reset + success notices ── */
+.login-notice {
+  margin-top: 10px; font-size: 0.76rem; font-weight: 500; color: #0b6b3a;
+  background: #e6f6ec; border: 1px solid #b7e4c7; border-radius: var(--r-md); padding: 8px 10px;
+}
+.login-link {
+  margin-top: 12px; background: none; border: none; cursor: pointer;
+  color: var(--indigo); font-size: 0.78rem; font-weight: 600; padding: 2px 0;
+}
+.login-link:hover { text-decoration: underline; }
+.login-link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
+
+/* ── change-password modal ── */
+.acct-overlay {
+  position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center;
+  background: rgba(17,20,32,0.45); padding: 24px;
+}
+.acct-modal {
+  width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: 0 30px 60px -20px rgba(0,0,0,0.4); overflow: hidden;
+}
+.acct-h {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 18px; border-bottom: 1px solid var(--line);
+}
+.acct-h-title { font-weight: 700; font-size: 0.98rem; color: var(--ink); }
+.acct-h-sub { font-size: 0.74rem; color: var(--ink-4); margin-top: 2px; }
+.acct-close {
+  background: none; border: none; cursor: pointer; color: var(--ink-4);
+  font-size: 1rem; line-height: 1; padding: 2px 4px;
+}
+.acct-close:hover { color: var(--ink); }
+.acct-body { padding: 18px; }
+.acct-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

@@ -1,10 +1,14 @@
 /* TopBar — converted 1:1 from karya-vaani_v3.html, plus the signed-in user
-   chip + logout for the role-based session. */
+   chip, change-password and logout for the role-based session. */
+import { useState } from 'react';
+import AccountModal from './AccountModal.jsx';
+
 function initials(name) {
   return String(name || '?').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
 export default function TopBar({ user, onLogout }) {
+  const [showAccount, setShowAccount] = useState(false);
   const name = (user && user.name) || 'Priya Menon';
   const title = (user && user.title) || 'CHRO';
   return (
@@ -43,10 +47,15 @@ export default function TopBar({ user, onLogout }) {
           <span className="tb-userinfo-title">{title}</span>
         </div>
         {' '}
+        <button className="tb-logout" onClick={() => setShowAccount(true)} title="Change password">
+          Change password
+        </button>
+        {' '}
         <button className="tb-logout" onClick={() => { if (onLogout) onLogout(); }} title="Sign out">
           Sign out
         </button>
       </div>
+      {showAccount && user ? <AccountModal user={user} onClose={() => setShowAccount(false)} /> : null}
     </div>
   );
 }

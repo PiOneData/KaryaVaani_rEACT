@@ -28,11 +28,14 @@ function verifyPassword(plain, stored) {
    shows genuine data. `admin` sees the full application. */
 const DEMO_ACCOUNTS = [
   { username: 'hr',         password: 'hr@daikin',         role: 'admin',
-    name: 'Priya Menon',    title: 'Site HR Manager',      linkedType: 'admin' },
+    name: 'Priya Menon',    title: 'Site HR Manager',      linkedType: 'admin',
+    email: 'hr@karyavaani.demo' },
   { username: 'worker',     password: 'worker@daikin',     role: 'employee',
-    name: '',               title: 'Worker / Labourer',    linkedType: 'employee' },
+    name: '',               title: 'Worker / Labourer',    linkedType: 'employee',
+    email: 'worker@karyavaani.demo' },
   { username: 'contractor', password: 'contractor@daikin', role: 'contractor',
-    name: '',               title: 'Contractor / Vendor',  linkedType: 'contractor' }
+    name: '',               title: 'Contractor / Vendor',  linkedType: 'contractor',
+    email: 'contractor@karyavaani.demo' }
 ];
 
 module.exports = { hashPassword, verifyPassword, DEMO_ACCOUNTS };
