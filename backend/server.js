@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 const { readStore, writeStore, initDb, dbPut, dbDel } = require('./db');
+const { hashPassword, verifyPassword, DEMO_ACCOUNTS } = require('./auth');
 
 const app = express();
 app.use(cors());
@@ -32,7 +33,9 @@ app.get('/api/bootstrap', (req, res) => {
   // Exclude the big/growing collections from the bundle every client loads —
   // documents are fetched per worker (/api/onboarding-documents) and the
   // communication log via /api/communications.
-  const { onboardingDocuments, communications, ...rest } = s.data;
+  // never ship documents (base64), the comms log, or the users table (password
+  // hashes) to the browser — those are fetched via their own guarded routes.
+  const { onboardingDocuments, communications, users, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -641,11 +644,66 @@ app.get('/api/whatsapp/messages', async (req, res) => {
   }
 });
 
+/* ── Role-based login ──────────────────────────────────────────────────────
+   Three demo accounts (HR/site manager · contractor · worker). Seeded into the
+   `users` collection on boot, with each non-admin account linked to a real
+   entity (a worker for the labourer, a contractor firm for the vendor) so their
+   home page shows genuine data. Passwords are scrypt-hashed; never stored plain.
+   ──────────────────────────────────────────────────────────────────────── */
+function publicUser(u) {
+  if (!u) return null;
+  return {
+    username: u.username, role: u.role, name: u.name, title: u.title,
+    linkedType: u.linkedType, linkedId: u.linkedId || '', linkedName: u.linkedName || ''
+  };
+}
+
+/* Create the demo accounts if none exist yet (idempotent, runs each boot). */
+function ensureDemoUsers() {
+  const store = readStore();
+  if (!store || !store.data) return;
+  store.data.users = store.data.users || [];
+  if (store.data.users.length) return; // already seeded
+
+  const worker = (store.data.chatContacts || [])[0] || (store.data.broadcastWorkers || [])[0] || null;
+  const firm   = (store.data.contractors || [])[0] || null;
+  const nowIso = new Date().toISOString();
+
+  DEMO_ACCOUNTS.forEach((a) => {
+    const u = {
+      username: a.username, role: a.role, title: a.title,
+      name: a.name, linkedType: a.linkedType, linkedId: '', linkedName: '',
+      passwordHash: hashPassword(a.password), createdAt: nowIso
+    };
+    if (a.linkedType === 'employee' && worker) {
+      u.linkedId = worker.id; u.linkedName = worker.name; u.name = worker.name;
+    } else if (a.linkedType === 'contractor' && firm) {
+      u.linkedId = firm.id; u.linkedName = firm.name; u.name = firm.name;
+    }
+    store.data.users.push(u);
+    dbPut('users', u.username, u);
+  });
+  console.log('[auth] Seeded demo accounts: ' + DEMO_ACCOUNTS.map((a) => a.username).join(', '));
+}
+
+app.post('/api/login', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting — try again in a moment.' });
+  const { username, password } = req.body || {};
+  if (!username || !password) return res.status(400).json({ ok: false, error: 'Username and password are required.' });
+  const u = (store.data.users || []).find((x) => x.username.toLowerCase() === String(username).trim().toLowerCase());
+  if (!u || !verifyPassword(password, u.passwordHash)) {
+    return res.status(401).json({ ok: false, error: 'Invalid username or password.' });
+  }
+  res.json({ ok: true, user: publicUser(u) });
+});
+
 const PORT = process.env.PORT || 4000;
 /* Connect to Postgres and warm the store cache (creates the table + migrates
    the file store on first run) before accepting requests. Falls back to the
    file store inside initDb() if the DB is unreachable, so this never blocks boot. */
 Promise.resolve(initDb())
+  .then(() => { try { ensureDemoUsers(); } catch (e) { console.error('[auth] demo user seed failed:', e.message); } })
   .catch((err) => console.error('Store init error:', err.message))
   .finally(() => {
     app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));

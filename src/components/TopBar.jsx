@@ -1,5 +1,12 @@
-/* TopBar — converted 1:1 from karya-vaani_v3.html */
-export default function TopBar() {
+/* TopBar — converted 1:1 from karya-vaani_v3.html, plus the signed-in user
+   chip + logout for the role-based session. */
+function initials(name) {
+  return String(name || '?').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+}
+
+export default function TopBar({ user, onLogout }) {
+  const name = (user && user.name) || 'Priya Menon';
+  const title = (user && user.title) || 'CHRO';
   return (
     <div className="topbar">
       <div className="tb-brand">
@@ -29,7 +36,16 @@ export default function TopBar() {
         {' '}
         <div className="tb-action">日本語</div>
         {' '}
-        <div className="tb-user" title="Priya Menon · CHRO">PM</div>
+        <div className="tb-user" title={name + ' · ' + title}>{initials(name)}</div>
+        {' '}
+        <div className="tb-userinfo">
+          <span className="tb-userinfo-name">{name}</span>
+          <span className="tb-userinfo-title">{title}</span>
+        </div>
+        {' '}
+        <button className="tb-logout" onClick={() => { if (onLogout) onLogout(); }} title="Sign out">
+          Sign out
+        </button>
       </div>
     </div>
   );

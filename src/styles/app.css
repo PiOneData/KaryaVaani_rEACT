@@ -6564,3 +6564,70 @@ mark.wk-hl { background: var(--amber-soft); color: var(--amber-dk); border-radiu
 .kv-wa-badge.live { color: #0b6b3a; background: #e6f6ec; border-color: #b7e4c7; }
 .kv-wa-badge.mock { color: #8a5a00; background: #fff4e0; border-color: #f0d49a; }
 .kv-wa-badge.off  { color: #8a3b2e; background: #fdecea; border-color: #f3c2ba; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ROLE-BASED LOGIN + SESSION
+   ══════════════════════════════════════════════════════════════════════════ */
+/* ── login screen ── */
+.login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(31,43,92,0.10), transparent 60%),
+    var(--paper);
+}
+.login-card {
+  width: 100%; max-width: 420px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 30px 28px; box-shadow: 0 30px 60px -24px rgba(0,0,0,0.28);
+}
+.login-brand { display: flex; flex-direction: column; gap: 2px; }
+.login-mark { font-family: var(--display); font-weight: 700; font-size: 1.5rem; color: var(--indigo); }
+.login-tag { font-size: 0.74rem; color: var(--ink-3); letter-spacing: 0.02em; }
+.login-tenant {
+  margin: 6px 0 20px; font-size: 0.7rem; font-weight: 600; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.login-form { display: flex; flex-direction: column; gap: 6px; }
+.login-l { font-size: 0.72rem; font-weight: 600; color: var(--ink-3); margin-top: 8px; }
+.login-err {
+  margin-top: 10px; font-size: 0.76rem; font-weight: 500; color: #8a3b2e;
+  background: #fdecea; border: 1px solid #f3c2ba; border-radius: var(--r-md); padding: 8px 10px;
+}
+.login-submit { margin-top: 16px; width: 100%; justify-content: center; padding: 10px; font-size: 0.9rem; }
+.login-demo-h {
+  margin: 22px 0 10px; font-size: 0.68rem; font-weight: 700; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: 0.08em; text-align: center;
+}
+.login-demo { display: flex; flex-direction: column; gap: 8px; }
+.login-demo-btn {
+  display: flex; flex-direction: column; gap: 1px; text-align: left; cursor: pointer;
+  background: var(--paper); border: 1px solid var(--line); border-left: 3px solid var(--indigo);
+  border-radius: var(--r-md); padding: 9px 12px; transition: transform .12s ease, box-shadow .12s ease;
+}
+.login-demo-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(0,0,0,0.25); }
+.login-demo-btn:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+.login-demo-role { font-weight: 700; font-size: 0.82rem; color: var(--ink); }
+.login-demo-sub { font-size: 0.72rem; color: var(--ink-3); }
+.login-demo-cred { font-family: var(--mono); font-size: 0.68rem; color: var(--ink-4); margin-top: 2px; }
+
+/* ── topbar user chip + logout ── */
+.tb-userinfo { display: flex; flex-direction: column; line-height: 1.1; }
+.tb-userinfo-name { font-size: 0.78rem; font-weight: 600; color: var(--ink); }
+.tb-userinfo-title { font-size: 0.65rem; color: var(--ink-4); }
+.tb-logout {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+  font-size: 0.72rem; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  cursor: pointer; transition: background .12s ease, color .12s ease;
+}
+.tb-logout:hover { background: var(--indigo); color: var(--paper); border-color: var(--indigo); }
+
+/* ── the Employee / Contractor homes are reached by logging in as those roles,
+   so their top-nav groups are retired from the admin nav ── */
+#grp-employee, #grp-contractor { display: none !important; }
+
+/* ── kiosk lock: a worker / contractor sees only their own home. Hide the whole
+   top navbar and the persona switcher (they can only sign out). ── */
+body.role-employee .navbar,
+body.role-contractor .navbar { display: none; }
+body.role-employee .emp-picker,
+body.role-contractor .emp-picker { display: none; }

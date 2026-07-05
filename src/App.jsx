@@ -2,7 +2,9 @@
    Styling: src/styles/app.css (verbatim copy of the original <style> block).
    Behaviour: public/legacy/app.js (verbatim copy of the original <script>),
    loaded after mount via useLegacyApp(). */
+import { useState, useEffect } from 'react';
 import { useLegacyApp } from './legacy/useLegacyApp.js';
+import Login from './components/Login.jsx';
 import TopBar from './components/TopBar.jsx';
 import NavBar from './components/NavBar.jsx';
 import EmailModal from './components/EmailModal.jsx';
@@ -32,12 +34,41 @@ import SecHandoff from './sections/SecHandoff.jsx';
 import SecDirectory from './sections/SecDirectory.jsx';
 import SecCtdirectory from './sections/SecCtdirectory.jsx';
 
+const KVUSER_KEY = 'kvUser';
+function readStoredUser() {
+  try { return JSON.parse(localStorage.getItem(KVUSER_KEY) || 'null'); } catch { return null; }
+}
+
+/* Auth gate: unauthenticated → Login; otherwise route the role to its surface. */
 export default function App() {
+  const [user, setUser] = useState(readStoredUser);
+  useEffect(() => { window.__KVUSER = user || null; }, [user]);
+
+  if (!user) {
+    return <Login onLogin={(u) => { localStorage.setItem(KVUSER_KEY, JSON.stringify(u)); setUser(u); }} />;
+  }
+  return <AuthedApp user={user} onLogout={() => { localStorage.removeItem(KVUSER_KEY); window.location.reload(); }} />;
+}
+
+function AuthedApp({ user, onLogout }) {
+  // expose the session to the legacy layer BEFORE its script is injected, so
+  // role-application (kvApplyRole) can lock a worker/contractor into their home.
+  window.__KVUSER = user;
   useLegacyApp();
+  useEffect(() => {
+    window.__KVUSER = user;
+    let tries = 0;
+    const apply = () => {
+      if (window.kvApplyRole && window.__kvLegacyReady) { try { window.kvApplyRole(user); } catch (e) { /* keep app rendering */ } }
+      else if (tries++ < 150) { setTimeout(apply, 60); }
+    };
+    apply();
+  }, [user]);
+
   return (
     <>
       {/*  ════ TOP BAR ════  */}
-      <TopBar />
+      <TopBar user={user} onLogout={onLogout} />
       {/*  ════ TOP NAV BAR ════  */}
       <NavBar />
       <div className="shell">

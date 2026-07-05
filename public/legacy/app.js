@@ -84,6 +84,31 @@ function __kvOnReady(fn) {
   }
   window.exitPersona = exitPersona;
 
+  /* ── role-based session routing ──────────────────────────────────────────
+     Called by the React auth gate after login. Admin (HR / site manager) gets
+     the full application; a worker is locked into their own Employee Home and a
+     contractor into their Firm Home (navbar + persona switcher hidden by the
+     role-* body classes), showing the real entity linked to their account. */
+  function kvApplyRole(user) {
+    user = user || window.__KVUSER || null;
+    document.body.classList.remove('role-employee', 'role-contractor', 'role-admin');
+    if (!user || user.role === 'admin') {
+      document.body.classList.add('role-admin');
+      document.body.classList.remove('emp-mode', 'ct-mode');
+      return;
+    }
+    if (user.role === 'employee') {
+      document.body.classList.add('role-employee');
+      if (user.linkedId && typeof empSetWorker === 'function') empSetWorker(user.linkedId);
+      nav('emp-home', null);
+    } else if (user.role === 'contractor') {
+      document.body.classList.add('role-contractor');
+      if (user.linkedId && typeof ctSetActive === 'function') ctSetActive(user.linkedId);
+      nav('ct-home', null);
+    }
+  }
+  window.kvApplyRole = kvApplyRole;
+
   /* ── inline tabs (used in onboarding) ── */
   function subTab(evt, group, name) {
     const tabs = evt.target.parentElement.querySelectorAll('.tab');

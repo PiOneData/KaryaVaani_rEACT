@@ -47,6 +47,7 @@ const COLLECTIONS = {
   captureWorkorders:   { table: 'capture_workorders',    kind: 'array', id: (r) => r.id },
   chatContacts:        { table: 'chat_contacts',         kind: 'array', id: (r) => r.id },
   onboardingCaptures:  { table: 'onboarding_captures',   kind: 'array', id: (r) => r.id },
+  users:               { table: 'users',                 kind: 'array', id: (r) => r.username },
   readinessSurveys:    { table: 'readiness_surveys',     kind: 'array', id: (r) => r.id },
   appointmentOrders:   { table: 'appointment_orders',    kind: 'array', id: (r) => r.id },
   communications:      { table: 'communications',        kind: 'array', id: (r) => r.id },
