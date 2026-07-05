@@ -50,6 +50,7 @@ const COLLECTIONS = {
   users:               { table: 'users',                 kind: 'array', id: (r) => r.username },
   readinessSurveys:    { table: 'readiness_surveys',     kind: 'array', id: (r) => r.id },
   appointmentOrders:   { table: 'appointment_orders',    kind: 'array', id: (r) => r.id },
+  voiceCache:          { table: 'voice_cache',           kind: 'array', id: (r) => r.hash },
   communications:      { table: 'communications',        kind: 'array', id: (r) => r.id },
   chatThreads:         { table: 'chat_threads',          kind: 'map' },
   onboardingDocuments: { table: 'onboarding_documents',  kind: 'map' },

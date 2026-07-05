@@ -170,6 +170,11 @@ export default function SecVaaniBroadcast() {
                   <span style={{ fontSize: "0.9rem" }}>✦</span>
                   {" Ask Knowledge Center\n            "}
                 </button>
+                {' '}
+                <button className="btn" id="vb-prewarm-btn" onClick={(event) => { window.vbPrewarmVoices() }} data-onclick="vbPrewarmVoices()" title="Generate & store the voice note for every template in every language, once — so playback is instant afterwards" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "0.9rem" }}>⚡</span>
+                  Pre-generate voices
+                </button>
               </div>
               {' '}
               <div className="vbm-row-hint" id="vb-template-hint">

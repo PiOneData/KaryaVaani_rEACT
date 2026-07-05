@@ -34,9 +34,9 @@ app.get('/api/bootstrap', (req, res) => {
   // Exclude the big/growing collections from the bundle every client loads —
   // documents are fetched per worker (/api/onboarding-documents) and the
   // communication log via /api/communications.
-  // never ship documents (base64), the comms log, or the users table (password
-  // hashes) to the browser — those are fetched via their own guarded routes.
-  const { onboardingDocuments, communications, users, ...rest } = s.data;
+  // never ship documents / voice audio (base64), the comms log, or the users
+  // table (password hashes) to the browser — those are fetched via their own routes.
+  const { onboardingDocuments, communications, users, voiceCache, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -518,12 +518,47 @@ app.post('/api/translate', async (req, res) => {
      TTS_API_URL   default http://4.247.160.91:64574
    ──────────────────────────────────────────────────────────────────────── */
 const TTS_API_URL = (process.env.TTS_API_URL || 'http://4.247.160.91:64574').replace(/\/$/, '');
+const VOICE_CACHE_MAX = parseInt(process.env.VOICE_CACHE_MAX || '600', 10);
 
+function ttsHash(text) { return crypto.createHash('sha256').update(String(text)).digest('hex'); }
+function voiceCacheGet(hash) {
+  const s = readStore();
+  const list = (s && s.data && s.data.voiceCache) || [];
+  return list.find((v) => v.hash === hash) || null;
+}
+function voiceCachePut(hash, buf, contentType) {
+  const s = readStore();
+  if (!s || !s.data) return;
+  s.data.voiceCache = s.data.voiceCache || [];
+  const rec = { hash, audio: buf.toString('base64'), contentType: contentType || 'audio/wav', bytes: buf.length, createdAt: new Date().toISOString() };
+  s.data.voiceCache.push(rec);
+  dbPut('voiceCache', hash, rec);
+  // evict oldest beyond the cap so the cache can't grow without bound
+  while (s.data.voiceCache.length > VOICE_CACHE_MAX) {
+    const old = s.data.voiceCache.shift();
+    if (old && old.hash) dbDel('voiceCache', old.hash);
+  }
+}
+
+/* POST /api/tts  { text }  → audio/wav bytes.
+   Voice synthesis is slow (single-worker model), and a given (already-translated)
+   text always yields the same audio — so the result is cached persistently by a
+   hash of the text. A cache hit returns the stored WAV immediately with no call
+   to the voice service; a miss synthesises once and stores it. Header
+   X-KV-Cache: hit|miss lets the client tell them apart. */
 app.post('/api/tts', async (req, res) => {
   const { text } = req.body || {};
   if (!text) {
     return res.status(400).json({ ok: false, error: 'text is required' });
   }
+  const hash = ttsHash(text);
+  const hit = voiceCacheGet(hash);
+  if (hit && hit.audio) {
+    res.set('Content-Type', hit.contentType || 'audio/wav');
+    res.set('X-KV-Cache', 'hit');
+    return res.send(Buffer.from(hit.audio, 'base64'));
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600000); // 10 min hard cap
   try {
@@ -538,7 +573,10 @@ app.post('/api/tts', async (req, res) => {
       return res.status(resp.status).json({ ok: false, error: 'tts service ' + resp.status + (detail ? ': ' + detail.slice(0, 200) : '') });
     }
     const buf = Buffer.from(await resp.arrayBuffer());
-    res.set('Content-Type', resp.headers.get('content-type') || 'audio/wav');
+    const contentType = resp.headers.get('content-type') || 'audio/wav';
+    try { voiceCachePut(hash, buf, contentType); } catch (e) { console.error('voice cache store failed:', e.message); }
+    res.set('Content-Type', contentType);
+    res.set('X-KV-Cache', 'miss');
     res.send(buf);
   } catch (err) {
     console.error('tts error:', err.message);
@@ -546,6 +584,13 @@ app.post('/api/tts', async (req, res) => {
   } finally {
     clearTimeout(timer);
   }
+});
+
+/* Lightweight cache status — how many voices are stored (for the pre-generate UI). */
+app.get('/api/tts/cache-status', (req, res) => {
+  const s = readStore();
+  const list = (s && s.data && s.data.voiceCache) || [];
+  res.json({ ok: true, count: list.length, max: VOICE_CACHE_MAX });
 });
 
 /* --- WhatsApp gateway proxy -----------------------------------------------

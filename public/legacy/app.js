@@ -5765,6 +5765,46 @@ function __kvOnReady(fn) {
     Object.keys(VB_VOICE_CACHE).forEach(function (k) { delete VB_VOICE_CACHE[k]; });
   }
 
+  /* Pre-generate & store the voice note for every template in every language,
+     once. The backend caches each synthesised WAV by a hash of its text, so
+     after this runs, translating a template and playing / attaching its voice
+     is instant (served from the store instead of re-rendering). Uses the same
+     live translate → /api/tts path as normal use, so the cached text matches
+     exactly. Runs sequentially — the voice + translate models are single-worker. */
+  async function vbPrewarmVoices() {
+    const presets = (typeof VB_PRESETS !== 'undefined') ? VB_PRESETS : {};
+    const keys = Object.keys(presets);
+    const langs = Object.keys(VB_NLLB);
+    const btn = document.getElementById('vb-prewarm-btn');
+    const orig = btn ? btn.innerHTML : '';
+    const total = keys.length * langs.length;
+    let done = 0, ok = 0, fail = 0;
+    if (!total) { toast('No templates to pre-generate', 'red'); return; }
+    if (btn) btn.disabled = true;
+    toast('Pre-generating ' + total + ' template voices · this runs once and is then stored…', 'green');
+    for (const k of keys) {
+      const body = presets[k] && presets[k].body;
+      if (!body) { continue; }
+      for (const code of langs) {
+        done++;
+        if (btn) btn.textContent = 'Caching ' + done + '/' + total + '…';
+        try {
+          const text = await vbTranslateOne(body, code);
+          const r = await fetch('/api/tts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+          });
+          if (!r.ok) throw new Error('tts ' + r.status);
+          await r.blob();
+          ok++;
+        } catch (e) { fail++; }
+      }
+    }
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    toast('Template voices stored · ' + ok + ' ready' + (fail ? ' · ' + fail + ' failed' : '') + '. Playback is now instant.', fail ? 'amber' : 'green');
+  }
+  window.vbPrewarmVoices = vbPrewarmVoices;
+
   /* NLLB-style language codes the VAANI translation service expects.
      Maps our short UI codes → the model's language identifiers. */
   const VB_NLLB = {
