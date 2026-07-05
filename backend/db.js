@@ -54,7 +54,9 @@ const COLLECTIONS = {
   communications:      { table: 'communications',        kind: 'array', id: (r) => r.id },
   chatThreads:         { table: 'chat_threads',          kind: 'map' },
   onboardingDocuments: { table: 'onboarding_documents',  kind: 'map' },
-  workerCompliance:    { table: 'worker_compliance',     kind: 'map' }
+  workerCompliance:    { table: 'worker_compliance',     kind: 'map' },
+  transportRoster:     { table: 'transport_roster',      kind: 'map' },
+  transportAttendance: { table: 'transport_attendance',  kind: 'map' }
 };
 const META_TABLE = 'store_meta';
 

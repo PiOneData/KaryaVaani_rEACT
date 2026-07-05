@@ -10847,7 +10847,7 @@ function __kvOnReady(fn) {
 
   const TR_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const TR_STATE = { shift: 'morning' };
+  const TR_STATE = { shift: 'morning', weekOffset: 0, date: null, roster: null, attendance: {}, published: false };
 
   function trShiftLabel() { return TR_STATE.shift === 'morning' ? 'Morning shift' : 'General shift'; }
 
@@ -10876,6 +10876,7 @@ function __kvOnReady(fn) {
     trRenderShiftToggle();
     trRenderWeek();
     trRenderRoutes();
+    if (document.getElementById('tr-batch-body')) trRenderBatches();
   }
 
   /* weekly table — every bus runs its own route Mon–Sat; Sat is a
@@ -11002,6 +11003,211 @@ function __kvOnReady(fn) {
     toast('Weekly transport plan exported · ' + trWeekLabel(), 'green');
   }
 
+  /* ════════════════════════════════════════════════════════════════
+     WEEKLY ROSTER · address-based batching · targeted comms · attendance
+     Employees have no home address on the master roster, so we extrapolate a
+     home locality from their code, map it to the matching zone route, and place
+     them on that bus for a pickup + shift. Communications then target each
+     route's batch (not everyone), and attendance is captured per trip — fed by
+     the ID-card provider's API once access is granted (simulated until then).
+     ════════════════════════════════════════════════════════════════ */
+  let TR_ROSTER = null;
+
+  function trHash(s) { let h = 2166136261; s = String(s || ''); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; } return h; }
+
+  /* ISO-week key (e.g. 2026-W27) for a week offset from the current one. */
+  function trWeekKey(offset) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + (offset || 0) * 7);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3);   // Thursday of that ISO week
+    const firstThu = new Date(d.getFullYear(), 0, 4);
+    firstThu.setDate(firstThu.getDate() - ((firstThu.getDay() + 6) % 7) + 3);
+    const week = 1 + Math.round((d - firstThu) / (7 * 864e5));
+    return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+  }
+  function trWeekRangeLabel(offset) {
+    const d = new Date(); d.setDate(d.getDate() + (offset || 0) * 7);
+    const day = d.getDay(); const mon = new Date(d); mon.setDate(d.getDate() - ((day + 6) % 7));
+    const sat = new Date(mon); sat.setDate(mon.getDate() + 5);
+    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return mon.getDate() + ' ' + M[mon.getMonth()] + ' – ' + sat.getDate() + ' ' + M[sat.getMonth()];
+  }
+  function trTodayISO() {
+    const d = TR_STATE.date ? new Date(TR_STATE.date) : new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* extrapolate a worker → home locality → route → pickup → shift → mobile. */
+  function trAssign(w) {
+    if (!TR_ROUTES.length) return null;
+    const h = trHash(w.code || w.name);
+    const route = TR_ROUTES[h % TR_ROUTES.length];
+    const town = (route.route.indexOf('·') !== -1 ? route.route.split('·')[1] : route.zone).trim();
+    const pickups = (route.stops || []).slice(0, -1);     // drop the plant-arrival stop
+    const pickup = pickups.length ? pickups[(h >>> 4) % pickups.length].name : (route.stops[0] && route.stops[0].name) || town;
+    const shift = ((h >>> 9) % 10) < 6 ? 'morning' : 'general';   // ~60% morning
+    const mobile = '9' + String(700000000 + (h % 89999999));
+    return {
+      code: w.code, name: w.name, dept: w.department || '—', desig: w.designation || '',
+      locality: town, route: route.code, routeName: route.route, pickup: pickup,
+      shift: shift, mobile: mobile, board: (route[shift] && route[shift].board) || ''
+    };
+  }
+  function trRoster() {
+    if (TR_ROSTER) return TR_ROSTER;
+    const workers = (window.__KVDATA && window.__KVDATA.omMapping) || (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
+    TR_ROSTER = workers.map(trAssign).filter(Boolean);
+    return TR_ROSTER;
+  }
+  function trBatch(routeCode, shift) { return trRoster().filter(function (a) { return a.route === routeCode && a.shift === shift; }); }
+
+  /* attendance loaded for the selected week+date, keyed by route|shift. */
+  function trLoadAttendance() {
+    const week = trWeekKey(TR_STATE.weekOffset);
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/attendance/' + week + '/' + trTodayISO())
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        TR_STATE.attendance = {};
+        (j && j.rows || []).forEach(function (row) { TR_STATE.attendance[row.route + '|' + row.shift] = row; });
+        TR_STATE.idcardLive = !!(j && j.idcardApiLive);
+        return TR_STATE.attendance;
+      }).catch(function () { TR_STATE.attendance = {}; return {}; });
+  }
+
+  /* the batches table for the selected shift + week. */
+  function trRenderBatches() {
+    const body = document.getElementById('tr-batch-body');
+    if (!body) return;
+    const shift = TR_STATE.shift;
+    const rows = TR_ROUTES.map(function (r) {
+      const batch = trBatch(r.code, shift);
+      const att = TR_STATE.attendance[r.code + '|' + shift];
+      const attCell = att
+        ? '<span class="pill ' + (att.boarded / Math.max(att.total, 1) >= 0.85 ? 'green' : 'amber') + ' tiny">' + att.boarded + '/' + att.total + ' boarded</span>'
+        : '<span class="pill outline tiny">not taken</span>';
+      return '<tr>' +
+        '<td><span class="tr-bus-dot" style="background:' + r.colour + '">' + r.code + '</span> <span class="t-strong">' + r.route + '</span><div class="t-mute">' + r.zone + '</div></td>' +
+        '<td>' + r.stops[0].name.replace(' Bus Stand', '') + '</td>' +
+        '<td style="text-align:center"><span class="t-strong">' + batch.length + '</span> <span class="t-mute">workers</span></td>' +
+        '<td class="mono">' + ((r[shift] && r[shift].board) || '—') + '</td>' +
+        '<td style="text-align:center">' + attCell + '</td>' +
+        '<td style="text-align:right;white-space:nowrap">' +
+          '<button class="btn tiny" onclick="trOpenBatch(\'' + r.code + '\')">View</button> ' +
+          '<button class="btn tiny" onclick="trNotifyBatch(\'' + r.code + '\')" ' + (batch.length ? '' : 'disabled') + '>Notify batch</button> ' +
+          '<button class="btn tiny primary" onclick="trTakeAttendance(\'' + r.code + '\')" ' + (batch.length ? '' : 'disabled') + '>Take attendance</button>' +
+        '</td></tr>';
+    }).join('');
+    body.innerHTML = rows;
+    const total = trRoster().filter(function (a) { return a.shift === shift; }).length;
+    const cnt = document.getElementById('tr-batch-count'); if (cnt) cnt.textContent = total + ' workers · ' + trShiftLabel().toLowerCase();
+    const wl = document.getElementById('tr-roster-week'); if (wl) wl.textContent = trWeekKey(TR_STATE.weekOffset) + ' · ' + trWeekRangeLabel(TR_STATE.weekOffset);
+    const pub = document.getElementById('tr-roster-status');
+    if (pub) pub.innerHTML = TR_STATE.published
+      ? '<span class="pill green tiny">Published</span>'
+      : '<span class="pill amber tiny">Draft — not published</span>';
+  }
+
+  /* drill into one route's batch: the workers, their pickup + boarded status. */
+  function trOpenBatch(code) {
+    const r = TR_ROUTES.find(function (x) { return x.code === code; });
+    const shift = TR_STATE.shift;
+    const batch = trBatch(code, shift);
+    const att = TR_STATE.attendance[code + '|' + shift];
+    const boardedSet = {};
+    if (att) att.records.forEach(function (rec) { boardedSet[rec.code] = rec.boarded; });
+    const rowsHtml = batch.map(function (a) {
+      const status = att
+        ? (boardedSet[a.code] ? '<span class="pill green tiny">Boarded</span>' : '<span class="pill red tiny">Absent</span>')
+        : '<span class="pill outline tiny">—</span>';
+      return '<tr><td class="mono">' + a.code + '</td><td class="t-strong">' + a.name + '</td><td>' + a.dept + '</td>' +
+        '<td>' + a.locality + '</td><td>' + a.pickup + '</td><td class="mono">' + a.mobile + '</td><td style="text-align:center">' + status + '</td></tr>';
+    }).join('');
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">' + r.route + ' · ' + trShiftLabel() + ' · ' + trWeekRangeLabel(TR_STATE.weekOffset) + '</span>' +
+        '<span class="modal-h-title">' + code + ' batch · ' + batch.length + ' workers</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body"><div class="tiny muted" style="margin-bottom:8px">Boards at ' + r.stops[0].name + ' area · departs ' + ((r[shift] && r[shift].board) || '—') + ' · reaches plant ' + ((r[shift] && r[shift].plant) || '—') + '</div>' +
+        '<table class="t"><thead><tr><th>Code</th><th>Name</th><th>Dept</th><th>Locality</th><th>Pickup</th><th>Mobile</th><th style="text-align:center">Today</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Extrapolated home locality → route → pickup</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" onclick="trNotifyBatch(\'' + code + '\')">Notify this batch</button>' +
+        '<button class="btn" onclick="trTakeAttendance(\'' + code + '\')">Take attendance</button></div></div>',
+      1040
+    );
+  }
+
+  /* targeted comm to ONE route batch (not a broadcast to everyone). */
+  function trNotifyBatch(code) {
+    const r = TR_ROUTES.find(function (x) { return x.code === code; });
+    const shift = TR_STATE.shift;
+    const batch = trBatch(code, shift);
+    if (!batch.length) { toast('No workers in this batch', 'red'); return; }
+    const msg = 'Transport ' + r.route + ' (' + shift + ' shift, week ' + trWeekRangeLabel(TR_STATE.weekOffset) + '): your bus ' + code +
+      ' boards at ' + r.stops[0].name + ' area at ' + ((r[shift] && r[shift].board) || '') + ' and reaches the plant by ' + ((r[shift] && r[shift].plant) || '') + '. Be 5 minutes early.';
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/notify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: trWeekKey(TR_STATE.weekOffset), route: code, routeName: r.route, shift: shift, channel: 'whatsapp',
+        recipients: batch.map(function (b) { return { name: b.name, mobile: b.mobile }; }), message: msg,
+        subject: 'Transport · ' + r.route + ' · ' + shift + ' shift' })
+    }).then(function (x) { return x.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) toast('Sent to the ' + code + ' batch only · ' + j.delivered + ' workers (' + shift + ' shift) · logged to comms', 'green');
+        else toast('Notify failed: ' + ((j && j.error) || 'unknown'), 'red');
+      }).catch(function (e) { toast('Notify failed: ' + e.message, 'red'); });
+  }
+
+  /* notify every route batch its OWN targeted message (still per-batch, not one blast). */
+  async function trNotifyAllBatches() {
+    let sent = 0;
+    for (const r of TR_ROUTES) {
+      if (trBatch(r.code, TR_STATE.shift).length) { await trNotifyBatch(r.code); sent++; }
+    }
+    toast('All ' + sent + ' route batches notified — each got its own route + pickup message', 'green');
+  }
+
+  /* capture attendance for a batch. The ID-card provider API will feed this once
+     access is granted; until then we simulate a realistic boarded/absent split. */
+  function trTakeAttendance(code) {
+    const r = TR_ROUTES.find(function (x) { return x.code === code; });
+    const shift = TR_STATE.shift;
+    const batch = trBatch(code, shift);
+    if (!batch.length) { toast('No workers in this batch', 'red'); return; }
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/attendance/scan', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: trWeekKey(TR_STATE.weekOffset), date: trTodayISO(), route: code, shift: shift, simulate: true,
+        codes: batch.map(function (b) { return { code: b.code, name: b.name }; }) })
+    }).then(function (x) { return x.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          toast('ID-card attendance captured · ' + j.boarded + '/' + j.total + ' boarded on ' + code + ' (' + j.source + ')', 'green');
+          return trLoadAttendance().then(trRenderBatches);
+        }
+        toast('Attendance failed: ' + ((j && j.error) || 'unknown'), 'red');
+      }).catch(function (e) { toast('Attendance failed: ' + e.message, 'red'); });
+  }
+
+  /* publish the derived roster for the selected week so it's the record of truth. */
+  function trPublishRoster() {
+    const week = trWeekKey(TR_STATE.weekOffset);
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/roster', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: week, generatedBy: (window.__KVUSER && window.__KVUSER.name) || 'HR', assignments: trRoster() })
+    }).then(function (x) { return x.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) { TR_STATE.published = true; trRenderBatches(); toast('Roster published for ' + week + ' · ' + j.count + ' workers batched across ' + TR_ROUTES.length + ' routes', 'green'); }
+        else toast('Publish failed: ' + ((j && j.error) || 'unknown'), 'red');
+      }).catch(function (e) { toast('Publish failed: ' + e.message, 'red'); });
+  }
+
+  function trSetWeek(offset) {
+    TR_STATE.weekOffset = parseInt(offset, 10) || 0;
+    TR_STATE.published = false;
+    // is this week already published?
+    fetch((window.__KV_API_BASE || '') + '/api/transport/roster/' + trWeekKey(TR_STATE.weekOffset))
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { TR_STATE.published = !!(j && j.roster); trRenderBatches(); }).catch(function () {});
+    trLoadAttendance().then(trRenderBatches);
+  }
+  function trSetDate(v) { TR_STATE.date = v; trLoadAttendance().then(trRenderBatches); }
+
   function initTr() {
     if (!document.getElementById('tr-week-table')) return;
     document.getElementById('tr-kpi-pickups').textContent = trPickupCount();
@@ -11011,9 +11217,22 @@ function __kvOnReady(fn) {
     trRenderWeek();
     trRenderRoutes();
     const note = document.getElementById('tr-shift-note');
-    if (note) note.innerHTML = '<strong>Plan note.</strong> Each of the five buses runs a fixed zone route for the whole week. Morning-shift buses board first and reach the plant by 06:45; general-shift buses board two hours later. The evening drop leaves the plant at 15:45. Saturday runs a reduced plan — Routes 3 and 5 are stood down for lighter weekend demand.';
+    if (note) note.innerHTML = '<strong>Plan note.</strong> Each bus runs a fixed zone route for the whole week. Morning-shift buses board first and reach the plant by 06:45; general-shift buses board two hours later. The evening drop leaves the plant at 15:45. Saturday runs a reduced plan — Routes 3 and 5 are stood down for lighter weekend demand.';
     const sub = document.getElementById('tr-shift-sub');
     if (sub) sub.textContent = 'Which bus runs which route, by day — showing ' + trShiftLabel().toLowerCase() + ' departures';
+
+    // ── weekly roster · batches · attendance ──
+    if (document.getElementById('tr-batch-body')) {
+      if (!TR_STATE.date) TR_STATE.date = trTodayISO();
+      const dsel = document.getElementById('tr-att-date'); if (dsel && !dsel.value) dsel.value = trTodayISO();
+      const wsel = document.getElementById('tr-week-sel'); if (wsel) wsel.value = String(TR_STATE.weekOffset);
+      const kb = document.getElementById('tr-kpi-batched'); if (kb) kb.textContent = trRoster().length;
+      // reflect published status for the current week, then paint the batches
+      fetch((window.__KV_API_BASE || '') + '/api/transport/roster/' + trWeekKey(TR_STATE.weekOffset))
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) { TR_STATE.published = !!(j && j.roster); trRenderBatches(); }).catch(function () {});
+      trLoadAttendance().then(trRenderBatches);
+    }
   }
   __kvOnReady(initTr);
 

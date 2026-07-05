@@ -34,9 +34,11 @@ app.get('/api/bootstrap', (req, res) => {
   // Exclude the big/growing collections from the bundle every client loads —
   // documents are fetched per worker (/api/onboarding-documents) and the
   // communication log via /api/communications.
-  // never ship documents / voice audio (base64), the comms log, or the users
-  // table (password hashes) to the browser — those are fetched via their own routes.
-  const { onboardingDocuments, communications, users, voiceCache, ...rest } = s.data;
+  // never ship documents / voice audio (base64), the comms log, the users table
+  // (password hashes), or the per-week transport roster/attendance to the
+  // browser — those are fetched via their own routes.
+  const { onboardingDocuments, communications, users, voiceCache,
+          transportRoster, transportAttendance, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -688,6 +690,103 @@ app.get('/api/whatsapp/messages', async (req, res) => {
   } catch (err) {
     res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
   }
+});
+
+/* ── Transport: weekly roster · targeted batch comms · ID-card attendance ────
+   Employees are batched by route (derived from their home locality) for a given
+   week and shift. Transport communications go to the specific route batch — not
+   a broadcast to everyone. Attendance is captured per trip; the live feed will
+   come from the ID-card provider's API (access pending) — until then a scan can
+   be simulated so the workflow is complete end to end.
+   ──────────────────────────────────────────────────────────────────────── */
+const IDCARD_API_URL = process.env.IDCARD_API_URL || ''; // set when the provider API is live
+
+/* GET the published roster for a week (or null). */
+app.get('/api/transport/roster/:week', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const roster = (store.data.transportRoster || {})[req.params.week] || null;
+  res.json({ ok: true, week: req.params.week, roster });
+});
+
+/* Publish/replace the roster for a week. Body: { week, assignments:[...], generatedBy }.
+   Each assignment: { code, name, dept, locality, route, routeName, pickup, shift, mobile }. */
+app.post('/api/transport/roster', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const { week, assignments, generatedBy } = req.body || {};
+  if (!week || !Array.isArray(assignments)) return res.status(400).json({ ok: false, error: 'week and assignments[] are required.' });
+  store.data.transportRoster = store.data.transportRoster || {};
+  const rec = { week, generatedBy: generatedBy || 'HR', generatedAt: new Date().toISOString(), count: assignments.length, assignments };
+  store.data.transportRoster[week] = rec;
+  dbPut('transportRoster', week, rec);
+  res.json({ ok: true, week, count: assignments.length });
+});
+
+/* Send a transport communication to ONE route's batch (targeted, not everyone).
+   Logs the send to the comms trail so analytics reflect the targeted delivery.
+   Body: { week, route, routeName, shift, channel, recipients:[{name,mobile}], message } */
+app.post('/api/transport/notify', (req, res) => {
+  const { week, route, routeName, shift, channel, recipients, message, subject } = req.body || {};
+  if (!route || !Array.isArray(recipients) || !recipients.length) {
+    return res.status(400).json({ ok: false, error: 'route and recipients[] are required.' });
+  }
+  const ch = channel === 'email' ? 'email' : 'whatsapp';
+  const to = recipients.slice(0, 50).map((r) => r.mobile || r.name).filter(Boolean);
+  logComm({
+    channel: ch, to, recipients: recipients.length,
+    subject: subject || ('Transport · ' + (routeName || route) + ' · ' + (shift || '') + ' shift'),
+    preview: String(message || '').slice(0, 140),
+    status: 'mock', targeted: true, route, routeName, shift, week
+  });
+  res.json({ ok: true, channel: ch, route, shift, delivered: recipients.length });
+});
+
+/* Deterministic boarding simulation for the pending ID-card feed. */
+function simulateBoarded(code, date) {
+  const n = parseInt(crypto.createHash('md5').update(String(code) + '|' + String(date)).digest('hex').slice(0, 8), 16);
+  return (n % 100) < 88; // ~88% board on any given day
+}
+
+/* Record attendance for a trip. With the ID-card provider API live this would be
+   fed by their scan webhook; until then pass { simulate:true } to generate a
+   realistic boarded/absent split from the batch. Body:
+   { week, date, route, shift, codes:[...] , simulate } or { records:[{code,boarded}] } */
+app.post('/api/transport/attendance/scan', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const { week, date, route, shift, codes, records, simulate } = req.body || {};
+  if (!date || !route || !shift) return res.status(400).json({ ok: false, error: 'date, route and shift are required.' });
+  const nowIso = new Date().toISOString();
+  let recs;
+  if (Array.isArray(records)) {
+    recs = records.map((r) => ({ code: r.code, name: r.name, boarded: !!r.boarded, at: r.boarded ? nowIso : null }));
+  } else if (simulate && Array.isArray(codes)) {
+    recs = codes.map((c) => {
+      const code = c.code || c;
+      const boarded = simulateBoarded(code, date);
+      return { code, name: c.name, boarded, at: boarded ? nowIso : null };
+    });
+  } else {
+    return res.status(400).json({ ok: false, error: 'Provide records[] or simulate:true with codes[].' });
+  }
+  const key = [week || '', date, route, shift].join('|');
+  const boarded = recs.filter((r) => r.boarded).length;
+  const rec = { key, week, date, route, shift, source: IDCARD_API_URL ? 'id-card-api' : 'simulated', scannedAt: nowIso, total: recs.length, boarded, records: recs };
+  store.data.transportAttendance = store.data.transportAttendance || {};
+  store.data.transportAttendance[key] = rec;
+  dbPut('transportAttendance', key, rec);
+  res.json({ ok: true, key, total: recs.length, boarded, absent: recs.length - boarded, source: rec.source });
+});
+
+/* GET all attendance rows for a week+date (across routes/shifts). */
+app.get('/api/transport/attendance/:week/:date', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const all = store.data.transportAttendance || {};
+  const prefix = (req.params.week || '') + '|' + req.params.date + '|';
+  const rows = Object.keys(all).filter((k) => k.indexOf(prefix) === 0).map((k) => all[k]);
+  res.json({ ok: true, week: req.params.week, date: req.params.date, rows, idcardApiLive: !!IDCARD_API_URL });
 });
 
 /* ── Role-based login ──────────────────────────────────────────────────────
