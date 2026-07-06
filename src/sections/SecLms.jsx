@@ -26,6 +26,10 @@ export default function SecLms() {
         </div>
         {' '}
         <div className="page-h-right">
+          <button className="btn" onClick={(event) => { window.kcDownloadAllDocx() }} data-onclick="kcDownloadAllDocx()" title="Download every Knowledge Center document as Word files in one ZIP">
+            ⤓ All documents (.zip)
+          </button>
+          {' '}
           <button className="btn">SCORM upload</button>
           {' '}
           <button className="btn primary">+ New track</button>

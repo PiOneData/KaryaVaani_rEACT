@@ -5,10 +5,14 @@
 const fs = require('fs');
 const path = require('path');
 const HTMLtoDOCX = require('html-to-docx');
+const JSZip = require('jszip');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = path.join(ROOT, 'public', 'legacy', 'knowledge-docs.json');
 const OUT = path.join(ROOT, 'public', 'legacy', 'docs');
+const ZIP = path.join(OUT, 'knowledge-center-documents.zip');
+
+function slug(s) { return String(s || '').replace(/&amp;/g, 'and').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, ''); }
 
 const CAT = { policies: 'Policies', training: 'Training materials', notices: 'Notices', transport: 'Transport' };
 
@@ -44,11 +48,18 @@ function docHtml(d) {
   const docs = JSON.parse(fs.readFileSync(SRC, 'utf8'));
   fs.mkdirSync(OUT, { recursive: true });
   const opts = { orientation: 'portrait', margins: { top: 1000, right: 1000, bottom: 1000, left: 1000 }, table: { row: { cantSplit: true } }, footer: false, pageNumber: false };
+  const zip = new JSZip();
   let n = 0;
   for (const d of docs) {
     const buffer = await HTMLtoDOCX(docHtml(d), null, opts);
     fs.writeFileSync(path.join(OUT, d.id + '.docx'), buffer);
+    // add to the bundle under a per-module folder with a readable filename
+    const folder = CAT[d.cat] || d.cat;
+    zip.file(folder + '/' + slug(d.title) + '.docx', buffer);
     n++;
   }
+  const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  fs.writeFileSync(ZIP, zipBuf);
   console.log('[docx] wrote ' + n + ' documents to public/legacy/docs/');
+  console.log('[docx] bundled ' + (zipBuf.length / 1024).toFixed(0) + ' KB → ' + path.basename(ZIP));
 })().catch((e) => { console.error('[docx] failed:', e.message); process.exit(1); });

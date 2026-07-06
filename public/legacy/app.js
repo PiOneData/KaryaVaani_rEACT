@@ -4916,11 +4916,22 @@ function __kvOnReady(fn) {
     if (!d) return;
     const a = document.createElement('a');
     a.href = '/legacy/docs/' + docId + '.docx';
-    a.download = String(d.title || docId).replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') + '.docx';
+    a.download = String(d.title || docId).replace(/&amp;/g, 'and').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') + '.docx';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     toast('Downloading “' + d.title + '” (.docx)', 'green');
   }
   window.kcDownloadDocx = kcDownloadDocx;
+
+  /* download every document as Word files bundled in one ZIP (grouped by module),
+     served from the repo at /legacy/docs/knowledge-center-documents.zip. */
+  function kcDownloadAllDocx() {
+    const a = document.createElement('a');
+    a.href = '/legacy/docs/knowledge-center-documents.zip';
+    a.download = 'Karya-Vaani-Knowledge-Center-Documents.zip';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('Downloading all documents (.zip)', 'green');
+  }
+  window.kcDownloadAllDocx = kcDownloadAllDocx;
 
   function initKc() {
     if (!document.getElementById('kc-cats')) return;
