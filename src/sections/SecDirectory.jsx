@@ -137,6 +137,9 @@ export default function SecDirectory() {
           </div>
           <span className="pill outline" id="ob-count">—</span>
         </div>
+        <div className="dir-controls" style={{ marginBottom: "10px" }}>
+          <input type="text" className="input" id="ob-search" autoComplete="off" placeholder="Search ID, name, type, category, contractor, status…" style={{ maxWidth: "380px" }} />
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table className="t" id="ob-grid">
             <thead>
@@ -155,6 +158,7 @@ export default function SecDirectory() {
             <tbody id="ob-grid-body" />
           </table>
         </div>
+        <div id="ob-pagination" className="om-pagination" />
         <div id="ob-noresults" className="wk-noresults">
           No workers onboarded yet — capture a profile in Onboarding (Operational Pillars).
         </div>

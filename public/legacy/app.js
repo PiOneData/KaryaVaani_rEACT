@@ -109,6 +109,79 @@ function __kvOnReady(fn) {
   }
   window.kvApplyRole = kvApplyRole;
 
+  /* ── reusable data table: client-side search + pagination for ANY table ─────
+     Call KVTABLE.set({...}) from a render function with the full row set. It
+     filters on the search box (id "<key>-search"), paginates, paints the tbody,
+     updates the count element and the pager (id "<key>-pagination"), reusing the
+     shared .om-pg* pagination styles. cfg:
+       key      unique id prefix (search box = key-search, pager = key-pagination)
+       tbody    tbody element id
+       rows     full array of items
+       row(it)  -> <tr> html
+       text(it) -> searchable string (relevant fields of that row)
+       count    (optional) element id to show the filtered total
+       noun     (optional) label after the count, e.g. 'non-compliant'
+       pageSize (default 12), cols (colspan for the empty row), empty (message)   */
+  const KVTABLE = (function () {
+    const reg = {};
+    function wire(key) {
+      const c = reg[key];
+      const si = document.getElementById(key + '-search');
+      if (si && si.__kvKey !== key) {
+        si.__kvKey = key;
+        si.addEventListener('input', function () { c.query = si.value; c.page = 1; paint(key); });
+      }
+    }
+    function set(cfg) {
+      const c = reg[cfg.key] = Object.assign({ page: 1, query: '' }, reg[cfg.key], cfg);
+      wire(cfg.key);
+      const si = document.getElementById(cfg.key + '-search');
+      if (si) c.query = si.value || '';
+      paint(cfg.key);
+    }
+    function paint(key) {
+      const c = reg[key]; if (!c) return;
+      const tb = document.getElementById(c.tbody); if (!tb) return;
+      const size = c.pageSize || 12;
+      let rows = c.rows || [];
+      const q = (c.query || '').trim().toLowerCase();
+      if (q && c.text) rows = rows.filter(function (it) { return String(c.text(it) || '').toLowerCase().indexOf(q) !== -1; });
+      const pages = Math.max(1, Math.ceil(rows.length / size));
+      if (c.page > pages) c.page = pages;
+      if (c.page < 1) c.page = 1;
+      const start = (c.page - 1) * size;
+      const slice = rows.slice(start, start + size);
+      tb.innerHTML = slice.length
+        ? slice.map(c.row).join('')
+        : '<tr><td colspan="' + (c.cols || 8) + '" class="tiny muted" style="text-align:center;padding:16px">' + (c.empty || (q ? 'No matches for “' + c.query + '”' : 'No records')) + '</td></tr>';
+      const cntEl = document.getElementById(c.count || (key + '-count'));
+      if (cntEl) cntEl.textContent = rows.length + (c.noun ? ' ' + c.noun : '');
+      pager(key, rows.length, pages, start, slice.length);
+    }
+    function pager(key, total, pages, start, shown) {
+      const c = reg[key];
+      const host = document.getElementById(c.pager || (key + '-pagination'));
+      if (!host) return;
+      if (pages <= 1) { host.innerHTML = ''; return; }
+      let nums = '', lo = Math.max(1, c.page - 2), hi = Math.min(pages, c.page + 2);
+      if (c.page <= 3) hi = Math.min(pages, 5);
+      if (c.page >= pages - 2) lo = Math.max(1, pages - 4);
+      if (lo > 1) { nums += '<button class="om-pg-num" onclick="KVTABLE.go(\'' + key + '\',1)">1</button>'; if (lo > 2) nums += '<span class="om-pg-gap">…</span>'; }
+      for (let p = lo; p <= hi; p++) nums += '<button class="om-pg-num' + (p === c.page ? ' on' : '') + '" onclick="KVTABLE.go(\'' + key + '\',' + p + ')">' + p + '</button>';
+      if (hi < pages) { if (hi < pages - 1) nums += '<span class="om-pg-gap">…</span>'; nums += '<button class="om-pg-num" onclick="KVTABLE.go(\'' + key + '\',' + pages + ')">' + pages + '</button>'; }
+      host.innerHTML =
+        '<div class="om-pg-info">Showing ' + (start + 1) + '–' + (start + shown) + ' of ' + total + ' · page ' + c.page + ' of ' + pages + '</div>' +
+        '<div class="om-pg-btns">' +
+          '<button class="om-pg-btn" ' + (c.page <= 1 ? 'disabled' : '') + ' onclick="KVTABLE.go(\'' + key + '\',' + (c.page - 1) + ')">‹ Prev</button>' +
+          nums +
+          '<button class="om-pg-btn" ' + (c.page >= pages ? 'disabled' : '') + ' onclick="KVTABLE.go(\'' + key + '\',' + (c.page + 1) + ')">Next ›</button>' +
+        '</div>';
+    }
+    function go(key, p) { const c = reg[key]; if (c) { c.page = p; paint(key); } }
+    return { set: set, go: go, paint: paint };
+  })();
+  window.KVTABLE = KVTABLE;
+
   /* ── inline tabs (used in onboarding) ── */
   function subTab(evt, group, name) {
     const tabs = evt.target.parentElement.querySelectorAll('.tab');
@@ -11075,28 +11148,31 @@ function __kvOnReady(fn) {
 
   /* the batches table for the selected shift + week. */
   function trRenderBatches() {
-    const body = document.getElementById('tr-batch-body');
-    if (!body) return;
+    if (!document.getElementById('tr-batch-body')) return;
     const shift = TR_STATE.shift;
-    const rows = TR_ROUTES.map(function (r) {
-      const batch = trBatch(r.code, shift);
-      const att = TR_STATE.attendance[r.code + '|' + shift];
-      const attCell = att
-        ? '<span class="pill ' + (att.boarded / Math.max(att.total, 1) >= 0.85 ? 'green' : 'amber') + ' tiny">' + att.boarded + '/' + att.total + ' boarded</span>'
-        : '<span class="pill outline tiny">not taken</span>';
-      return '<tr>' +
-        '<td><span class="tr-bus-dot" style="background:' + r.colour + '">' + r.code + '</span> <span class="t-strong">' + r.route + '</span><div class="t-mute">' + r.zone + '</div></td>' +
-        '<td>' + r.stops[0].name.replace(' Bus Stand', '') + '</td>' +
-        '<td style="text-align:center"><span class="t-strong">' + batch.length + '</span> <span class="t-mute">workers</span></td>' +
-        '<td class="mono">' + ((r[shift] && r[shift].board) || '—') + '</td>' +
-        '<td style="text-align:center">' + attCell + '</td>' +
-        '<td style="text-align:right;white-space:nowrap">' +
-          '<button class="btn tiny" onclick="trOpenBatch(\'' + r.code + '\')">View</button> ' +
-          '<button class="btn tiny" onclick="trNotifyBatch(\'' + r.code + '\')" ' + (batch.length ? '' : 'disabled') + '>Notify batch</button> ' +
-          '<button class="btn tiny primary" onclick="trTakeAttendance(\'' + r.code + '\')" ' + (batch.length ? '' : 'disabled') + '>Take attendance</button>' +
-        '</td></tr>';
-    }).join('');
-    body.innerHTML = rows;
+    KVTABLE.set({
+      key: 'tr-batch', tbody: 'tr-batch-body', count: '__tr_none__', pageSize: 12, cols: 6,
+      rows: TR_ROUTES.slice(),
+      text: function (r) { return r.code + ' ' + r.route + ' ' + r.zone + ' ' + r.stops[0].name; },
+      row: function (r) {
+        const batch = trBatch(r.code, shift);
+        const att = TR_STATE.attendance[r.code + '|' + shift];
+        const attCell = att
+          ? '<span class="pill ' + (att.boarded / Math.max(att.total, 1) >= 0.85 ? 'green' : 'amber') + ' tiny">' + att.boarded + '/' + att.total + ' boarded</span>'
+          : '<span class="pill outline tiny">not taken</span>';
+        return '<tr>' +
+          '<td><span class="tr-bus-dot" style="background:' + r.colour + '">' + r.code + '</span> <span class="t-strong">' + r.route + '</span><div class="t-mute">' + r.zone + '</div></td>' +
+          '<td>' + r.stops[0].name.replace(' Bus Stand', '') + '</td>' +
+          '<td style="text-align:center"><span class="t-strong">' + batch.length + '</span> <span class="t-mute">workers</span></td>' +
+          '<td class="mono">' + ((r[shift] && r[shift].board) || '—') + '</td>' +
+          '<td style="text-align:center">' + attCell + '</td>' +
+          '<td style="text-align:right;white-space:nowrap">' +
+            '<button class="btn tiny" onclick="trOpenBatch(\'' + r.code + '\')">View</button> ' +
+            '<button class="btn tiny" onclick="trNotifyBatch(\'' + r.code + '\')" ' + (batch.length ? '' : 'disabled') + '>Notify batch</button> ' +
+            '<button class="btn tiny primary" onclick="trTakeAttendance(\'' + r.code + '\')" ' + (batch.length ? '' : 'disabled') + '>Take attendance</button>' +
+          '</td></tr>';
+      }
+    });
     const total = trRoster().filter(function (a) { return a.shift === shift; }).length;
     const cnt = document.getElementById('tr-batch-count'); if (cnt) cnt.textContent = total + ' workers · ' + trShiftLabel().toLowerCase();
     const wl = document.getElementById('tr-roster-week'); if (wl) wl.textContent = trWeekKey(TR_STATE.weekOffset) + ' · ' + trWeekRangeLabel(TR_STATE.weekOffset);
@@ -14090,23 +14166,25 @@ function __kvOnReady(fn) {
     }
 
     /* at-risk table */
-    const tb = document.getElementById('exp-table-body');
-    if (tb) {
-      tb.innerHTML = rows.map(function (r) {
-        const wd = expWorstDim(r.c);
-        const col = expColor(r.c.score);
-        return '<tr style="cursor:pointer" onclick="ctOpenContractor(\'' + r.c.id + '\')" title="Open contractor · workers drilldown">' +
-          '<td class="t-strong">' + r.c.name + '</td>' +
-          '<td>' + (r.c.area || '—') + '</td>' +
-          '<td>' + (r.c.deployed || 0) + '</td>' +
-          '<td><span class="mono" style="color:' + col + '">' + r.c.score + '</span> ' + expBar(r.c.score, col, 56) + '</td>' +
-          '<td><span class="pill ' + expBand(wd.value) + ' tiny">' + wd.label + ' ' + wd.value + '</span></td>' +
-          '<td class="mono">' + expL(r.e.mid) + '</td>' +
-        '</tr>';
-      }).join('');
+    if (document.getElementById('exp-table-body')) {
+      KVTABLE.set({
+        key: 'exp', tbody: 'exp-table-body', count: 'exp-table-count', noun: 'contractors',
+        pageSize: 10, cols: 6, rows: rows,
+        text: function (r) { return r.c.name + ' ' + (r.c.area || '') + ' ' + r.c.score + ' ' + (expWorstDim(r.c).label || ''); },
+        row: function (r) {
+          const wd = expWorstDim(r.c);
+          const col = expColor(r.c.score);
+          return '<tr style="cursor:pointer" onclick="ctOpenContractor(\'' + r.c.id + '\')" title="Open contractor · workers drilldown">' +
+            '<td class="t-strong">' + r.c.name + '</td>' +
+            '<td>' + (r.c.area || '—') + '</td>' +
+            '<td>' + (r.c.deployed || 0) + '</td>' +
+            '<td><span class="mono" style="color:' + col + '">' + r.c.score + '</span> ' + expBar(r.c.score, col, 56) + '</td>' +
+            '<td><span class="pill ' + expBand(wd.value) + ' tiny">' + wd.label + ' ' + wd.value + '</span></td>' +
+            '<td class="mono">' + expL(r.e.mid) + '</td>' +
+          '</tr>';
+        }
+      });
     }
-    const cnt = document.getElementById('exp-table-count');
-    if (cnt) cnt.textContent = cs.length + ' contractors';
 
     // employee-level compliance % by department (OM workforce)
     if (typeof omExpDeptRender === 'function') omExpDeptRender();
@@ -15001,25 +15079,30 @@ function __kvOnReady(fn) {
     const body = document.getElementById('ob-grid-body');
     if (!body) return;
     const list = CAP_STATE.recent || [];
-    const cnt = document.getElementById('ob-count'); if (cnt) cnt.textContent = list.length + ' onboarded';
     const nr = document.getElementById('ob-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
-    body.innerHTML = list.map(function (r, i) {
-      const c = obWorkerCompliance(r);
-      const link = (r.type === 'contract' && r.employment && r.employment.contractor)
-        ? '<span class="cap-recent-link" onclick="event.stopPropagation();ctOpenContractorByName(\'' + (r.employment.contractor).replace(/'/g, "\\'") + '\')">' + r.employment.contractor + '</span>'
-        : ((r.employment && r.employment.posId) ? r.employment.posId : '—');
-      return '<tr style="cursor:pointer" onclick="obOpenCapture(' + i + ')">' +
-        '<td class="t-strong">' + r.id + '</td><td>' + r.name + '</td>' +
-        '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
-        '<td>' + (r.category || '—') + '</td><td>' + link + '</td>' +
-        '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
-        '<td>' + (r.status === 'confirmed' ? '<span class="pill green tiny">Confirmed</span>' : '<span class="pill amber tiny">Awaiting</span>') + '</td>' +
-        '<td><span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
-        '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
-          '<button class="btn" onclick="obEditCapture(' + i + ')">Edit</button> ' +
-          '<button class="btn danger" onclick="obDeleteCapture(' + i + ')">Delete</button></td>' +
-      '</tr>';
-    }).join('');
+    KVTABLE.set({
+      key: 'ob', tbody: 'ob-grid-body', count: 'ob-count', noun: 'onboarded',
+      pageSize: 12, cols: 9, rows: list.map(function (r, i) { return { r: r, i: i }; }),
+      text: function (x) { return (x.r.id || '') + ' ' + (x.r.name || '') + ' ' + (x.r.type || '') + ' ' + (x.r.category || '') + ' ' + ((x.r.employment && x.r.employment.contractor) || '') + ' ' + (x.r.status || ''); },
+      row: function (x) {
+        const r = x.r, i = x.i;
+        const c = obWorkerCompliance(r);
+        const link = (r.type === 'contract' && r.employment && r.employment.contractor)
+          ? '<span class="cap-recent-link" onclick="event.stopPropagation();ctOpenContractorByName(\'' + (r.employment.contractor).replace(/'/g, "\\'") + '\')">' + r.employment.contractor + '</span>'
+          : ((r.employment && r.employment.posId) ? r.employment.posId : '—');
+        return '<tr style="cursor:pointer" onclick="obOpenCapture(' + i + ')">' +
+          '<td class="t-strong">' + r.id + '</td><td>' + r.name + '</td>' +
+          '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
+          '<td>' + (r.category || '—') + '</td><td>' + link + '</td>' +
+          '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+          '<td>' + (r.status === 'confirmed' ? '<span class="pill green tiny">Confirmed</span>' : '<span class="pill amber tiny">Awaiting</span>') + '</td>' +
+          '<td><span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
+          '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
+            '<button class="btn" onclick="obEditCapture(' + i + ')">Edit</button> ' +
+            '<button class="btn danger" onclick="obDeleteCapture(' + i + ')">Delete</button></td>' +
+        '</tr>';
+      }
+    });
   }
 
   /* delete a captured worker (DB + session) */
@@ -15216,15 +15299,19 @@ function __kvOnReady(fn) {
       const rows = cs.map(function (c, i) { return { c: c, r: roster[i] }; })
         .filter(function (x) { return x.c.status !== 'compliant'; })
         .sort(function (a, b) { return a.c.score - b.c.score; });
-      tb.innerHTML = rows.map(function (x) {
-        const fails = x.c.failing.map(function (f) { return f.label; }).join(', ');
-        return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + x.r.code + '\')">' +
-          '<td class="t-strong">' + x.r.name + '</td><td>' + x.r.code + '</td><td>' + x.r.dept + '</td>' +
-          '<td><span class="mono" style="color:' + omComplyColor(x.c.score) + '">' + x.c.score + '</span></td>' +
-          '<td class="tiny">' + fails + '</td>' +
-          '<td style="text-align:right"><button class="btn amber" onclick="event.stopPropagation();omOpenNotify(\'' + x.r.code + '\')">Notify</button></td></tr>';
-      }).join('');
-      const cnt = document.getElementById('wfc-table-count'); if (cnt) cnt.textContent = rows.length + ' non-compliant';
+      KVTABLE.set({
+        key: 'wfc', tbody: 'wfc-table-body', count: 'wfc-table-count', noun: 'non-compliant',
+        pageSize: 10, cols: 6, rows: rows,
+        text: function (x) { return x.r.name + ' ' + x.r.code + ' ' + x.r.dept + ' ' + x.c.score + ' ' + x.c.failing.map(function (f) { return f.label; }).join(' '); },
+        row: function (x) {
+          const fails = x.c.failing.map(function (f) { return f.label; }).join(', ');
+          return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + x.r.code + '\')">' +
+            '<td class="t-strong">' + x.r.name + '</td><td>' + x.r.code + '</td><td>' + x.r.dept + '</td>' +
+            '<td><span class="mono" style="color:' + omComplyColor(x.c.score) + '">' + x.c.score + '</span></td>' +
+            '<td class="tiny">' + fails + '</td>' +
+            '<td style="text-align:right"><button class="btn amber" onclick="event.stopPropagation();omOpenNotify(\'' + x.r.code + '\')">Notify</button></td></tr>';
+        }
+      });
     }
   }
   __kvOnReady(initWorkforceCompliance);
@@ -15288,20 +15375,25 @@ function __kvOnReady(fn) {
         '<div class="bar"><span style="width:' + Math.round(byDay[d] / maxDay * 100) + '%;background:var(--indigo)"></span></div></div>';
     }).join('');
 
-    // recent log (newest first)
-    const tb = document.getElementById('comm-log-body');
-    if (tb) tb.innerHTML = list.slice().reverse().slice(0, 40).map(function (x) {
-      const to = Array.isArray(x.to) ? (x.to.length > 1 ? x.to[0] + ' +' + (x.to.length - 1) : (x.to[0] || '—')) : (x.to || '—');
-      const statusCls = x.status === 'sent' ? 'green' : x.status === 'mock' ? 'amber' : 'red';
-      const desc = x.subject || x.template || x.preview || '—';
-      const when = x.at ? new Date(x.at).toLocaleString('en-IN') : '—';
-      return '<tr><td class="tiny">' + when + '</td>' +
-        '<td><span class="pill ' + (x.channel === 'email' ? 'blue' : 'green') + ' tiny">' + (x.channel || '—') + '</span></td>' +
-        '<td class="tiny">' + to + (x.recipients > 1 ? ' <span class="muted">(' + x.recipients + ')</span>' : '') + '</td>' +
-        '<td class="tiny">' + String(desc).slice(0, 70) + '</td>' +
-        '<td><span class="pill ' + statusCls + ' tiny">' + (x.status || '—') + '</span></td></tr>';
-    }).join('');
-    const cc = document.getElementById('comm-log-count'); if (cc) cc.textContent = total + ' logged';
+    // recent log (newest first) — searchable + paginated
+    if (document.getElementById('comm-log-body')) {
+      KVTABLE.set({
+        key: 'comm', tbody: 'comm-log-body', count: 'comm-log-count', noun: 'logged',
+        pageSize: 12, cols: 5, rows: list.slice().reverse(),
+        text: function (x) { return (x.channel || '') + ' ' + (Array.isArray(x.to) ? x.to.join(' ') : (x.to || '')) + ' ' + (x.subject || x.template || x.preview || '') + ' ' + (x.status || ''); },
+        row: function (x) {
+          const to = Array.isArray(x.to) ? (x.to.length > 1 ? x.to[0] + ' +' + (x.to.length - 1) : (x.to[0] || '—')) : (x.to || '—');
+          const statusCls = x.status === 'sent' ? 'green' : x.status === 'mock' ? 'amber' : 'red';
+          const desc = x.subject || x.template || x.preview || '—';
+          const when = x.at ? new Date(x.at).toLocaleString('en-IN') : '—';
+          return '<tr><td class="tiny">' + when + '</td>' +
+            '<td><span class="pill ' + (x.channel === 'email' ? 'blue' : 'green') + ' tiny">' + (x.channel || '—') + '</span></td>' +
+            '<td class="tiny">' + to + (x.recipients > 1 ? ' <span class="muted">(' + x.recipients + ')</span>' : '') + '</td>' +
+            '<td class="tiny">' + String(desc).slice(0, 70) + '</td>' +
+            '<td><span class="pill ' + statusCls + ' tiny">' + (x.status || '—') + '</span></td></tr>';
+        }
+      });
+    }
   }
   __kvOnReady(initCommsAnalytics);
 

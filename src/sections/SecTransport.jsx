@@ -113,6 +113,10 @@ export default function SecTransport() {
           </span>
         </div>
         {' '}
+        <div className="dir-controls" style={{ marginBottom: "10px" }}>
+          <input type="text" className="input" id="tr-batch-search" autoComplete="off" placeholder="Search route, bus, town, zone…" style={{ maxWidth: "340px" }} />
+        </div>
+        {' '}
         <div style={{ overflowX: "auto" }}>
           <table className="t" id="tr-batch-table">
             <thead>
@@ -128,6 +132,7 @@ export default function SecTransport() {
             <tbody id="tr-batch-body" />
           </table>
         </div>
+        <div id="tr-batch-pagination" className="om-pagination" />
       </div>
       {' '}
       {/*  weekly plan (which bus runs which route, by day)  */}

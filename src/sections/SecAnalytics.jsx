@@ -92,12 +92,16 @@ export default function SecAnalytics() {
             </div>
             <span className="pill outline" id="wfc-table-count">—</span>
           </div>
+          <div className="dir-controls" style={{ marginBottom: "10px" }}>
+            <input type="text" className="input" id="wfc-search" autoComplete="off" placeholder="Search name, code, department, failing item…" style={{ maxWidth: "360px" }} />
+          </div>
           <table className="t" id="wfc-table">
             <thead>
               <tr><th>Name</th><th>Code</th><th>Department</th><th>Score</th><th>Failing items</th><th></th></tr>
             </thead>
             <tbody id="wfc-table-body" />
           </table>
+          <div id="wfc-pagination" className="om-pagination" />
         </div>
       </div>
       {' '}
@@ -158,6 +162,9 @@ export default function SecAnalytics() {
             </div>
             <span className="pill outline" id="exp-table-count">—</span>
           </div>
+          <div className="dir-controls" style={{ marginBottom: "10px" }}>
+            <input type="text" className="input" id="exp-search" autoComplete="off" placeholder="Search contractor, area, weakest dimension…" style={{ maxWidth: "360px" }} />
+          </div>
           <table className="t" id="exp-table">
             <thead>
               <tr>
@@ -171,6 +178,7 @@ export default function SecAnalytics() {
             </thead>
             <tbody id="exp-table-body" />
           </table>
+          <div id="exp-pagination" className="om-pagination" />
         </div>
         {' '}
         {/* compliance % by department → employee-level drilldown */}
@@ -269,12 +277,16 @@ export default function SecAnalytics() {
             </div>
             <span className="pill outline" id="comm-log-count">—</span>
           </div>
+          <div className="dir-controls" style={{ marginBottom: "10px" }}>
+            <input type="text" className="input" id="comm-search" autoComplete="off" placeholder="Search channel, recipient, subject, status…" style={{ maxWidth: "360px" }} />
+          </div>
           <table className="t" id="comm-log">
             <thead>
               <tr><th>Time</th><th>Channel</th><th>To</th><th>Subject / message</th><th>Status</th></tr>
             </thead>
             <tbody id="comm-log-body" />
           </table>
+          <div id="comm-pagination" className="om-pagination" />
         </div>
       </div>
       {' '}
