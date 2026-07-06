@@ -42,6 +42,56 @@ function __kvOnReady(fn) {
     'ct-home':           'grp-contractor',
   };
 
+  /* ── URL routing ────────────────────────────────────────────────────────
+     Reflect the current section in the address bar and make the browser
+     Back/Forward buttons move between app pages instead of leaving the app.
+     nav() pushes a clean path (e.g. /knowledge-center); popstate navigates back
+     to the matching section. The server has an index.html fallback, so these
+     paths also survive a refresh / direct link. ──────────────────────────── */
+  const KV_ROUTES = {
+    dashboard: 'dashboard', diagnostic: 'labour-code-readiness', architecture: 'architecture',
+    'karya-nirnay': 'karya-nirnay', recruitment: 'recruitment', onboarding: 'onboarding',
+    induction: 'induction', appointment: 'appointment-order', vendor: 'vendor-compliance',
+    ohs: 'workplace-safety', compliance: 'compliance', 'vaani-broadcast': 'vaani-broadcast',
+    chat: 'chat', transport: 'transport', lms: 'knowledge-center', analytics: 'analytics',
+    rules: 'rule-library', locale: 'localization', audit: 'audit-trail', handoff: 'api-handoff',
+    directory: 'worker-directory', ctdirectory: 'contractor-directory',
+    'emp-home': 'employee-home', 'ct-home': 'contractor-home'
+  };
+  let KV_SUPPRESS_HISTORY = false;   /* set while navigating from a popstate/init so we don't re-push */
+  let KV_HISTORY_READY = false;      /* first section replaces the entry; later ones push */
+  function kvSlug(id) { return KV_ROUTES[id] || id; }
+  function kvTitleCase(s) { return String(s).split('-').map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; }).join(' '); }
+  function kvIdForPath() {
+    const seg = decodeURIComponent((location.pathname || '').replace(/^\/+|\/+$/g, '').split('/')[0] || '');
+    if (!seg) return null;
+    for (const k in KV_ROUTES) { if (KV_ROUTES[k] === seg) return k; }
+    if (document.getElementById('sec-' + seg)) return seg;   /* accept the raw section id too */
+    return null;
+  }
+  function kvNavEl(id) { return document.querySelector('.sb-item[data-onclick="nav(\'' + id + '\', this)"]') || null; }
+  function kvSyncUrl(id) {
+    if (!document.getElementById('sec-' + id)) return;
+    const slug = kvSlug(id);
+    try { document.title = 'Karya Vaani · ' + kvTitleCase(slug); } catch (e) {}
+    if (KV_SUPPRESS_HISTORY || !window.history || !history.pushState) return;
+    try {
+      const url = '/' + slug;
+      if (location.pathname !== url) {
+        if (KV_HISTORY_READY) history.pushState({ kvSec: id }, '', url);
+        else history.replaceState({ kvSec: id }, '', url);
+      }
+      KV_HISTORY_READY = true;
+    } catch (e) { /* history not available */ }
+  }
+  window.addEventListener('popstate', function (ev) {
+    const u = window.__KVUSER;
+    if (u && (u.role === 'employee' || u.role === 'contractor')) return;   /* kiosk roles are locked to their home */
+    const id = (ev.state && ev.state.kvSec) || kvIdForPath() || 'dashboard';
+    KV_SUPPRESS_HISTORY = true;
+    try { window.nav(id, kvNavEl(id)); } finally { KV_SUPPRESS_HISTORY = false; }
+  });
+
   /* ── SPA-style section nav: hide all, show selected ── */
   function nav(id, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -71,6 +121,7 @@ function __kvOnReady(fn) {
     /* contractor mode — same idea, but the contractor sees only their group */
     document.body.classList.toggle('ct-mode', id === 'ct-home');
 
+    kvSyncUrl(id);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
@@ -95,16 +146,20 @@ function __kvOnReady(fn) {
     if (!user || user.role === 'admin') {
       document.body.classList.add('role-admin');
       document.body.classList.remove('emp-mode', 'ct-mode');
+      // land on the section named in the URL (deep link / refresh), else dashboard
+      let target = kvIdForPath();
+      if (!target || target === 'emp-home' || target === 'ct-home') target = 'dashboard';
+      nav(target, kvNavEl(target));
       return;
     }
     if (user.role === 'employee') {
       document.body.classList.add('role-employee');
       if (user.linkedId && typeof empSetWorker === 'function') empSetWorker(user.linkedId);
-      nav('emp-home', null);
+      nav('emp-home', kvNavEl('emp-home'));
     } else if (user.role === 'contractor') {
       document.body.classList.add('role-contractor');
       if (user.linkedId && typeof ctSetActive === 'function') ctSetActive(user.linkedId);
-      nav('ct-home', null);
+      nav('ct-home', kvNavEl('ct-home'));
     }
   }
   window.kvApplyRole = kvApplyRole;

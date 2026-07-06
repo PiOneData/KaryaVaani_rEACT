@@ -47,7 +47,7 @@ export default function App() {
   if (!user) {
     return <Login onLogin={(u) => { localStorage.setItem(KVUSER_KEY, JSON.stringify(u)); setUser(u); }} />;
   }
-  return <AuthedApp user={user} onLogout={() => { localStorage.removeItem(KVUSER_KEY); window.location.reload(); }} />;
+  return <AuthedApp user={user} onLogout={() => { localStorage.removeItem(KVUSER_KEY); window.location.href = '/'; }} />;
 }
 
 function AuthedApp({ user, onLogout }) {
