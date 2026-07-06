@@ -6730,6 +6730,9 @@ mark.wk-hl { background: var(--amber-soft); color: var(--amber-dk); border-radiu
 .gktr .rsl { font-size:8.5px; color:var(--txt4); display:flex; align-items:center; gap:3px; }
 .gktr .rsl-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
 .gktr .rc-night { font-size:8.5px; color:var(--rose); font-weight:600; }
+.gktr .rc-op { font-size:8.5px; color:var(--txt3); margin:5px 0; display:flex; align-items:center; gap:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gktr .rd-mini { font-size:8.5px; padding:1px 7px; border-radius:5px; border:1px solid var(--gk); background:var(--gk); color:#fff; cursor:pointer; margin-left:5px; }
+.gktr .rd-mini:hover { background:var(--gk2); }
 /* roster drawer */
 .gktr .roster-drawer { background:var(--bg3); border:1px solid var(--border2); border-radius:9px; overflow:hidden; display:none; margin-top:8px; }
 .gktr .roster-drawer.open { display:block; }
@@ -6833,7 +6836,8 @@ mark.wk-hl { background: var(--amber-soft); color: var(--amber-dk); border-radiu
 /* ── kiosk lock: a worker / contractor sees only their own home. Hide the whole
    top navbar and the persona switcher (they can only sign out). ── */
 body.role-employee .navbar,
-body.role-contractor .navbar { display: none; }
+body.role-contractor .navbar,
+body.role-operator .navbar { display: none; }
 body.role-employee .emp-picker,
 body.role-contractor .emp-picker { display: none; }
 

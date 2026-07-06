@@ -38,7 +38,7 @@ app.get('/api/bootstrap', (req, res) => {
   // (password hashes), or the per-week transport roster/attendance to the
   // browser — those are fetched via their own routes.
   const { onboardingDocuments, communications, users, voiceCache,
-          transportRoster, transportAttendance, ...rest } = s.data;
+          transportRoster, transportAttendance, nightConsents, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -787,6 +787,31 @@ app.get('/api/transport/attendance/:week/:date', (req, res) => {
   const prefix = (req.params.week || '') + '|' + req.params.date + '|';
   const rows = Object.keys(all).filter((k) => k.indexOf(prefix) === 0).map((k) => all[k]);
   res.json({ ok: true, week: req.params.week, date: req.params.date, rows, idcardApiLive: !!IDCARD_API_URL });
+});
+
+/* ── Night-shift transport consent (OSHC Rule 83) ───────────────────────────
+   Women (and any worker) rostered for night transport must have consented.
+   Consent is captured at onboarding or collected by the transport operator;
+   stored per worker code as the single source of truth, surfaced on the board
+   and in the employee detail. */
+app.get('/api/transport/consents', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  res.json({ ok: true, consents: store.data.nightConsents || {} });
+});
+app.post('/api/transport/consent', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const { code, name, consented, method, by } = req.body || {};
+  if (!code) return res.status(400).json({ ok: false, error: 'worker code is required.' });
+  store.data.nightConsents = store.data.nightConsents || {};
+  const rec = {
+    code: String(code), name: name || '', consented: !!consented,
+    method: method || 'operator', by: by || 'HR', at: new Date().toISOString()
+  };
+  store.data.nightConsents[String(code)] = rec;
+  dbPut('nightConsents', String(code), rec);
+  res.json({ ok: true, consent: rec });
 });
 
 /* ── Role-based login ──────────────────────────────────────────────────────

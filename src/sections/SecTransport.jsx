@@ -57,7 +57,7 @@ export default function SecTransport() {
             <div className="os-meta">Women · Shift C · Sricity</div>
           </div>
           <div className="os-items">
-            <div className="osi osi-ok"><div className="osi-dot" /><span className="osi-val">31/32</span>&nbsp;Consent</div>
+            <div className="osi osi-ok" id="tr-oshc-consent-box"><div className="osi-dot" /><span className="osi-val" id="tr-oshc-consent">—</span>&nbsp;Consent · R.83</div>
             <div className="osi osi-ok"><div className="osi-dot" /><span className="osi-val">4/4</span>&nbsp;Vehicles</div>
             <div className="osi osi-warn"><div className="osi-dot" /><span className="osi-val">28/32</span>&nbsp;Pickup confirmed</div>
             <div className="osi osi-risk"><div className="osi-dot" /><span className="osi-val">3/32</span>&nbsp;Safe drops</div>
@@ -87,7 +87,7 @@ export default function SecTransport() {
               <div className="rd-hd">
                 <div>
                   <div className="rd-title" id="tr-rd-title">Route roster</div>
-                  <div className="rd-meta"><span id="tr-rd-bus">Bus —</span><span id="tr-rd-dept">Departs —</span><span id="tr-rd-total">— workers</span></div>
+                  <div className="rd-meta"><span id="tr-rd-bus">Bus —</span><span id="tr-rd-dept">Departs —</span><span id="tr-rd-operator" style={{ color: "var(--gk)", fontWeight: 600 }}>Operator —</span><span id="tr-rd-total">— workers</span></div>
                 </div>
                 <button className="rd-close" onClick={() => { window.trGkCloseRoster() }}>✕</button>
               </div>
@@ -100,7 +100,7 @@ export default function SecTransport() {
               </div>
               <div className="rd-table-wrap">
                 <table className="rt">
-                  <thead><tr><th>Name</th><th>ID</th><th>Type</th><th>Agency</th><th>Pickup point</th><th>Departs</th><th>Boarded</th></tr></thead>
+                  <thead><tr><th>Name</th><th>ID</th><th>Type</th><th>Agency</th><th>Pickup point</th><th>Departs</th><th>Boarded</th><th>Consent · R.83</th></tr></thead>
                   <tbody id="tr-rd-tbody" />
                 </table>
               </div>
@@ -124,7 +124,7 @@ export default function SecTransport() {
             </div>
 
             <div className="women-strip" id="tr-women-strip">
-              <div className="ws-hd"><span className="ws-title">♀ Night transport · OSHC Rule 83</span><span className="ws-stat">Women · Shift C</span></div>
+              <div className="ws-hd"><span className="ws-title">♀ Night transport · OSHC Rule 83</span><span className="ws-stat" id="tr-women-stat">Women · Shift C</span></div>
               <div className="ws-tokens" id="tr-women-tokens" />
             </div>
 

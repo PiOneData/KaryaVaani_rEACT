@@ -35,7 +35,15 @@ const DEMO_ACCOUNTS = [
     email: 'worker@karyavaani.demo' },
   { username: 'contractor', password: 'contractor@daikin', role: 'contractor',
     name: '',               title: 'Contractor / Vendor',  linkedType: 'contractor',
-    email: 'contractor@karyavaani.demo' }
+    email: 'contractor@karyavaani.demo' },
+  { username: 'operator',   password: 'operator@daikin',   role: 'operator',
+    name: 'Sri Balaji Travels', title: 'Transport Operator', linkedType: 'operator',
+    email: 'operator@karyavaani.demo' }
 ];
 
-module.exports = { hashPassword, verifyPassword, DEMO_ACCOUNTS };
+/* Fleet operators running the worker buses. Route index i → OPERATORS[i % 4]
+   (the frontend uses the identical rule), so each route has one operator and an
+   operator owns a fixed set of routes. */
+const TRANSPORT_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'APSRTC Contract Fleet', 'Sricity Logistics'];
+
+module.exports = { hashPassword, verifyPassword, DEMO_ACCOUNTS, TRANSPORT_OPERATORS };

@@ -86,7 +86,7 @@ function __kvOnReady(fn) {
   }
   window.addEventListener('popstate', function (ev) {
     const u = window.__KVUSER;
-    if (u && (u.role === 'employee' || u.role === 'contractor')) return;   /* kiosk roles are locked to their home */
+    if (u && (u.role === 'employee' || u.role === 'contractor' || u.role === 'operator')) return;   /* kiosk roles are locked to their surface */
     const id = (ev.state && ev.state.kvSec) || kvIdForPath() || 'dashboard';
     KV_SUPPRESS_HISTORY = true;
     try { window.nav(id, kvNavEl(id)); } finally { KV_SUPPRESS_HISTORY = false; }
@@ -143,6 +143,8 @@ function __kvOnReady(fn) {
   function kvApplyRole(user) {
     user = user || window.__KVUSER || null;
     document.body.classList.remove('role-employee', 'role-contractor', 'role-admin');
+    try { if (typeof TR_STATE !== 'undefined') TR_STATE.operatorFilter = null; } catch (e) {}
+    document.body.classList.remove('role-operator');
     if (!user || user.role === 'admin') {
       document.body.classList.add('role-admin');
       document.body.classList.remove('emp-mode', 'ct-mode');
@@ -160,6 +162,13 @@ function __kvOnReady(fn) {
       document.body.classList.add('role-contractor');
       if (user.linkedId && typeof ctSetActive === 'function') ctSetActive(user.linkedId);
       nav('ct-home', kvNavEl('ct-home'));
+    } else if (user.role === 'operator') {
+      // transport operator — locked to the transport board, filtered to the
+      // routes they run; the consent → boarding → attendance workflow is theirs.
+      document.body.classList.add('role-operator');
+      document.body.classList.remove('emp-mode', 'ct-mode');
+      try { if (typeof TR_STATE !== 'undefined') TR_STATE.operatorFilter = user.name; } catch (e) {}
+      nav('transport', kvNavEl('transport'));
     }
   }
   window.kvApplyRole = kvApplyRole;
@@ -11242,6 +11251,13 @@ function __kvOnReady(fn) {
   }
 
   const TR_AGENCIES = ['OM Manpower', 'ARK HR Solutions', 'Blue Ocean Personnel', 'CHR Enterprises', 'Casa Grande Propcare', 'Saptagiri Ent.'];
+  /* fleet operators — route index i → TR_OPERATORS[i % 4] (identical rule to the
+     backend), so each route has one operator and an operator owns fixed routes. */
+  const TR_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'APSRTC Contract Fleet', 'Sricity Logistics'];
+  function trRouteOperator(routeCode) {
+    const i = TR_ROUTES.findIndex(function (r) { return r.code === routeCode; });
+    return TR_OPERATORS[(i < 0 ? 0 : i) % TR_OPERATORS.length];
+  }
   /* extrapolate a worker → home locality → route → pickup → shift → mobile,
      plus the attributes the transport board needs (emp/contract type, gender,
      bus plate, agency) — all deterministic so a worker's record is stable. */
@@ -11258,12 +11274,60 @@ function __kvOnReady(fn) {
     const gender = ((h >>> 15) % 5) < 2 ? 'F' : 'M';              // ~40% women
     const plate = 'AP-29-' + (3800 + (h % 1099));
     const agency = type === 'emp' ? 'Daikin direct' : TR_AGENCIES[(h >>> 18) % TR_AGENCIES.length];
+    const routeIdx = TR_ROUTES.indexOf(route);
+    const operator = TR_OPERATORS[(routeIdx < 0 ? 0 : routeIdx) % TR_OPERATORS.length];
+    // OSHC Rule 83 night-shift consent — required for women; base is deterministic
+    // (most consented at onboarding, some still pending), overridden by the store.
+    const nightConsent = gender === 'F' ? (((h >>> 20) % 100) < 80 ? 'yes' : 'pending') : 'na';
     return {
       code: w.code, name: w.name, dept: w.department || '—', desig: w.designation || '',
       locality: town, route: route.code, routeName: route.route, pickup: pickup,
       shift: shift, mobile: mobile, board: (route[shift] && route[shift].board) || '',
-      type: type, gender: gender, plate: plate, agency: agency
+      type: type, gender: gender, plate: plate, agency: agency,
+      operator: operator, nightConsent: nightConsent
     };
+  }
+  /* effective night-shift consent for a worker: stored override, else the base. */
+  function trConsent(a) {
+    const ov = (TR_STATE.consents || {})[a.code];
+    if (ov) return ov.consented ? 'yes' : 'no';
+    return a.nightConsent;
+  }
+  function trConsentPill(v) {
+    if (v === 'yes') return '<span class="pill green tiny">✓ Consented</span>';
+    if (v === 'pending') return '<span class="pill amber tiny">Consent pending</span>';
+    if (v === 'no') return '<span class="pill red tiny">Declined</span>';
+    return '<span class="pill outline tiny">n/a</span>';
+  }
+  function trLoadConsents() {
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/consents')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { TR_STATE.consents = (j && j.consents) || {}; return TR_STATE.consents; })
+      .catch(function () { TR_STATE.consents = TR_STATE.consents || {}; return TR_STATE.consents; });
+  }
+  /* collect / confirm consent for one worker (operator or HR action). Sends a
+     WhatsApp consent request and records the consent. */
+  function trCollectConsent(code) {
+    const a = trRoster().find(function (x) { return x.code === code; });
+    if (!a) return;
+    if (window.KVWhatsApp && a.mobile) {
+      window.KVWhatsApp.notify(a.mobile,
+        'Namaste ' + a.name + ', do you consent to night-shift (Shift C) transport under OSHC Rule 83? ' +
+        'Your bus is operated by ' + trRouteOperator(a.route) + '. Reply YES to confirm. — Karya Vaani',
+        { label: 'Consent request sent to ' + a.name });
+    }
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: a.code, name: a.name, consented: true, method: 'whatsapp', by: (window.__KVUSER && window.__KVUSER.name) || 'Operator' })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          TR_STATE.consents = TR_STATE.consents || {}; TR_STATE.consents[a.code] = j.consent;
+          toast('Night-shift consent confirmed for ' + a.name + ' · OSHC Rule 83 logged', 'green');
+          if (TR_STATE.gkOpenRoute) trGkOpenRoster(TR_STATE.gkOpenRoute);
+          trGkRenderNight();
+        } else { toast('Consent failed: ' + ((j && j.error) || 'unknown'), 'red'); }
+      }).catch(function (e) { toast('Consent failed: ' + e.message, 'red'); });
   }
   /* today's boarding status for a worker, deterministic per code+date. */
   function trTodayBrd(code) {
@@ -11498,29 +11562,35 @@ function __kvOnReady(fn) {
     const g = document.getElementById('tr-route-grid');
     if (!g) return;
     const s = TR_STATE.gkShift || 'A';
-    g.innerHTML = TR_ROUTES.map(function (r) {
+    const routes = TR_STATE.operatorFilter
+      ? TR_ROUTES.filter(function (r) { return trRouteOperator(r.code) === TR_STATE.operatorFilter; })
+      : TR_ROUTES;
+    g.innerHTML = routes.map(function (r) {
       const batch = trGkBatch(r.code, s);
       const emp = batch.filter(function (a) { return a.type === 'emp'; }).length;
       const ctr = batch.length - emp;
       const women = batch.filter(function (a) { return a.gender === 'F'; }).length;
+      const consented = batch.filter(function (a) { return a.gender === 'F' && trConsent(a) === 'yes'; }).length;
       const boarded = batch.filter(function (a) { return trTodayBrd(a.code) === 'ok'; }).length;
       const rate = batch.length ? Math.round(boarded / batch.length * 100) : 0;
       const st = rate < 60 ? 'crit' : rate < 78 ? 'delay' : 'ok';
       const badge = st === 'ok' ? ['rb-ok', 'On time'] : st === 'delay' ? ['rb-delay', '⚡ Delayed'] : ['rb-crit', '⚠ Check'];
       const cc = st === 'ok' ? '' : st === 'delay' ? 'rc-delay' : 'rc-crit';
       const empW = Math.round(emp / Math.max(batch.length, 1) * 100);
-      const nightF = (s === 'C' && women > 0) ? '<div class="rc-night">♀ ' + women + ' women · Rule 83</div>' : '';
+      const nightF = (s === 'C' && women > 0)
+        ? '<div class="rc-night">♀ ' + women + ' women · ' + consented + '/' + women + ' consent' + (consented < women ? ' ⚠' : ' ✓') + '</div>' : '';
       return '<div class="rc ' + cc + '" onclick="trGkOpenRoster(\'' + r.code + '\')" title="Click to view roster">' +
         '<div class="rc-top"><div class="rc-name">' + r.code + ' · ' + trTown(r) + '</div><div class="rc-badge ' + badge[0] + '">' + badge[1] + '</div></div>' +
         '<div class="rc-meta"><span class="tr-mono">' + (batch[0] ? batch[0].plate : 'AP-29-—') + '</span>' +
           '<span style="color:var(--gk);font-weight:600">' + trGkBoardTime(r, s) + '</span>' +
           '<span style="color:var(--txt4)">' + batch.length + ' pax · ' + rate + '%</span></div>' +
+        '<div class="rc-op">🚌 ' + trRouteOperator(r.code) + '</div>' +
         '<div class="rc-split"><div class="rcs-emp" style="width:' + empW + '%"></div><div class="rcs-ctr" style="width:' + (100 - empW) + '%"></div></div>' +
         '<div class="rc-split-lbl"><div class="rsl"><div class="rsl-dot" style="background:var(--gk3)"></div>' + emp + ' EMP</div>' +
           '<div class="rsl"><div class="rsl-dot" style="background:var(--amber2)"></div>' + ctr + ' CTR</div>' + nightF + '</div>' +
       '</div>';
     }).join('');
-    trTxt('tr-routes-title', 'Shift ' + s + ' · ' + TR_ROUTES.length + ' routes · click a route to view its roster');
+    trTxt('tr-routes-title', (TR_STATE.operatorFilter ? TR_STATE.operatorFilter + ' · ' : 'Shift ' + s + ' · ') + routes.length + ' routes · click a route to view its roster');
     trGkCloseRoster();
   }
   function trGkOpenRoster(code) {
@@ -11533,6 +11603,7 @@ function __kvOnReady(fn) {
     trTxt('tr-rd-bus', batch[0] ? batch[0].plate : 'Bus —');
     trTxt('tr-rd-dept', 'Departs ' + trGkBoardTime(r, s));
     trTxt('tr-rd-total', batch.length + ' workers');
+    trTxt('tr-rd-operator', 'Operated by ' + trRouteOperator(code));
     const emp = batch.filter(function (a) { return a.type === 'emp'; }).length;
     const boarded = batch.filter(function (a) { return trTodayBrd(a.code) === 'ok'; }).length;
     trTxt('tr-rd-emp', emp + ' direct employees');
@@ -11545,6 +11616,9 @@ function __kvOnReady(fn) {
       const g = a.gender === 'F' ? ' <span style="color:var(--rose)">♀</span>' : '';
       const brdCell = brd === 'ok' ? '<span class="brd-ok">✓ Boarded</span>' : brd === 'pend' ? '<span class="brd-p">Pending</span>' : '<span class="brd-m">✗ No scan</span>';
       const trCls = brd === 'miss' ? 'tr-alert' : brd === 'pend' ? 'tr-pend' : '';
+      const cons = trConsent(a);
+      const consCell = cons === 'na' ? '<span class="pill outline tiny">—</span>'
+        : trConsentPill(cons) + (cons === 'pending' ? ' <button class="rd-mini" onclick="event.stopPropagation();trCollectConsent(\'' + a.code + '\')">Collect</button>' : '');
       return '<tr class="' + trCls + '" style="cursor:pointer" onclick="omOpenWorker(\'' + a.code + '\')" title="Open employee details · travel history · attendance">' +
         '<td style="font-weight:600;color:var(--txt)">' + a.name + g + '</td>' +
         '<td><span class="wid">' + a.code + '</span></td>' +
@@ -11552,8 +11626,9 @@ function __kvOnReady(fn) {
         '<td class="tr-agency">' + a.agency + '</td>' +
         '<td style="color:var(--txt3)">' + a.pickup + '</td>' +
         '<td><span class="dep">' + trGkBoardTime(r, s) + '</span></td>' +
-        '<td>' + brdCell + '</td></tr>';
-    }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--txt4);padding:16px">No workers on this route for shift ' + s + '.</td></tr>';
+        '<td>' + brdCell + '</td>' +
+        '<td>' + consCell + '</td></tr>';
+    }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--txt4);padding:16px">No workers on this route for shift ' + s + '.</td></tr>';
     const drawer = document.getElementById('tr-roster-drawer');
     if (drawer) { drawer.classList.add('open'); drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   }
@@ -11575,7 +11650,13 @@ function __kvOnReady(fn) {
     const night = (TR_STATE.gkShift || 'A') === 'C';
     ['tr-women-strip', 'tr-sos-row', 'tr-oshc'].forEach(function (id) { const e = document.getElementById(id); if (e) e.classList.toggle('visible', night); });
     if (!night) return;
-    const women = trRoster().filter(function (a) { return a.gender === 'F'; }).slice(0, 12);
+    const allWomen = trRoster().filter(function (a) { return a.gender === 'F'; });
+    const consented = allWomen.filter(function (a) { return trConsent(a) === 'yes'; }).length;
+    trTxt('tr-oshc-consent', consented + '/' + allWomen.length);
+    const oc = document.getElementById('tr-oshc-consent-box');
+    if (oc) oc.className = 'osi ' + (consented >= allWomen.length ? 'osi-ok' : 'osi-warn');
+    trTxt('tr-women-stat', allWomen.length + ' women · ' + consented + ' consented · Shift C');
+    const women = allWomen.slice(0, 12);
     const states = ['wst-safe', 'wst-safe', 'wst-transit', 'wst-transit', 'wst-pend', 'wst-alert'];
     const st = ['Dropped 23:14', 'Dropped 23:22', 'Bus · 12 km', 'En route', 'At gate 2', 'No scan · 18 min'];
     const tok = document.getElementById('tr-women-tokens');
@@ -11663,6 +11744,7 @@ function __kvOnReady(fn) {
     if (!TR_STATE.gkShift) TR_STATE.gkShift = 'A';
     if (!TR_STATE.date) TR_STATE.date = trTodayISO();
     trGkRenderKV();
+    trLoadConsents().then(function () { trShift(TR_STATE.gkShift); });
     trShift(TR_STATE.gkShift);
     for (let i = 0; i < 4; i++) trGkAddScan();
     if (!TR_STATE._scanTimer) {
@@ -12545,6 +12627,8 @@ function __kvOnReady(fn) {
       gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
       address: { addr1: capVal('cap-addr1'), addr2: capVal('cap-addr2'), city: capVal('cap-city'), district: capVal('cap-district'), pin: capVal('cap-pin'), state: capVal('cap-homestate') },
       migrant: getC('cap-migrant'),
+      nightShiftConsent: getC('cap-nightconsent'),
+      nightConsentAt: getC('cap-nightconsent') ? new Date().toISOString() : null,
       employment: { posId: capVal('cap-posid'), dept: capVal('cap-department') || capVal('cap-dept'), workorder: capVal('cap-workorder'), contractor: capVal('cap-contractor'), clra: capVal('cap-clra'), shift: capVal('cap-shift'), doj: capVal('cap-doj') },
       ppe: { uniform: capVal('cap-uniform'), shoe: capVal('cap-shoe'), helmet: capVal('cap-helmet'), glove: capVal('cap-glove'), eyewear: capVal('cap-eyewear'), hearing: capVal('cap-hearing'), extra: (CAP_STATE.ppe || []).slice() },
       ppeAckAt: new Date().toISOString()
@@ -12553,6 +12637,13 @@ function __kvOnReady(fn) {
     capRenderRecent();
     if (typeof obRenderDirectory === 'function') obRenderDirectory();
     toast('Profile saved · confirmation link sent to ' + name + ' on WhatsApp (' + capLangName() + ')', 'green');
+
+    /* record the night-shift transport consent (OSHC Rule 83) as the single
+       source of truth, so it shows on the transport board + employee detail. */
+    fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: wid, name: name, consented: getC('cap-nightconsent'), method: 'onboarding', by: (window.__KVUSER && window.__KVUSER.name) || 'HR' })
+    }).catch(function () {});
 
     /* persist the full onboarding profile to the backend (Aadhaar privacy-gated) */
     fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
@@ -12646,6 +12737,7 @@ function __kvOnReady(fn) {
     });
     const mig = document.getElementById('cap-migrant'); if (mig) mig.checked = false;
     const ack = document.getElementById('cap-ppe-ack'); if (ack) ack.checked = false;
+    const nc = document.getElementById('cap-nightconsent'); if (nc) nc.checked = false;
     CAP_STATE.lang = 'TE';
     CAP_STATE.ppe = [];
     CAP_STATE.photo = null;
@@ -14922,7 +15014,12 @@ function __kvOnReady(fn) {
           '<div class="kpi"><div class="kpi-eye">Assigned route</div><div class="kpi-val" style="font-size:1.1rem">' + a.route + '</div><div class="kpi-sub">' + a.routeName + '</div></div>' +
           '<div class="kpi"><div class="kpi-eye">Boarding attendance</div><div class="kpi-val" style="color:' + (travel.pct >= 85 ? 'var(--green-dk)' : 'var(--amber-dk)') + '">' + travel.pct + '%</div><div class="kpi-sub">' + travel.present + '/' + travel.total + ' of last ' + travel.total + ' working days</div></div>' +
         '</div>' +
-        kv2col(kvKV('Home locality', a.locality) + kvKV('Pickup point', a.pickup) + kvKV('Shift', cap(a.shift) + ' shift') + kvKV('Boards at', a.board || '—')) +
+        kv2col(
+          kvKV('Home locality', a.locality) + kvKV('Pickup point', a.pickup) +
+          kvKV('Shift', cap(a.shift) + ' shift') + kvKV('Boards at', a.board || '—') +
+          kvKV('Transport operator', a.operator || (typeof trRouteOperator === 'function' ? trRouteOperator(a.route) : '—')) +
+          kvKV('Night-shift consent · OSHC R.83', (typeof trConsentPill === 'function' && typeof trConsent === 'function') ? trConsentPill(trConsent(a)) : '—')
+        ) +
         '<div class="card-h-title" style="font-size:0.9rem;margin:14px 0 4px">Travel history · last ' + travel.total + ' working days</div>' +
         '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Date</th><th>Day</th><th>Route</th><th>Shift</th><th>Pickup</th><th>Scan</th><th style="text-align:center">Boarding</th></tr></thead><tbody>' + trows + '</tbody></table></div>' +
         '<div class="note amber" style="margin-top:10px;font-size:0.74rem">Boarding is captured from the ID-card provider’s turnstile scans — live API integration pending; the history reflects the roster + boarding record.</div>';

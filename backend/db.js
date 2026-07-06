@@ -56,7 +56,8 @@ const COLLECTIONS = {
   onboardingDocuments: { table: 'onboarding_documents',  kind: 'map' },
   workerCompliance:    { table: 'worker_compliance',     kind: 'map' },
   transportRoster:     { table: 'transport_roster',      kind: 'map' },
-  transportAttendance: { table: 'transport_attendance',  kind: 'map' }
+  transportAttendance: { table: 'transport_attendance',  kind: 'map' },
+  nightConsents:       { table: 'night_consents',        kind: 'map' }
 };
 const META_TABLE = 'store_meta';
 

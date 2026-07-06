@@ -663,6 +663,17 @@ export default function SecOnboarding() {
                       {" Inter-state migrant worker (ISMW / OSHC)"}
                     </label>
                   </div>
+                  {' '}
+                  <div className="field" style={{ display: "flex", alignItems: "flex-end" }}>
+                    <label className="cap-check">
+                      <input type="checkbox" id="cap-nightconsent" />
+                      {" Consents to night-shift (Shift C) transport — OSHC Rule 83"}
+                    </label>
+                  </div>
+                </div>
+                {' '}
+                <div className="cap-hint" style={{ marginTop: "6px" }}>
+                  Night-shift transport consent is required for workers rostered on Shift C (especially women, under OSHC Rule 83). It can also be collected later by the transport operator.
                 </div>
               </div>
               {' '}
