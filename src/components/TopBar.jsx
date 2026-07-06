@@ -9,6 +9,7 @@ function initials(name) {
 
 export default function TopBar({ user, onLogout }) {
   const [showAccount, setShowAccount] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const name = (user && user.name) || 'Priya Menon';
   const title = (user && user.title) || 'CHRO';
   return (
@@ -40,20 +41,33 @@ export default function TopBar({ user, onLogout }) {
         {' '}
         <div className="tb-action">日本語</div>
         {' '}
-        <div className="tb-user" title={name + ' · ' + title}>{initials(name)}</div>
-        {' '}
-        <div className="tb-userinfo">
-          <span className="tb-userinfo-name">{name}</span>
-          <span className="tb-userinfo-title">{title}</span>
+        <div className="tb-profile">
+          <button className="tb-profile-btn" onClick={() => setMenuOpen((o) => !o)} title="Account" aria-haspopup="true" aria-expanded={menuOpen}>
+            <span className="tb-user">{initials(name)}</span>
+            <span className="tb-userinfo">
+              <span className="tb-userinfo-name">{name}</span>
+              <span className="tb-userinfo-title">{title}</span>
+            </span>
+            <span className="tb-profile-caret" style={{ transform: menuOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
+          </button>
+          {menuOpen ? (
+            <>
+              <div className="tb-profile-backdrop" onClick={() => setMenuOpen(false)} />
+              <div className="tb-profile-menu" role="menu">
+                <div className="tb-profile-head">
+                  <div className="tb-profile-head-name">{name}</div>
+                  <div className="tb-profile-head-title">{title}</div>
+                </div>
+                <button className="tb-profile-item" role="menuitem" onClick={() => { setMenuOpen(false); setShowAccount(true); }}>
+                  Change password
+                </button>
+                <button className="tb-profile-item danger" role="menuitem" onClick={() => { setMenuOpen(false); if (onLogout) onLogout(); }}>
+                  Sign out
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
-        {' '}
-        <button className="tb-logout" onClick={() => setShowAccount(true)} title="Change password">
-          Change password
-        </button>
-        {' '}
-        <button className="tb-logout" onClick={() => { if (onLogout) onLogout(); }} title="Sign out">
-          Sign out
-        </button>
       </div>
       {showAccount && user ? <AccountModal user={user} onClose={() => setShowAccount(false)} /> : null}
     </div>

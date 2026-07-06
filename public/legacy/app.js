@@ -4383,6 +4383,7 @@ function __kvOnReady(fn) {
       const ext = (d.ext || '').toUpperCase();
       const icon = d.ext === 'mp4' ? '▶' : d.ext === 'xls' ? '▦' : '◯';
       const langChips = d.langs.map(l => '<span class="kc-doc-lang">' + l + '</span>').join('');
+      const fullText = d.body ? '<span class="kc-doc-fulltext" title="Full text available">● Full text</span>' : '';
       cards += '<div class="kc-doc-card' + (isActive ? ' active' : '') + '" onclick="kcSelectDoc(\'' + d.id + '\')">' +
                '  <div class="kc-doc-card-top">' +
                '    <span class="kc-doc-card-ico">' + icon + '</span>' +
@@ -4396,8 +4397,11 @@ function __kvOnReady(fn) {
                '    <span class="kc-dm"><span class="kc-dm-k">Topic</span>' + d.topic + '</span>' +
                '  </div>' +
                '  <div class="kc-doc-card-foot">' +
-               '    <span class="kc-doc-langs">' + langChips + '</span>' +
-               '    <span class="kc-doc-card-cta">' + (isActive ? '✓ in chat' : 'Use & ask →') + '</span>' +
+               '    <span class="kc-doc-langs">' + langChips + fullText + '</span>' +
+               '    <span class="kc-doc-foot-actions">' +
+               (d.body ? '<span class="kc-doc-card-read" onclick="event.stopPropagation();kcReadDoc(\'' + d.id + '\')">Read ▤</span>' : '') +
+               '      <span class="kc-doc-card-cta">' + (isActive ? '✓ in chat' : 'Use & ask →') + '</span>' +
+               '    </span>' +
                '  </div>' +
                '</div>';
     });
@@ -4857,12 +4861,58 @@ function __kvOnReady(fn) {
     toast('New chat started', 'green');
   }
 
+  /* The substantial, full-text documents live in the repo as a static asset
+     (public/legacy/knowledge-docs.json) — version-controlled, not in the DB.
+     Load them once and merge into the browser so every module has real content. */
+  let KC_DOCS_LOADED = false;
+  function kcLoadDocs() {
+    if (KC_DOCS_LOADED) return;
+    KC_DOCS_LOADED = true;
+    fetch('/legacy/knowledge-docs.json')
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (docs) {
+        if (!Array.isArray(docs) || !docs.length) return;
+        const ids = {};
+        docs.forEach(function (d) { ids[d.id] = 1; });
+        KC_DOCS = docs.concat(KC_DOCS.filter(function (d) { return !ids[d.id]; }));
+        if (document.getElementById('kc-cats')) { kcRenderCategories(); kcRenderDocBrowser(); }
+      })
+      .catch(function () { /* offline — the metadata cards from bootstrap still show */ });
+  }
+
+  /* full-text reader — renders the document body in a modal. */
+  function kcReadDoc(docId) {
+    const d = kcDocById(docId);
+    if (!d) return;
+    const cat = kcCatById(d.cat);
+    const meta = [d.dept, d.owner, kcFmtDate(d.created), d.version, (d.readMins ? d.readMins + ' min read' : '')].filter(Boolean).join(' · ');
+    const langChips = (d.langs || []).map(function (l) { return '<span class="kc-doc-lang">' + l + '</span>'; }).join('');
+    const bodyHtml = d.body ? d.body : '<p class="muted">The full text of this document isn’t loaded yet — select it and use the chat to query it.</p>';
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">' + (cat ? cat.head : 'Document') + ' · ' + String(d.ext || 'DOC').toUpperCase() + '</span>' +
+        '<span class="modal-h-title">' + d.title + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="tiny muted" style="margin-bottom:6px">' + meta + '</div>' +
+        '<div style="margin-bottom:10px">' + langChips + '</div>' +
+        (d.summary ? '<div class="note indigo" style="margin-bottom:14px">' + d.summary + '</div>' : '') +
+        '<div class="kc-doc-read">' + bodyHtml + '</div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Version-controlled document · Knowledge Center</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" onclick="omCloseModal();kcSelectDoc(\'' + d.id + '\')">Use in chat / translate</button>' +
+        '<button class="btn" onclick="omCloseModal()">Close</button></div></div>',
+      920
+    );
+  }
+  window.kcReadDoc = kcReadDoc;
+
   function initKc() {
     if (!document.getElementById('kc-cats')) return;
     KC_STATE.view = 'browse';
     KC_STATE.activeCat = null;
     KC_STATE.activeDoc = null;
     KC_STATE.history = [];
+    kcLoadDocs();
     kcRenderCategories();
     kcRenderDocBrowser();
     kcRenderContextBar();

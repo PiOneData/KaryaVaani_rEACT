@@ -1,0 +1,382 @@
+[
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 4,
+  "version": "v1.0",
+  "id": "kc-pol-1",
+  "cat": "policies",
+  "title": "Employee Code of Conduct",
+  "dept": "HR",
+  "owner": "Meera Krishnan",
+  "created": "2026-05-04",
+  "topic": "Conduct & discipline",
+  "summary": "The standards of integrity, safety and behaviour every associate at Daikin Sricity is expected to uphold.",
+  "body": "<h4>1. Purpose &amp; scope</h4>\n<p>This Code applies to every associate — permanent, fixed-term and contract — working at the Daikin Sricity (SRICITY-FG) facility. It sets the minimum standards of conduct expected on the shop floor, in offices and on company transport.</p>\n<h4>2. Core expectations</h4>\n<ul>\n<li><strong>Integrity.</strong> Be honest in attendance, output reporting and expense claims. Falsifying records is a serious misconduct.</li>\n<li><strong>Safety first.</strong> Wear the prescribed PPE, follow standard operating procedures, and never bypass a machine guard or interlock.</li>\n<li><strong>Respect.</strong> Treat colleagues, supervisors and visitors with dignity regardless of gender, religion, caste, language or region.</li>\n<li><strong>Confidentiality.</strong> Do not share drawings, process parameters, pricing or personnel data outside the Company.</li>\n</ul>\n<h4>3. Prohibited conduct</h4>\n<p>The following are treated as misconduct under the certified Standing Orders and may lead to disciplinary action up to termination: reporting for duty under the influence of alcohol or drugs; wilful damage to property; theft; physical violence or abusive language; sleeping on duty; and refusal to carry out a lawful instruction.</p>\n<h4>4. Reporting concerns</h4>\n<p>Raise concerns with your supervisor, HR, or through the confidential grievance channel. Retaliation against anyone who reports a genuine concern in good faith is itself a violation of this Code.</p>\n<h4>5. Acknowledgement</h4>\n<p>Every associate confirms, at induction and on each material revision, that they have read and understood this Code in their preferred language.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE"
+  ],
+  "readMins": 4,
+  "version": "v1.0",
+  "id": "kc-pol-2",
+  "cat": "policies",
+  "title": "Certified Standing Orders (IESO Act, 1946)",
+  "dept": "HR",
+  "owner": "Meera Krishnan",
+  "created": "2026-03-19",
+  "topic": "Conduct & discipline",
+  "summary": "Classification of workmen, working hours, leave, and the disciplinary procedure certified under the Industrial Employment (Standing Orders) Act.",
+  "body": "<h4>1. Classification of workmen</h4>\n<p>Workmen are classified as permanent, probationers, fixed-term, apprentices, or contract, as defined under the certified Standing Orders and the Industrial Relations Code, 2020.</p>\n<h4>2. Hours, shifts and attendance</h4>\n<ul>\n<li>Normal working hours are 8 per day / 48 per week, arranged across morning and general shifts.</li>\n<li>Shift schedules are displayed on the notice board and the Karya Vaani app; changes are notified at least 24 hours in advance where practicable.</li>\n<li>Overtime is voluntary, authorised in advance, and paid at twice the ordinary wage rate as per law.</li>\n</ul>\n<h4>3. Leave</h4>\n<p>Earned leave, casual leave and sick leave accrue per the Leave Policy and the Factories Act. Leave must be applied for in advance except in a genuine emergency.</p>\n<h4>4. Disciplinary procedure</h4>\n<ol>\n<li>Charge-sheet issued in writing, in a language the workman understands.</li>\n<li>Opportunity to explain; domestic enquiry by an impartial enquiry officer.</li>\n<li>Findings recorded; proportionate penalty imposed.</li>\n<li>Right of appeal to the Works Manager.</li>\n</ol>\n<h4>5. Termination &amp; notice</h4>\n<p>Either party may terminate employment by the notice period stipulated, or wages in lieu, save in cases of proven misconduct where summary action is permitted after due enquiry.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI",
+   "TA"
+  ],
+  "readMins": 4,
+  "version": "v1.0",
+  "id": "kc-pol-3",
+  "cat": "policies",
+  "title": "Prevention of Sexual Harassment (PoSH) Policy",
+  "dept": "HR",
+  "owner": "Anjali Rao",
+  "created": "2026-02-11",
+  "topic": "Workplace rights",
+  "summary": "The Company’s zero-tolerance policy and Internal Committee process under the PoSH Act, 2013.",
+  "body": "<h4>1. Commitment</h4>\n<p>Daikin Sricity is committed to a workplace free from sexual harassment, in line with the Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013. The policy protects all women at the workplace, including contract and visiting workers.</p>\n<h4>2. What constitutes harassment</h4>\n<p>Unwelcome physical contact, demands or requests for sexual favours, sexually coloured remarks, showing pornography, or any other unwelcome conduct of a sexual nature — whether physical, verbal or non-verbal.</p>\n<h4>3. Internal Committee (IC)</h4>\n<ul>\n<li>Chaired by a senior woman employee, with an external member from an NGO/legal background.</li>\n<li>Complaints may be made in writing within 3 months of the incident; the IC may extend this for good reason.</li>\n<li>Enquiry completed within 90 days; recommendations acted upon within 60 days.</li>\n</ul>\n<h4>4. Confidentiality &amp; protection</h4>\n<p>The identity of the complainant, respondent and witnesses is kept confidential. Retaliation against a complainant or witness is prohibited and separately punishable.</p>\n<h4>5. How to reach the IC</h4>\n<p>Contact any IC member, HR, or use the confidential drop-box near the HR office and the grievance option in the Karya Vaani app.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 4,
+  "version": "v1.0",
+  "id": "kc-pol-4",
+  "cat": "policies",
+  "title": "Leave &amp; Attendance Policy",
+  "dept": "HR",
+  "owner": "Suresh Babu",
+  "created": "2026-04-27",
+  "topic": "Time & attendance",
+  "summary": "Leave entitlements, application process, and attendance-marking rules including ID-card punching.",
+  "body": "<h4>1. Leave entitlements (per calendar year)</h4>\n<table class=\"t\"><thead><tr><th>Type</th><th>Entitlement</th><th>Notes</th></tr></thead>\n<tbody>\n<tr><td>Earned Leave (EL)</td><td>1 day per 20 days worked</td><td>Encashable; carry-forward capped per policy</td></tr>\n<tr><td>Casual Leave (CL)</td><td>7 days</td><td>Max 3 at a stretch</td></tr>\n<tr><td>Sick Leave (SL)</td><td>7 days</td><td>Medical certificate for &gt; 2 days</td></tr>\n<tr><td>National &amp; Festival</td><td>Per holiday list</td><td>Paid holidays</td></tr>\n</tbody></table>\n<h4>2. Applying for leave</h4>\n<p>Apply through your supervisor or the Karya Vaani app in advance. In an emergency, inform your supervisor by phone before shift start and regularise on return.</p>\n<h4>3. Attendance marking</h4>\n<ul>\n<li>Mark in and out at the turnstile using your ID card. Buddy-punching is misconduct.</li>\n<li>Grace period of 10 minutes; three late marks in a month equal one half-day of CL.</li>\n<li>Transport boarding is captured by the same ID-card scan for roster attendance.</li>\n</ul>\n<h4>4. Absence without leave</h4>\n<p>Continuous unauthorised absence of 8 days may be treated as abandonment of service after due notice, as per the Standing Orders.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 4,
+  "version": "v1.0",
+  "id": "kc-pol-5",
+  "cat": "policies",
+  "title": "Grievance Redressal Policy",
+  "dept": "HR",
+  "owner": "Anjali Rao",
+  "created": "2026-01-30",
+  "topic": "Workplace rights",
+  "summary": "A three-stage, time-bound process for associates to raise and resolve workplace grievances.",
+  "body": "<h4>1. Purpose</h4>\n<p>To provide every associate a fair, accessible and time-bound mechanism to raise grievances relating to working conditions, wages, safety, or treatment, consistent with the Industrial Relations Code, 2020.</p>\n<h4>2. Three-stage process</h4>\n<ol>\n<li><strong>Stage 1 — Supervisor.</strong> Raise the grievance verbally or via the app. Response within 48 hours.</li>\n<li><strong>Stage 2 — Department Head / HR.</strong> If unresolved, escalate. Response within 7 working days.</li>\n<li><strong>Stage 3 — Grievance Redressal Committee.</strong> Joint management–worker committee; decision within 30 days.</li>\n</ol>\n<h4>3. What can be raised</h4>\n<p>Wage or attendance disputes, unsafe conditions, harassment, denial of statutory benefits, transport issues, or unfair treatment. PoSH matters are routed to the Internal Committee.</p>\n<h4>4. Principles</h4>\n<ul>\n<li>No victimisation for raising a genuine grievance.</li>\n<li>Grievances may be raised in the associate’s preferred language.</li>\n<li>All stages are documented and auditable.</li>\n</ul>\n<h4>5. Records</h4>\n<p>Every grievance and its resolution is logged for statutory inspection and continuous improvement.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 6,
+  "version": "v1.0",
+  "id": "kc-trn-1",
+  "cat": "training",
+  "title": "New Joiner Plant Induction — Module 1",
+  "dept": "EHS",
+  "owner": "R. Karthik",
+  "created": "2026-05-12",
+  "topic": "Induction",
+  "summary": "The mandatory day-one induction covering plant layout, safety basics, emergency response and code of conduct.",
+  "body": "<h4>Welcome to Daikin Sricity</h4>\n<p>This module must be completed before you are permitted on the shop floor. It takes about 45 minutes and ends with a short quiz. A safety certificate is issued only after all mandatory modules are passed.</p>\n<h4>1. Plant layout &amp; gates</h4>\n<p>Familiarise yourself with the compressor line, paint shop, warehouse, and the three plant gates. Your ID card grants access only to your authorised zones.</p>\n<h4>2. Safety basics</h4>\n<ul>\n<li>Always wear the PPE prescribed for your zone (see the PPE-by-zone guide).</li>\n<li>Know the nearest two emergency exits and your assembly point.</li>\n<li>Report every near-miss and injury, however minor, to your supervisor.</li>\n</ul>\n<h4>3. Emergency response</h4>\n<p>On hearing the alarm, stop work, switch off your machine, and walk — do not run — to your assembly point. Do not use lifts. Await roll-call by your supervisor.</p>\n<h4>4. Conduct &amp; hygiene</h4>\n<p>Follow the Code of Conduct, maintain 5S at your station, and keep walkways clear. Smoking is permitted only in designated areas.</p>\n<h4>5. Assessment</h4>\n<p>Answer the 10-question quiz. You may retake it. Your supervisor schedules the shop-floor buddy walk once you pass.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 5,
+  "version": "v1.0",
+  "id": "kc-trn-2",
+  "cat": "training",
+  "title": "Lockout–Tagout (LOTO) Standard Operating Procedure",
+  "dept": "EHS",
+  "owner": "R. Karthik",
+  "created": "2026-04-08",
+  "topic": "Machine safety",
+  "summary": "The six-step energy-isolation procedure to be followed before servicing any machine that can start unexpectedly.",
+  "body": "<h4>Why LOTO</h4>\n<p>Lockout–Tagout prevents the accidental start-up or release of stored energy while a machine is being serviced. It is mandatory for any maintenance, cleaning, or clearing of a jam.</p>\n<h4>The six steps</h4>\n<ol>\n<li><strong>Prepare.</strong> Identify all energy sources — electrical, pneumatic, hydraulic, mechanical, thermal.</li>\n<li><strong>Shut down.</strong> Stop the equipment using the normal stopping procedure.</li>\n<li><strong>Isolate.</strong> Operate the disconnect/valve to isolate each energy source.</li>\n<li><strong>Lock &amp; tag.</strong> Apply your personal lock and a tag stating who, why and when.</li>\n<li><strong>Release stored energy.</strong> Bleed pressure, discharge capacitors, block suspended parts.</li>\n<li><strong>Verify.</strong> Attempt a normal start to confirm zero energy, then return controls to off.</li>\n</ol>\n<h4>Group lockout</h4>\n<p>When several people work on one machine, each applies their own lock to a group lockout box. The machine cannot be re-energised until the last lock is removed.</p>\n<h4>Golden rules</h4>\n<ul>\n<li>One lock, one key, one person — never share or remove another's lock.</li>\n<li>If in doubt, do not proceed; call your supervisor.</li>\n</ul>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 3,
+  "version": "v1.0",
+  "id": "kc-trn-3",
+  "cat": "training",
+  "title": "PPE Usage by Work Zone",
+  "dept": "EHS",
+  "owner": "Priya Menon",
+  "created": "2026-03-25",
+  "topic": "Personal protective equipment",
+  "summary": "The minimum personal protective equipment required in each zone, and how to inspect and maintain it.",
+  "body": "<h4>PPE is the last line of defence</h4>\n<p>Engineering controls and safe procedures come first, but the correct PPE must always be worn in the zones below.</p>\n<table class=\"t\"><thead><tr><th>Zone</th><th>Mandatory PPE</th></tr></thead>\n<tbody>\n<tr><td>Compressor Line</td><td>Class-B helmet, steel-toe shoes, cut-resistant gloves, safety glasses</td></tr>\n<tr><td>Paint Shop</td><td>Chemical-resistant gloves, respirator, apron, safety glasses</td></tr>\n<tr><td>Warehouse / Dispatch</td><td>High-visibility vest, steel-toe shoes</td></tr>\n<tr><td>Press Shop</td><td>Hearing protection, cut-resistant gloves, helmet, steel-toe shoes</td></tr>\n</tbody></table>\n<h4>Inspect before every use</h4>\n<ul>\n<li>Check gloves for cuts, helmets for cracks, respirators for a good seal.</li>\n<li>Report damaged PPE and get a replacement — never work with defective PPE.</li>\n</ul>\n<h4>Care</h4>\n<p>Clean reusable PPE at shift end, store it in your locker, and replace consumables (respirator cartridges, ear plugs) per the schedule.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 5,
+  "version": "v1.0",
+  "id": "kc-trn-4",
+  "cat": "training",
+  "title": "Fire Safety &amp; Emergency Evacuation Drill",
+  "dept": "EHS",
+  "owner": "R. Karthik",
+  "created": "2026-05-20",
+  "topic": "Emergency preparedness",
+  "summary": "Fire prevention basics, extinguisher use, and the assembly-point plan for each zone.",
+  "body": "<h4>Prevention first</h4>\n<p>Keep the two nearest exits from your work area known and clear at all times. Do not store combustibles near electrical panels or heat sources.</p>\n<h4>If you discover a fire</h4>\n<ol>\n<li>Raise the alarm — break the nearest call point.</li>\n<li>If trained and the fire is small, use the correct extinguisher (PASS: Pull, Aim, Squeeze, Sweep).</li>\n<li>If not, evacuate immediately.</li>\n</ol>\n<h4>Assembly points</h4>\n<table class=\"t\"><thead><tr><th>Zone</th><th>Assembly area</th></tr></thead>\n<tbody>\n<tr><td>Compressor Line</td><td>Area-A, near Gate 2</td></tr>\n<tr><td>Paint Shop</td><td>Area-C, behind the canteen</td></tr>\n<tr><td>Warehouse</td><td>Area-B</td></tr>\n</tbody></table>\n<h4>During evacuation</h4>\n<ul>\n<li>Stop work, switch off your machine, walk — do not run.</li>\n<li>Do not use lifts. Help visitors and new joiners find the route.</li>\n<li>Report to your supervisor for roll-call; do not re-enter until the all-clear.</li>\n</ul>\n<p>Evacuation drills are held monthly and announced as notices.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 6,
+  "version": "v1.0",
+  "id": "kc-trn-5",
+  "cat": "training",
+  "title": "Forklift &amp; Material Handling Competency Pack",
+  "dept": "Logistics",
+  "owner": "Naveen Kumar",
+  "created": "2026-02-28",
+  "topic": "Material handling",
+  "summary": "Safe operation of forklifts and manual handling techniques, with the certification requirements to operate.",
+  "body": "<h4>Who may operate</h4>\n<p>Only associates holding a valid in-plant forklift licence, issued after this training and a practical assessment, may operate a forklift. Licences are renewed annually.</p>\n<h4>Pre-use inspection</h4>\n<ul>\n<li>Check tyres, forks, hydraulics, horn, lights, seat belt and the load chart.</li>\n<li>Report any defect and tag the truck out of service.</li>\n</ul>\n<h4>Safe operation</h4>\n<ol>\n<li>Wear the seat belt; sound the horn at intersections and blind corners.</li>\n<li>Never exceed the rated load; keep the load low and tilted back while travelling.</li>\n<li>Keep pedestrians clear — maintain the marked forklift–pedestrian segregation.</li>\n<li>Travel in reverse when the load blocks your view.</li>\n</ol>\n<h4>Manual handling</h4>\n<p>For manual lifts: assess the load, bend the knees not the back, keep the load close, and get help or a trolley for heavy or awkward items. Report any strain early.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-not-1",
+  "cat": "notices",
+  "title": "Minimum Wage Revision — 2026 (Andhra Pradesh)",
+  "dept": "HR",
+  "owner": "Suresh Babu",
+  "created": "2026-06-01",
+  "topic": "Wages",
+  "summary": "The revised minimum wages applicable from this month, inclusive of variable dearness allowance.",
+  "body": "<h4>Notice</h4>\n<p>Pursuant to the Government of Andhra Pradesh notification, the minimum wages applicable to our category of establishment are revised with effect from this month, inclusive of the Variable Dearness Allowance (VDA).</p>\n<table class=\"t\"><thead><tr><th>Skill category</th><th>Revised monthly wage (incl. VDA)</th></tr></thead>\n<tbody>\n<tr><td>Unskilled</td><td>₹13,210</td></tr>\n<tr><td>Semi-skilled</td><td>₹14,260</td></tr>\n<tr><td>Skilled</td><td>₹15,860</td></tr>\n<tr><td>Highly skilled</td><td>₹17,290</td></tr>\n</tbody></table>\n<h4>What this means for you</h4>\n<ul>\n<li>Your next pay slip reflects the revised rate.</li>\n<li>Statutory contributions (EPF, ESI) are recomputed on the revised wage.</li>\n<li>The full notification is posted on the notice board and the Karya Vaani app.</li>\n</ul>\n<p>For any clarification, contact Plant HR. Please acknowledge that you have read this notice.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-not-2",
+  "cat": "notices",
+  "title": "Annual Holiday List — 2026",
+  "dept": "HR",
+  "owner": "Meera Krishnan",
+  "created": "2026-01-05",
+  "topic": "Holidays",
+  "summary": "The list of national, festival and optional holidays for the calendar year, with plant-closure notes.",
+  "body": "<h4>Declared holidays (paid)</h4>\n<table class=\"t\"><thead><tr><th>Occasion</th><th>Date</th><th>Day</th></tr></thead>\n<tbody>\n<tr><td>Republic Day</td><td>26 Jan</td><td>National</td></tr>\n<tr><td>Ugadi</td><td>19 Mar</td><td>Festival</td></tr>\n<tr><td>May Day</td><td>1 May</td><td>National</td></tr>\n<tr><td>Independence Day</td><td>15 Aug</td><td>National</td></tr>\n<tr><td>Vinayaka Chavithi</td><td>26 Aug</td><td>Festival</td></tr>\n<tr><td>Gandhi Jayanti</td><td>2 Oct</td><td>National</td></tr>\n<tr><td>Deepavali</td><td>8 Nov</td><td>Festival</td></tr>\n<tr><td>Christmas</td><td>25 Dec</td><td>Festival</td></tr>\n</tbody></table>\n<h4>Notes</h4>\n<ul>\n<li>On declared holidays the plant remains closed and company transport does not run.</li>\n<li>Optional (restricted) holidays may be availed as per policy — apply in advance.</li>\n<li>Plan your leave around these dates. Please acknowledge that you have read this notice.</li>\n</ul>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-not-3",
+  "cat": "notices",
+  "title": "Heat Advisory — Summer Shift Protocol",
+  "dept": "EHS",
+  "owner": "Priya Menon",
+  "created": "2026-04-15",
+  "topic": "Health & safety",
+  "summary": "Hydration, rest-break and heat-illness response measures in force during the summer months.",
+  "body": "<h4>Advisory in effect</h4>\n<p>A heat advisory is in effect for the summer shift. The following measures apply until further notice.</p>\n<h4>Stay safe</h4>\n<ul>\n<li>Drink water every 30 minutes from the marked hydration stations — do not wait until you feel thirsty.</li>\n<li>Take your rest break in the cooled rest area.</li>\n<li>Wear light, breathable clothing under your PPE where permitted.</li>\n</ul>\n<h4>Recognise heat illness</h4>\n<p>Watch for dizziness, headache, nausea, cramps or confusion — in yourself and colleagues. These are early signs of heat exhaustion.</p>\n<h4>If someone is affected</h4>\n<ol>\n<li>Move them to the cooled rest area and give water/ORS.</li>\n<li>Inform the supervisor and first-aider at once.</li>\n<li>For confusion or collapse, treat as a medical emergency and call the plant clinic.</li>\n</ol>\n<p>Please acknowledge that you have read this notice.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-not-4",
+  "cat": "notices",
+  "title": "Shift Roster Change — Effective Monday",
+  "dept": "Production",
+  "owner": "B. Venkatesh",
+  "created": "2026-06-08",
+  "topic": "Scheduling",
+  "summary": "Notice of the revised general-shift timing and how to confirm your updated shift and team.",
+  "body": "<h4>Notice</h4>\n<p>The shift roster changes with effect from Monday. The general shift moves to <strong>07:00–15:30</strong>. Morning-shift timing is unchanged.</p>\n<h4>Action required</h4>\n<ul>\n<li>Check your updated shift and team on the notice board or the Karya Vaani app.</li>\n<li>Your supervisor will confirm your shift in person during the current week.</li>\n<li>Company transport timings are aligned to the revised shift — see the transport schedule.</li>\n</ul>\n<h4>If your shift is unclear</h4>\n<p>Reply on WhatsApp to Plant HR, or speak to your supervisor, before the weekend so the roster can be corrected in time. Please acknowledge that you have read this notice.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-not-5",
+  "cat": "notices",
+  "title": "Statutory Bonus Declaration — Payment of Bonus Act",
+  "dept": "HR",
+  "owner": "Suresh Babu",
+  "created": "2026-03-02",
+  "topic": "Wages",
+  "summary": "Declaration of the annual statutory bonus, eligibility and the disbursement schedule.",
+  "body": "<h4>Notice</h4>\n<p>In accordance with the Payment of Bonus Act, 1965, the annual statutory bonus for the accounting year is declared for all eligible employees.</p>\n<h4>Eligibility &amp; rate</h4>\n<ul>\n<li>Employees who worked at least 30 working days in the year and draw wages within the statutory ceiling are eligible.</li>\n<li>The bonus is paid at the applicable percentage of the qualifying wage, subject to the statutory minimum and maximum.</li>\n</ul>\n<h4>Disbursement</h4>\n<p>The bonus will be credited with the current month's wages to your registered bank account. Your pay slip will show the bonus as a separate line item.</p>\n<h4>Queries</h4>\n<p>For any question on your eligibility or amount, contact Plant HR with your associate code. Please acknowledge that you have read this notice.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 3,
+  "version": "v1.0",
+  "id": "kc-tra-1",
+  "cat": "transport",
+  "title": "Weekly Bus Route Map &amp; Pickup Points",
+  "dept": "Admin / Transport",
+  "owner": "K. Rajesh",
+  "created": "2026-06-02",
+  "topic": "Routes & pickups",
+  "summary": "The zone-wise bus routes, their pickup points and the gate each route reaches.",
+  "body": "<h4>How routing works</h4>\n<p>Each bus runs a fixed zone route for the week. You are placed on the route serving your home locality, with a specific pickup point and shift. Check your route on the notice board or the Karya Vaani app.</p>\n<h4>Sample routes</h4>\n<table class=\"t\"><thead><tr><th>Bus</th><th>Route · town</th><th>Reaches</th></tr></thead>\n<tbody>\n<tr><td>B1</td><td>Tada</td><td>Plant Gate 1</td></tr>\n<tr><td>B2</td><td>Sullurpet</td><td>Plant Gate 2</td></tr>\n<tr><td>B3</td><td>Naidupet</td><td>Plant Gate 3</td></tr>\n<tr><td>B4</td><td>Varadaihpalem</td><td>Plant Gate 1</td></tr>\n</tbody></table>\n<h4>Pickup points</h4>\n<p>Each route stops at the town bus stand, junction and cross before reaching the plant gate. Board at your assigned pickup — the one nearest your residence.</p>\n<h4>Be on time</h4>\n<p>Reach your pickup point 5 minutes early. Buses do not wait beyond the scheduled minute.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 3,
+  "version": "v1.0",
+  "id": "kc-tra-2",
+  "cat": "transport",
+  "title": "Transport Safety &amp; Boarding Rules",
+  "dept": "Admin / Transport",
+  "owner": "K. Rajesh",
+  "created": "2026-05-18",
+  "topic": "Transport safety",
+  "summary": "Rules for safe boarding, conduct on board, and what to do in a breakdown or emergency.",
+  "body": "<h4>Boarding</h4>\n<ul>\n<li>Board only at your assigned pickup point and tap your ID card for attendance.</li>\n<li>Form a queue; do not rush the door. Let the bus stop completely before boarding.</li>\n<li>Keep the aisle and door clear of bags.</li>\n</ul>\n<h4>On board</h4>\n<ul>\n<li>Remain seated while the bus is moving; hold the rail if standing is unavoidable.</li>\n<li>No leaning out, no boarding/alighting from a moving bus.</li>\n<li>Report rash driving to the transport desk with the bus number.</li>\n</ul>\n<h4>In a breakdown or emergency</h4>\n<ol>\n<li>Stay calm and remain with the bus unless told otherwise.</li>\n<li>The driver informs the transport desk; a relief bus is dispatched.</li>\n<li>In an accident, the driver follows the emergency protocol and calls the plant control room.</li>\n</ol>\n<p>Your safety to and from work is part of our safety commitment. Report any concern to the transport desk.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-tra-3",
+  "cat": "transport",
+  "title": "Shift Transport Timings &amp; Late-Shift Drop",
+  "dept": "Admin / Transport",
+  "owner": "K. Rajesh",
+  "created": "2026-05-30",
+  "topic": "Schedules",
+  "summary": "Boarding and plant-arrival times for morning and general shifts, and the evening/late-shift drop.",
+  "body": "<h4>Boarding &amp; arrival</h4>\n<table class=\"t\"><thead><tr><th>Shift</th><th>First boarding</th><th>Reaches plant by</th></tr></thead>\n<tbody>\n<tr><td>Morning</td><td>05:40–06:05</td><td>06:45</td></tr>\n<tr><td>General</td><td>07:40–08:05</td><td>08:45</td></tr>\n</tbody></table>\n<h4>Evening &amp; late-shift drop</h4>\n<ul>\n<li>The evening drop leaves the plant at <strong>15:45</strong>.</li>\n<li>The last late-shift drop leaves the plant at <strong>23:15</strong>.</li>\n<li>Buses depart on the scheduled minute — be at the boarding bay on time.</li>\n</ul>\n<h4>Saturday plan</h4>\n<p>Saturday runs a reduced plan; some routes are stood down for lighter weekend demand. Check the app for your Saturday route before the weekend.</p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 2,
+  "version": "v1.0",
+  "id": "kc-tra-4",
+  "cat": "transport",
+  "title": "ID-Card Boarding &amp; Attendance Policy",
+  "dept": "Admin / Transport",
+  "owner": "K. Rajesh",
+  "created": "2026-06-10",
+  "topic": "Attendance",
+  "summary": "How ID-card scans at boarding capture transport attendance and link to the weekly roster.",
+  "body": "<h4>Why we scan</h4>\n<p>Boarding attendance is captured from your ID-card tap so the transport roster reflects who actually travelled on each trip. This helps right-size buses per route and confirms safe pickup of every worker.</p>\n<h4>How it works</h4>\n<ul>\n<li>Tap your ID card on the reader as you board your assigned bus.</li>\n<li>The scan records your route, shift and date against the weekly roster.</li>\n<li>Boarding data feeds the same attendance view used by HR and the transport desk.</li>\n</ul>\n<h4>Your responsibilities</h4>\n<ol>\n<li>Carry your ID card every day; report a lost card to HR immediately.</li>\n<li>Board only your assigned route unless a change is approved.</li>\n<li>Do not tap for a colleague — buddy-punching is misconduct.</li>\n</ol>\n<p><em>Note: live turnstile integration with the ID-card provider is being enabled; until then boarding may be captured manually by the coordinator.</em></p>"
+ },
+ {
+  "ext": "pdf",
+  "langs": [
+   "EN",
+   "TE",
+   "HI"
+  ],
+  "readMins": 3,
+  "version": "v1.0",
+  "id": "kc-tra-5",
+  "cat": "transport",
+  "title": "Monsoon Transport Contingency Plan",
+  "dept": "Admin / Transport",
+  "owner": "K. Rajesh",
+  "created": "2026-06-16",
+  "topic": "Contingency",
+  "summary": "How transport operates during heavy rain and flooding, including route diversions and communication.",
+  "body": "<h4>Purpose</h4>\n<p>Heavy rain can flood low-lying stretches on several routes. This plan keeps workers safe and informed when normal routing is affected.</p>\n<h4>Triggers</h4>\n<ul>\n<li>IMD heavy-rain warning for the Sricity region, or a reported waterlogged stretch.</li>\n<li>The transport desk activates the contingency plan and notifies affected routes.</li>\n</ul>\n<h4>What changes</h4>\n<ol>\n<li><strong>Diversions.</strong> Affected routes use an alternate safe road; the revised pickup is sent to your batch on WhatsApp.</li>\n<li><strong>Delays.</strong> Allow extra travel time; buses will not attempt flooded stretches.</li>\n<li><strong>Suspension.</strong> If a route is unsafe, it is suspended and workers are advised not to travel; attendance is protected as per policy.</li>\n</ol>\n<h4>Stay informed</h4>\n<p>Watch for the targeted transport notice to your route batch on the Karya Vaani app. When in doubt, contact the transport desk before leaving home.</p>"
+ }
+]
