@@ -109,6 +109,7 @@ export default function SecTransport() {
                 <span id="tr-rd-ctr">— contract</span>
                 <span id="tr-rd-rate">— boarding</span>
                 <span style={{ marginLeft: "auto", display: "inline-flex", gap: "6px" }}>
+                  <button className="rd-act warn" onClick={() => { window.trReportLateOpen() }}>⚠ Log late departure</button>
                   <button className="rd-act" onClick={() => { window.trGkNotifyOpen() }}>Notify batch</button>
                   <button className="rd-act primary" onClick={() => { window.trGkAttendOpen() }}>Take attendance</button>
                 </span>
@@ -118,9 +119,19 @@ export default function SecTransport() {
 
           {/* ── right column ── */}
           <div className="right-col">
+            <div className="op-panel">
+              <div className="ss-hd">Transport operator · compliance</div>
+              <div id="tr-operator-card" />
+            </div>
+
             <div className="shift-summary">
               <div className="ss-hd" id="tr-summary-label">Shift A · morning transport</div>
               <div className="ss-grid" id="tr-summary-grid" />
+            </div>
+
+            <div className="ev-panel">
+              <div className="ss-hd">Transport events · incident log</div>
+              <div className="ev-list" id="tr-events" />
             </div>
 
             <div className="women-strip" id="tr-women-strip">

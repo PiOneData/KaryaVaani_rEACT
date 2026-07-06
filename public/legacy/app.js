@@ -11326,8 +11326,114 @@ function __kvOnReady(fn) {
           toast('Night-shift consent confirmed for ' + a.name + ' · OSHC Rule 83 logged', 'green');
           if (TR_STATE.gkOpenRoute) trGkOpenRoster(TR_STATE.gkOpenRoute);
           trGkRenderNight();
+          if (typeof trLogEvent === 'function') trLogEvent('consent-collected', { code: a.code, silent: true });
         } else { toast('Consent failed: ' + ((j && j.error) || 'unknown'), 'red'); }
       }).catch(function (e) { toast('Consent failed: ' + e.message, 'red'); });
+  }
+
+  /* ── transport events / incident log + operator compliance score ──────────
+     Operational events (off-route drops, missed pickups, late departures, SOS,
+     safe drops, consent collected) are logged and drive the transport
+     operator's compliance score, alongside consent %, boarding % and on-time. */
+  const TR_EVENT_TYPES = {
+    'off-route-drop':    { label: 'Dropped off route',   sev: 'high',     neg: true },
+    'missed-pickup':     { label: 'Missed pickup',       sev: 'high',     neg: true },
+    'no-scan':           { label: 'No boarding scan',    sev: 'medium',   neg: true },
+    'late-departure':    { label: 'Late departure',      sev: 'low',      neg: true },
+    'sos':               { label: 'SOS raised',          sev: 'critical', neg: true },
+    'safe-drop':         { label: 'Safe drop confirmed', sev: 'ok',       neg: false },
+    'consent-collected': { label: 'Consent collected',   sev: 'ok',       neg: false }
+  };
+  function trLoadEvents() {
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/events')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { TR_STATE.events = (j && j.events) || []; return TR_STATE.events; })
+      .catch(function () { TR_STATE.events = TR_STATE.events || []; return TR_STATE.events; });
+  }
+  function trLogEvent(type, opts) {
+    opts = opts || {};
+    const a = opts.code ? trRoster().find(function (x) { return x.code === opts.code; }) : null;
+    const routeCode = opts.route || (a ? a.route : TR_STATE.gkOpenRoute) || '';
+    const operator = routeCode ? trRouteOperator(routeCode) : (TR_STATE.operatorFilter || '');
+    const meta = TR_EVENT_TYPES[type] || { label: type, sev: 'medium', neg: true };
+    return fetch((window.__KV_API_BASE || '') + '/api/transport/event', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: type, route: routeCode, operator: operator, code: opts.code || '', name: a ? a.name : (opts.name || ''), note: opts.note || '', severity: meta.sev, by: (window.__KVUSER && window.__KVUSER.name) || 'Operator' })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          TR_STATE.events = TR_STATE.events || []; TR_STATE.events.push(j.event);
+          if (!opts.silent) toast(meta.label + (a ? ' · ' + a.name : (routeCode ? ' · ' + routeCode : '')) + ' logged', meta.neg ? 'amber' : 'green');
+          trRenderEvents(); trRenderOperatorCard(); trGkRenderRoutes();
+          if (TR_STATE.gkOpenRoute) trGkOpenRoster(TR_STATE.gkOpenRoute);
+        } else if (!opts.silent) { toast('Could not log event: ' + ((j && j.error) || 'unknown'), 'red'); }
+      }).catch(function (e) { if (!opts.silent) toast('Could not log event: ' + e.message, 'red'); });
+  }
+  function trReportOffRoute(code) { trLogEvent('off-route-drop', { code: code, note: 'Worker dropped off the planned route / pickup point' }); }
+  function trReportLateOpen() { if (TR_STATE.gkOpenRoute) trLogEvent('late-departure', { route: TR_STATE.gkOpenRoute }); }
+
+  /* operator compliance = consent 30% + boarding 30% + on-time 25% + safety 15%
+     (safety reduced by logged incidents). */
+  function trOperatorScore(op) {
+    const routes = TR_ROUTES.filter(function (r) { return trRouteOperator(r.code) === op; });
+    let women = 0, consented = 0, pax = 0, boarded = 0, onTime = 0;
+    routes.forEach(function (r) {
+      const nightW = trRoster().filter(function (a) { return a.route === r.code && a.gender === 'F'; });
+      women += nightW.length; consented += nightW.filter(function (a) { return trConsent(a) === 'yes'; }).length;
+      const batch = trGkBatch(r.code, TR_STATE.gkShift || 'A');
+      const b = batch.filter(function (a) { return trTodayBrd(a.code) === 'ok'; }).length;
+      pax += batch.length; boarded += b;
+      if ((batch.length ? b / batch.length : 1) >= 0.78) onTime++;
+    });
+    const consentPct = women ? consented / women : 1;
+    const boardingPct = pax ? boarded / pax : 1;
+    const onTimePct = routes.length ? onTime / routes.length : 1;
+    const incidents = (TR_STATE.events || []).filter(function (e) { return e.operator === op && (TR_EVENT_TYPES[e.type] || {}).neg; }).length;
+    const safetyPct = Math.max(0, 1 - incidents * 0.08);
+    const score = Math.round((consentPct * 0.30 + boardingPct * 0.30 + onTimePct * 0.25 + safetyPct * 0.15) * 100);
+    return { operator: op, routes: routes.length, score: score, band: score >= 85 ? 'green' : score >= 70 ? 'amber' : 'red',
+      consentPct: Math.round(consentPct * 100), boardingPct: Math.round(boardingPct * 100), onTimePct: Math.round(onTimePct * 100), incidents: incidents };
+  }
+  function trBandColor(band) { return band === 'green' ? 'var(--sage)' : band === 'amber' ? 'var(--amber2)' : 'var(--ember)'; }
+  function trOpBar(label, pct) {
+    return '<div class="op-bar"><div class="op-bar-hd"><span>' + label + '</span><span class="tr-mono">' + pct + '%</span></div>' +
+      '<div class="op-bar-track"><span style="width:' + pct + '%;background:' + (pct >= 85 ? 'var(--sage2)' : pct >= 70 ? 'var(--amber2)' : 'var(--ember)') + '"></span></div></div>';
+  }
+  function trRenderOperatorCard() {
+    const host = document.getElementById('tr-operator-card');
+    if (!host) return;
+    if (TR_STATE.operatorFilter) {
+      const s = trOperatorScore(TR_STATE.operatorFilter);
+      host.innerHTML =
+        '<div class="op-score"><div class="op-score-val" style="color:' + trBandColor(s.band) + '">' + s.score + '<small>/100</small></div>' +
+          '<div class="op-score-meta"><div class="op-score-name">' + s.operator + '</div><div class="op-score-sub">' + s.routes + ' routes · ' + s.incidents + ' incident' + (s.incidents === 1 ? '' : 's') + '</div></div></div>' +
+        '<div class="op-bars">' + trOpBar('Consent · R.83', s.consentPct) + trOpBar('Boarding', s.boardingPct) + trOpBar('On-time', s.onTimePct) + '</div>';
+    } else {
+      host.innerHTML = TR_OPERATORS.map(function (op) {
+        const s = trOperatorScore(op);
+        return '<div class="op-row"><span class="op-row-dot" style="background:' + trBandColor(s.band) + '"></span>' +
+          '<span class="op-row-name">' + op + '</span>' +
+          '<span class="op-row-inc">' + (s.incidents ? '⚠ ' + s.incidents : '—') + '</span>' +
+          '<span class="op-row-score" style="color:' + trBandColor(s.band) + '">' + s.score + '</span></div>';
+      }).join('');
+    }
+  }
+  function trRenderEvents() {
+    const host = document.getElementById('tr-events');
+    if (!host) return;
+    let evs = (TR_STATE.events || []).slice();
+    if (TR_STATE.operatorFilter) evs = evs.filter(function (e) { return e.operator === TR_STATE.operatorFilter; });
+    evs = evs.reverse().slice(0, 14);
+    if (!evs.length) { host.innerHTML = '<div class="tiny muted" style="padding:6px 2px">No transport events logged yet — off-route drops, late departures and SOS appear here.</div>'; return; }
+    host.innerHTML = evs.map(function (e) {
+      const meta = TR_EVENT_TYPES[e.type] || { label: e.type, sev: e.severity, neg: true };
+      const col = meta.neg ? ((meta.sev === 'critical' || meta.sev === 'high') ? 'var(--ember)' : 'var(--amber2)') : 'var(--sage)';
+      const when = e.at ? new Date(e.at).toLocaleString('en-IN') : '';
+      return '<div class="tev"><span class="tev-dot" style="background:' + col + '"></span>' +
+        '<div class="tev-main"><div class="tev-t"><strong style="color:' + col + '">' + meta.label + '</strong>' +
+          (e.name ? ' · ' + e.name : '') + (e.route ? ' <span class="tr-mono" style="color:var(--txt4)">' + e.route + '</span>' : '') + '</div>' +
+          '<div class="tev-sub">' + (e.operator || '') + ' · ' + when + '</div></div></div>';
+    }).join('');
   }
   /* today's boarding status for a worker, deterministic per code+date. */
   function trTodayBrd(code) {
@@ -11557,6 +11663,8 @@ function __kvOnReady(fn) {
     trGkRenderRoutes();
     trGkRenderSummary();
     trGkRenderNight();
+    trRenderOperatorCard();
+    trRenderEvents();
   }
   function trGkRenderRoutes() {
     const g = document.getElementById('tr-route-grid');
@@ -11626,7 +11734,7 @@ function __kvOnReady(fn) {
         '<td class="tr-agency">' + a.agency + '</td>' +
         '<td style="color:var(--txt3)">' + a.pickup + '</td>' +
         '<td><span class="dep">' + trGkBoardTime(r, s) + '</span></td>' +
-        '<td>' + brdCell + '</td>' +
+        '<td>' + brdCell + ' <button class="rd-mini warn" onclick="event.stopPropagation();trReportOffRoute(\'' + a.code + '\')" title="Log an off-route drop for this worker">⚠</button></td>' +
         '<td>' + consCell + '</td></tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--txt4);padding:16px">No workers on this route for shift ' + s + '.</td></tr>';
     const drawer = document.getElementById('tr-roster-drawer');
@@ -11728,6 +11836,7 @@ function __kvOnReady(fn) {
   function trGkTriggerSOS() {
     const a = document.getElementById('tr-sos-alert');
     if (a) { a.classList.add('show'); setTimeout(function () { a.classList.remove('show'); }, 8000); }
+    if (typeof trLogEvent === 'function') trLogEvent('sos', { route: TR_STATE.gkOpenRoute, note: 'SOS protocol activated' });
   }
   /* roster-drawer footer actions operate on the currently open route, reusing
      the real targeted-notify / attendance endpoints. */
@@ -11744,8 +11853,9 @@ function __kvOnReady(fn) {
     if (!TR_STATE.gkShift) TR_STATE.gkShift = 'A';
     if (!TR_STATE.date) TR_STATE.date = trTodayISO();
     trGkRenderKV();
-    trLoadConsents().then(function () { trShift(TR_STATE.gkShift); });
+    Promise.all([trLoadConsents(), trLoadEvents()]).then(function () { trShift(TR_STATE.gkShift); trRenderOperatorCard(); trRenderEvents(); });
     trShift(TR_STATE.gkShift);
+    trRenderOperatorCard(); trRenderEvents();
     for (let i = 0; i < 4; i++) trGkAddScan();
     if (!TR_STATE._scanTimer) {
       TR_STATE._scanTimer = setInterval(function () { if (document.getElementById('tr-scan-feed')) trGkAddScan(); }, 9000);

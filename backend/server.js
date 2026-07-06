@@ -38,7 +38,7 @@ app.get('/api/bootstrap', (req, res) => {
   // (password hashes), or the per-week transport roster/attendance to the
   // browser — those are fetched via their own routes.
   const { onboardingDocuments, communications, users, voiceCache,
-          transportRoster, transportAttendance, nightConsents, ...rest } = s.data;
+          transportRoster, transportAttendance, nightConsents, transportEvents, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -812,6 +812,38 @@ app.post('/api/transport/consent', (req, res) => {
   store.data.nightConsents[String(code)] = rec;
   dbPut('nightConsents', String(code), rec);
   res.json({ ok: true, consent: rec });
+});
+
+/* ── Transport events / incident log ────────────────────────────────────────
+   Operational events on the buses — off-route drops, missed pickups, late
+   departures, SOS, safe drops, consent collected. These form the audit trail
+   and feed the transport operator's compliance score. */
+app.get('/api/transport/events', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  let events = (store.data.transportEvents || []);
+  if (req.query.operator) events = events.filter((e) => e.operator === req.query.operator);
+  res.json({ ok: true, events: events.slice(-500) });
+});
+app.post('/api/transport/event', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const { type, route, operator, code, name, note, severity, by } = req.body || {};
+  if (!type) return res.status(400).json({ ok: false, error: 'event type is required.' });
+  store.data.transportEvents = store.data.transportEvents || [];
+  const ev = {
+    id: 'tev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    type, route: route || '', operator: operator || '', code: code || '', name: name || '',
+    note: note || '', severity: severity || 'medium', by: by || 'Operator', at: new Date().toISOString()
+  };
+  store.data.transportEvents.push(ev);
+  dbPut('transportEvents', ev.id, ev);
+  // cap the log
+  while (store.data.transportEvents.length > 2000) {
+    const old = store.data.transportEvents.shift();
+    if (old && old.id) dbDel('transportEvents', old.id);
+  }
+  res.json({ ok: true, event: ev });
 });
 
 /* ── Role-based login ──────────────────────────────────────────────────────

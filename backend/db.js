@@ -57,7 +57,8 @@ const COLLECTIONS = {
   workerCompliance:    { table: 'worker_compliance',     kind: 'map' },
   transportRoster:     { table: 'transport_roster',      kind: 'map' },
   transportAttendance: { table: 'transport_attendance',  kind: 'map' },
-  nightConsents:       { table: 'night_consents',        kind: 'map' }
+  nightConsents:       { table: 'night_consents',        kind: 'map' },
+  transportEvents:     { table: 'transport_events',      kind: 'array', id: (r) => r.id }
 };
 const META_TABLE = 'store_meta';
 
