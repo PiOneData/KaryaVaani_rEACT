@@ -607,7 +607,15 @@ const VOICE_TEMPLATES = [
   'Fire-safety reminder for all zones. Know the two nearest exits from your work area and keep them clear at all times. On the fire alarm, stop work, switch off your machine, and walk — do not run — to your assembly point. Do not use the lifts. Acknowledge that you have read this.',
   'The company transport schedule has been updated. Check your pickup point and timing on the notice board or the Karya Vaani app. Morning, general and late-shift buses each run on their own schedule. Be at your pickup point 5 minutes early — buses do not wait beyond the scheduled minute.'
 ];
-const VOICE_PREWARM_TOTAL = VOICE_TEMPLATES.length * VOICE_LANGS.length;
+/* already-translated native-script texts (the transport comms) — TTS directly,
+   no translate step, so their audio is cached too. */
+const VOICE_DIRECT = [
+  'నేటి రాత్రి షిఫ్ట్ C కోసం రవాణా ఏర్పాటు చేయబడింది. "అవును" పంపండి.',
+  'నైదుపేట రూట్ బస్సు 15 నిమిషాలు ఆలస్యంగా ఉంది. కొత్త రాక సమయం 06:15.',
+  'మీరు సురక్షితంగా ఉన్నారా? 1800-XXX-XXXX కి కాల్ చేయండి.',
+  'మీరు సురక్షితంగా ఇంటికి చేరుకున్నారు. 23:14. శుభ రాత్రి.'
+];
+const VOICE_PREWARM_TOTAL = VOICE_TEMPLATES.length * VOICE_LANGS.length + VOICE_DIRECT.length;
 function srcKey(text, lang) { return lang + '|' + crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 12); }
 
 async function prewarmTranslate(text, code) {
@@ -654,6 +662,18 @@ async function prewarmVoices() {
         if (r.generated) generated++; else cached++;
       } catch (e) { failed++; /* keep going; a later boot resumes the rest */ }
     }
+  }
+  // transport comms (already-translated) — TTS directly, no translate step
+  for (const text of VOICE_DIRECT) {
+    const key = 'direct|' + crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 12);
+    const warm = store.data.voiceWarm[key];
+    if (warm && warm.hash && voiceCacheGet(warm.hash)) { cached++; continue; }
+    try {
+      const r = await prewarmTts(text);
+      store.data.voiceWarm[key] = { hash: r.hash, at: new Date().toISOString() };
+      dbPut('voiceWarm', key, store.data.voiceWarm[key]);
+      if (r.generated) generated++; else cached++;
+    } catch (e) { failed++; }
   }
   VOICE_PREWARM_RUNNING = false;
   console.log('[voice] prewarm done · ' + (generated + cached) + '/' + VOICE_PREWARM_TOTAL + ' (' + generated + ' new, ' + cached + ' already cached, ' + failed + ' failed)');

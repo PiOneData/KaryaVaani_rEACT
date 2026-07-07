@@ -11911,14 +11911,39 @@ function __kvOnReady(fn) {
         });
       }).catch(function () { toast('Could not load transport comms', 'red'); });
   }
+  /* Play the comm's translated (native-script) audio via the VAANI TTS service
+     (/api/tts), which caches every synthesised WAV in the DB by a hash of the
+     text. The blob is also kept per session so replays are instant. */
+  const TR_KV_AUDIO = {};       /* message index → object URL */
+  let TR_KV_AUDIO_EL = null;    /* the Audio element currently playing */
+  function trKvResetButtons() {
+    const host = document.getElementById('tr-kv-msgs');
+    if (host) host.querySelectorAll('.pm').forEach(function (b) { b.textContent = '▶'; b.classList.remove('on'); });
+  }
+  function trKvStop() {
+    if (TR_KV_AUDIO_EL) { try { TR_KV_AUDIO_EL.pause(); } catch (e) {} TR_KV_AUDIO_EL = null; }
+    trKvResetButtons();
+  }
   function trGkPlayKV(i, btn) {
-    try {
-      if (!window.speechSynthesis) { toast('Voice playback not available', 'amber'); return; }
-      window.speechSynthesis.cancel();
-      const m = TR_KV_MSGS[i]; const u = new SpeechSynthesisUtterance(m.speech); u.lang = 'en-IN'; u.rate = 0.9;
-      window.speechSynthesis.speak(u);
-      if (btn) { btn.textContent = '❚❚'; u.onend = function () { btn.textContent = '▶'; }; u.onerror = function () { btn.textContent = '▶'; }; }
-    } catch (e) {}
+    const m = TR_KV_MSGS[i];
+    if (!m) return;
+    const wasPlaying = btn && btn.classList.contains('on');
+    trKvStop();
+    if (wasPlaying) return;   // clicking the playing button stops it
+    const start = function (url) {
+      const a = new Audio(url); TR_KV_AUDIO_EL = a;
+      if (btn) { btn.textContent = '❚❚'; btn.classList.add('on'); }
+      const done = function () { if (btn) { btn.textContent = '▶'; btn.classList.remove('on'); } if (TR_KV_AUDIO_EL === a) TR_KV_AUDIO_EL = null; };
+      a.onended = done; a.onerror = done;
+      a.play().catch(done);
+    };
+    if (TR_KV_AUDIO[i]) { start(TR_KV_AUDIO[i]); return; }
+    if (btn) btn.textContent = '…';
+    fetch((window.__KV_API_BASE || '') + '/api/tts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: m.text })
+    }).then(function (r) { if (!r.ok) throw new Error('tts ' + r.status); return r.blob(); })
+      .then(function (blob) { const url = URL.createObjectURL(blob); TR_KV_AUDIO[i] = url; start(url); })
+      .catch(function () { if (btn) { btn.textContent = '▶'; btn.classList.remove('on'); } toast('Voice not available for this message', 'amber'); });
   }
 
   /* live access-card scan feed */
