@@ -37,7 +37,7 @@ app.get('/api/bootstrap', (req, res) => {
   // never ship documents / voice audio (base64), the comms log, the users table
   // (password hashes), or the per-week transport roster/attendance to the
   // browser — those are fetched via their own routes.
-  const { onboardingDocuments, communications, users, voiceCache,
+  const { onboardingDocuments, communications, users, voiceCache, voiceWarm,
           transportRoster, transportAttendance, nightConsents, transportEvents, ...rest } = s.data;
   res.json(rest);
 });
@@ -588,11 +588,98 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
-/* Lightweight cache status — how many voices are stored (for the pre-generate UI). */
-app.get('/api/tts/cache-status', (req, res) => {
+/* ── Boot-time voice pre-warm ───────────────────────────────────────────────
+   Cache the voice for every broadcast template in every language into the DB on
+   startup, SEQUENTIALLY (one after another — the TTS model is single-worker, so
+   parallel requests fail). Each (template, language) whose voice is already in
+   the cache is skipped, so it never re-generates and a restart resumes wherever
+   it left off. Runs in the background so it never blocks boot. */
+const VOICE_LANGS = ['TE', 'HI', 'TA', 'OR', 'BN', 'MR'];
+const VOICE_TEMPLATES = [
+  'Heavy rain expected this afternoon. All outdoor work to be suspended from 14:00. Move to the nearest covered area when the hooter sounds. Supervisors, please confirm headcount on WhatsApp.',
+  'Evacuation drill at 15:30 today. Compressor Line proceed to Assembly Area-A near Gate 2. Paint Shop proceed to Area-C behind the canteen. Do not use the elevators. Report to your supervisor at the assembly point.',
+  'PPE reminder for the Compressor Line. Class-B helmet, steel-toe shoes and cut-resistant gloves are mandatory before entering the shop floor. Lockout/Tagout applies whenever you service equipment. Acknowledge that you have read this.',
+  'Heat advisory in effect for the summer shift. Drink water every 30 minutes from the marked stations. Take your rest break in the cooled rest area. Report any dizziness or cramps to your supervisor immediately. Acknowledge that you have read this.',
+  'The shift roster changes from Monday. General shift moves to 07:00–15:30. Check your updated shift and team on the notice board or the Karya Vaani app. Supervisors will confirm your shift in person. Reply on WhatsApp if your shift is unclear.',
+  'The 2026 minimum wage revision is now in effect. The revised rates and the VDA component are posted on the notice board and in the Karya Vaani app. Your next pay slip will reflect the new rate. Contact Plant HR if you have any questions.',
+  'The plant will remain closed on the declared holiday. No shift will operate. Company transport will not run on that day. The full 2026 holiday list is posted on the notice board. Acknowledge that you have read this.',
+  'New joiners must complete the general plant induction module before reaching the shop floor. The module is short and ends with a quiz. Passing all mandatory modules earns your safety certificate. Speak to your supervisor to schedule your session.',
+  'Fire-safety reminder for all zones. Know the two nearest exits from your work area and keep them clear at all times. On the fire alarm, stop work, switch off your machine, and walk — do not run — to your assembly point. Do not use the lifts. Acknowledge that you have read this.',
+  'The company transport schedule has been updated. Check your pickup point and timing on the notice board or the Karya Vaani app. Morning, general and late-shift buses each run on their own schedule. Be at your pickup point 5 minutes early — buses do not wait beyond the scheduled minute.'
+];
+const VOICE_PREWARM_TOTAL = VOICE_TEMPLATES.length * VOICE_LANGS.length;
+function srcKey(text, lang) { return lang + '|' + crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 12); }
+
+async function prewarmTranslate(text, code) {
+  const resp = await fetch(TRANSLATE_API_URL + '/translate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, source: toNllb('eng_Latn'), target: toNllb(code) })
+  });
+  const body = await resp.text();
+  let json; try { json = body ? JSON.parse(body) : {}; } catch { json = {}; }
+  return json.translation || (json.translations && json.translations[code]) || null;
+}
+async function prewarmTts(text) {
+  const hash = ttsHash(text);
+  if (voiceCacheGet(hash)) return { hash, generated: false };   // already cached — never re-generate
+  const resp = await fetch(TTS_API_URL + '/tts', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text })
+  });
+  if (!resp.ok) throw new Error('tts ' + resp.status);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  voiceCachePut(hash, buf, resp.headers.get('content-type') || 'audio/wav');
+  return { hash, generated: true };
+}
+
+let VOICE_PREWARM_RUNNING = false;
+async function prewarmVoices() {
+  if (VOICE_PREWARM_RUNNING) return;
+  const store = readStore();
+  if (!store || !store.data) return;
+  VOICE_PREWARM_RUNNING = true;
+  store.data.voiceWarm = store.data.voiceWarm || {};
+  let generated = 0, cached = 0, failed = 0;
+  console.log('[voice] prewarm starting · ' + VOICE_PREWARM_TOTAL + ' template voices (sequential)');
+  for (let i = 0; i < VOICE_TEMPLATES.length; i++) {
+    for (const lang of VOICE_LANGS) {
+      const key = srcKey(VOICE_TEMPLATES[i], lang);
+      const warm = store.data.voiceWarm[key];
+      if (warm && warm.hash && voiceCacheGet(warm.hash)) { cached++; continue; }   // already done — skip
+      try {
+        const text = await prewarmTranslate(VOICE_TEMPLATES[i], lang);
+        if (!text) throw new Error('no translation');
+        const r = await prewarmTts(text);
+        store.data.voiceWarm[key] = { hash: r.hash, lang, at: new Date().toISOString() };
+        dbPut('voiceWarm', key, store.data.voiceWarm[key]);
+        if (r.generated) generated++; else cached++;
+      } catch (e) { failed++; /* keep going; a later boot resumes the rest */ }
+    }
+  }
+  VOICE_PREWARM_RUNNING = false;
+  console.log('[voice] prewarm done · ' + (generated + cached) + '/' + VOICE_PREWARM_TOTAL + ' (' + generated + ' new, ' + cached + ' already cached, ' + failed + ' failed)');
+}
+
+/* Cache status — voices stored + how many template voices are warmed (drives
+   whether the frontend still shows the pre-generate button). */
+function voiceWarmDone() {
   const s = readStore();
   const list = (s && s.data && s.data.voiceCache) || [];
-  res.json({ ok: true, count: list.length, max: VOICE_CACHE_MAX });
+  const warm = (s && s.data && s.data.voiceWarm) || {};
+  const have = new Set(list.map((v) => v.hash));
+  let done = 0;
+  Object.keys(warm).forEach((k) => { if (warm[k] && warm[k].hash && have.has(warm[k].hash)) done++; });
+  return { count: list.length, done: done, total: VOICE_PREWARM_TOTAL };
+}
+app.get('/api/tts/cache-status', (req, res) => {
+  const w = voiceWarmDone();
+  res.json({ ok: true, count: w.count, max: VOICE_CACHE_MAX, templatesDone: w.done, templatesTotal: w.total, templatesWarmed: w.done >= w.total });
+});
+/* Manual kick (admin) — same sequential prewarm, useful if the services were
+   down at boot. Returns immediately; work continues in the background. */
+app.post('/api/tts/prewarm', (req, res) => {
+  if (VOICE_PREWARM_RUNNING) return res.json({ ok: true, running: true });
+  prewarmVoices().catch((e) => console.error('[voice] prewarm error:', e.message));
+  res.json({ ok: true, started: true });
 });
 
 /* --- WhatsApp gateway proxy -----------------------------------------------
@@ -1006,4 +1093,9 @@ Promise.resolve(initDb())
   .catch((err) => console.error('Store init error:', err.message))
   .finally(() => {
     app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));
+    // Pre-warm template voices into the DB, sequentially, in the background —
+    // never blocks boot; skips anything already cached. Disable with VOICE_PREWARM=off.
+    if (process.env.VOICE_PREWARM !== 'off') {
+      setTimeout(() => { prewarmVoices().catch((e) => console.error('[voice] prewarm error:', e.message)); }, 4000);
+    }
   });

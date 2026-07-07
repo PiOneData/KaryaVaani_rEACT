@@ -5979,43 +5979,38 @@ function __kvOnReady(fn) {
     Object.keys(VB_VOICE_CACHE).forEach(function (k) { delete VB_VOICE_CACHE[k]; });
   }
 
-  /* Pre-generate & store the voice note for every template in every language,
-     once. The backend caches each synthesised WAV by a hash of its text, so
-     after this runs, translating a template and playing / attaching its voice
-     is instant (served from the store instead of re-rendering). Uses the same
-     live translate → /api/tts path as normal use, so the cached text matches
-     exactly. Runs sequentially — the voice + translate models are single-worker. */
-  async function vbPrewarmVoices() {
-    const presets = (typeof VB_PRESETS !== 'undefined') ? VB_PRESETS : {};
-    const keys = Object.keys(presets);
-    const langs = Object.keys(VB_NLLB);
+  /* Kick the server-side pre-warm (sequential, one voice at a time, skips any
+     already cached) and poll its progress. The backend also runs this on boot,
+     so this button is only a manual fallback — it hides itself once every
+     template voice is cached. */
+  function vbPrewarmVoices() {
     const btn = document.getElementById('vb-prewarm-btn');
-    const orig = btn ? btn.innerHTML : '';
-    const total = keys.length * langs.length;
-    let done = 0, ok = 0, fail = 0;
-    if (!total) { toast('No templates to pre-generate', 'red'); return; }
-    if (btn) btn.disabled = true;
-    toast('Pre-generating ' + total + ' template voices · this runs once and is then stored…', 'green');
-    for (const k of keys) {
-      const body = presets[k] && presets[k].body;
-      if (!body) { continue; }
-      for (const code of langs) {
-        done++;
-        if (btn) btn.textContent = 'Caching ' + done + '/' + total + '…';
-        try {
-          const text = await vbTranslateOne(body, code);
-          const r = await fetch('/api/tts', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
-          });
-          if (!r.ok) throw new Error('tts ' + r.status);
-          await r.blob();
-          ok++;
-        } catch (e) { fail++; }
-      }
-    }
-    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
-    toast('Template voices stored · ' + ok + ' ready' + (fail ? ' · ' + fail + ' failed' : '') + '. Playback is now instant.', fail ? 'amber' : 'green');
+    if (btn) { btn.disabled = true; btn.textContent = 'Caching on server…'; }
+    fetch((window.__KV_API_BASE || '') + '/api/tts/prewarm', { method: 'POST' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function () {
+        toast('Voice caching running on the server (sequential) — this continues even if you leave the page.', 'green');
+        if (vbPrewarmPoll._t) clearInterval(vbPrewarmPoll._t);
+        vbPrewarmPoll._t = setInterval(vbPrewarmPoll, 4000);
+        vbPrewarmPoll();
+      })
+      .catch(function () { toast('Could not start voice caching', 'red'); if (btn) { btn.disabled = false; btn.textContent = 'Pre-generate voices'; } });
+  }
+  function vbPrewarmPoll() {
+    fetch((window.__KV_API_BASE || '') + '/api/tts/cache-status')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        const btn = document.getElementById('vb-prewarm-btn');
+        if (!j) return;
+        if (j.templatesWarmed) {
+          if (vbPrewarmPoll._t) { clearInterval(vbPrewarmPoll._t); vbPrewarmPoll._t = null; }
+          if (btn) btn.style.display = 'none';
+          toast('All template voices are cached · playback is now instant.', 'green');
+        } else if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Caching ' + (j.templatesDone || 0) + '/' + (j.templatesTotal || '?') + '…';
+        }
+      }).catch(function () {});
   }
   window.vbPrewarmVoices = vbPrewarmVoices;
 
@@ -6894,6 +6889,22 @@ function __kvOnReady(fn) {
     vbRenderLangs();
     vbRenderAudChips();
     vbPopulateKcTemplates();
+    vbSyncPrewarmButton();
+  }
+  /* the backend caches all template voices on boot; once that's complete, the
+     manual "Pre-generate voices" button is no longer needed, so hide it. */
+  function vbSyncPrewarmButton() {
+    const btn = document.getElementById('vb-prewarm-btn');
+    if (!btn) return;
+    fetch((window.__KV_API_BASE || '') + '/api/tts/cache-status')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.templatesWarmed) { btn.style.display = 'none'; }
+        else {
+          btn.style.display = '';
+          if (j && j.templatesTotal) btn.title = 'Template voices cached: ' + (j.templatesDone || 0) + '/' + j.templatesTotal + ' (auto-caching on the server)';
+        }
+      }).catch(function () {});
   }
   __kvOnReady(initVb);
 
