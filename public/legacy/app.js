@@ -11838,10 +11838,12 @@ function __kvOnReady(fn) {
       text: 'మీరు సురక్షితంగా ఇంటికి చేరుకున్నారు. 23:14. శుభ రాత్రి.', ch: 'WhatsApp', ack: 'ak-ok', ackl: '✓ OSHC R.83 logged',
       speech: 'You have safely reached home at 11:14 PM. Good night.' }
   ];
+  /* compact panel — only the top 3 comms, laid out as a horizontal strip you
+     scroll with the ‹ › buttons; "View all" opens the full searchable table. */
   function trGkRenderKV() {
     const host = document.getElementById('tr-kv-msgs');
     if (!host) return;
-    host.innerHTML = TR_KV_MSGS.map(function (m, i) {
+    host.innerHTML = TR_KV_MSGS.slice(0, 3).map(function (m, i) {
       return '<div class="kvm"><div class="kvm-bar ' + m.bar + '"></div><div class="kvm-body">' +
         '<div class="kvm-hd"><span class="kvm-type ' + m.type + '">' + m.label + '</span><span class="kvm-time">' + m.time + '</span></div>' +
         '<div class="kvm-to">' + m.to + '</div><div class="kvm-text te">' + m.text + '</div>' +
@@ -11849,6 +11851,54 @@ function __kvOnReady(fn) {
           '<button class="pm" onclick="trGkPlayKV(' + i + ',this)">▶</button>' +
           '<span class="kvm-ack ' + m.ack + '">' + m.ackl + '</span></div></div></div>';
     }).join('');
+  }
+  function trKvScroll(dir) {
+    const el = document.getElementById('tr-kv-scroll');
+    if (el) el.scrollBy({ left: dir * 240, behavior: 'smooth' });
+  }
+  /* View all transport comms as a searchable, paginated table (KVTABLE). Pulls
+     the representative operational comms + the real targeted transport
+     notifications logged to the communications trail. */
+  function trViewAllComms() {
+    const ops = TR_KV_MSGS.map(function (m) { return { at: null, type: m.label, to: m.to, message: m.text, channel: (m.ch || '').split(' ')[0], status: (m.ackl || '').replace(/[✓]/g, '').trim() || 'sent' }; });
+    fetch((window.__KV_API_BASE || '') + '/api/communications')
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        const comms = (j && j.communications) || [];
+        const logged = comms.filter(function (c) { return c.route || /transport/i.test(c.subject || ''); })
+          .map(function (c) {
+            return { at: c.at, type: c.subject || 'Transport notification',
+              to: Array.isArray(c.to) ? (c.to[0] + (c.to.length > 1 ? ' +' + (c.to.length - 1) : '')) : (c.to || '—'),
+              message: c.preview || '', channel: c.channel || '', status: c.status || '' };
+          });
+        const rows = logged.concat(ops);   // newest logged first, then the samples
+        omModal(
+          '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Karyavaani · transport comms</span>' +
+            '<span class="modal-h-title">All transport communications</span></div>' +
+            '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+          '<div class="modal-body">' +
+            '<div class="dir-controls" style="margin-bottom:10px"><input type="text" class="input" id="trcomm-search" autocomplete="off" placeholder="Search type, recipient, message, channel, status…" style="max-width:360px"></div>' +
+            '<table class="t"><thead><tr><th>Time</th><th>Type</th><th>To</th><th>Message</th><th>Channel</th><th>Status</th></tr></thead><tbody id="trcomm-body"></tbody></table>' +
+            '<div id="trcomm-pagination" class="om-pagination"></div>' +
+          '</div>' +
+          '<div class="modal-footer"><div class="modal-footer-left"><span class="pill outline" id="trcomm-count">—</span></div>' +
+            '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div></div>',
+          960
+        );
+        KVTABLE.set({
+          key: 'trcomm', tbody: 'trcomm-body', pager: 'trcomm-pagination', count: 'trcomm-count', noun: 'comms',
+          pageSize: 9, cols: 6, rows: rows,
+          text: function (x) { return (x.type || '') + ' ' + (x.to || '') + ' ' + (x.message || '') + ' ' + (x.channel || '') + ' ' + (x.status || ''); },
+          row: function (x) {
+            const when = x.at ? new Date(x.at).toLocaleString('en-IN') : '—';
+            const sc = x.status === 'sent' ? 'green' : x.status === 'mock' ? 'amber' : x.status === 'failed' ? 'red' : 'outline';
+            return '<tr><td class="tiny">' + when + '</td><td class="tiny t-strong">' + (x.type || '') + '</td>' +
+              '<td class="tiny">' + (x.to || '—') + '</td><td class="tiny">' + String(x.message || '').slice(0, 90) + '</td>' +
+              '<td><span class="pill ' + (x.channel === 'email' ? 'blue' : 'green') + ' tiny">' + (x.channel || '—') + '</span></td>' +
+              '<td><span class="pill ' + sc + ' tiny">' + (x.status || '—') + '</span></td></tr>';
+          }
+        });
+      }).catch(function () { toast('Could not load transport comms', 'red'); });
   }
   function trGkPlayKV(i, btn) {
     try {

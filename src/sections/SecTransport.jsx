@@ -142,15 +142,27 @@ export default function SecTransport() {
             <div className="kv-panel">
               <div className="kv-hd">
                 <div className="kv-pip" />
-                <div><div className="kv-name">Karyavaani</div><div className="kv-sub">Transport comms</div></div>
+                <div><div className="kv-name">Karyavaani</div><div className="kv-sub">Transport comms · top 3</div></div>
+                <span className="kv-tools">
+                  <button className="kv-scroll" onClick={() => { window.trKvScroll(-1) }} title="Scroll left">‹</button>
+                  <button className="kv-scroll" onClick={() => { window.trKvScroll(1) }} title="Scroll right">›</button>
+                  <button className="kv-viewall" onClick={() => { window.trViewAllComms() }}>View all</button>
+                </span>
               </div>
-              <div className="kv-msgs" id="tr-kv-msgs" />
+              <div className="kv-msgs-scroll" id="tr-kv-scroll">
+                <div className="kv-msgs" id="tr-kv-msgs" />
+              </div>
             </div>
 
             <div className="sos-row" id="tr-sos-row">
-              <div className="sos-lbl">Emergency · OSHC Rule 83(f)</div>
-              <div className="sos-nums"><span className="sos-n">181</span><span className="sos-n">1800-XXX-0001</span></div>
-              <button className="btn-sos" onClick={() => { window.trGkTriggerSOS() }}>Trigger SOS</button>
+              <div className="sos-line">
+                <span className="sos-lbl">Emergency · OSHC Rule 83(f)</span>
+                <span className="sos-n">1800-XXX-0001</span>
+              </div>
+              <div className="sos-line">
+                <span className="sos-n">Women helpline · 181</span>
+                <button className="btn-sos" onClick={() => { window.trGkTriggerSOS() }}>Trigger SOS</button>
+              </div>
             </div>
           </div>
         </div>
