@@ -11819,7 +11819,7 @@ function __kvOnReady(fn) {
     const tok = document.getElementById('tr-women-tokens');
     if (tok) tok.innerHTML = women.map(function (a, i) {
       const k = i % states.length;
-      return '<div class="wst ' + states[k] + '"><div class="wst-dot"></div><div><div class="wst-name">' + a.name + '</div><div style="font-size:8.5px;opacity:.7">' + st[k] + '</div></div></div>';
+      return '<div class="wst ' + states[k] + '"><div class="wst-dot"></div><div><div class="wst-name">' + a.name + '</div><div style="font-size:11.5px;opacity:.7">' + st[k] + '</div></div></div>';
     }).join('');
   }
 
@@ -11865,22 +11865,29 @@ function __kvOnReady(fn) {
     { g: 'Gate 2', b: 'sb-f', l: '♀ CTR' }, { g: 'Gate 1', b: 'sb-ctr', l: 'CTR' },
     { g: 'Gate 2', b: 'sb-tr', l: 'EMP' }, { g: 'Gate 3', b: 'sb-ctr', l: 'CTR' }, { g: 'Gate 2', b: 'sb-f', l: '♀ CTR' }
   ];
+  /* rolling access-card feed — a new ID-card swipe animates in from the left
+     every few seconds and old ones roll off the right, simulating live turnstile
+     scans. The worker + gate are pseudo-random for a lively feel, and the badge
+     reflects the real worker (♀ / EMP / contract). */
   function trGkAddScan() {
     const f = document.getElementById('tr-scan-feed');
     if (!f) return;
     const roster = trRoster();
     if (!roster.length) return;
-    const a = roster[(TR_STATE._scanIdx || 0) % roster.length];
-    const sc = TR_SCAN_POOL[(TR_STATE._scanIdx || 0) % TR_SCAN_POOL.length];
     TR_STATE._scanIdx = (TR_STATE._scanIdx || 0) + 1;
+    const a = roster[trHash('scan|' + TR_STATE._scanIdx + '|' + trTodayISO()) % roster.length];
+    const gate = 'Gate ' + (1 + (trHash(a.code) % 3));
+    const dir = (trHash('d' + TR_STATE._scanIdx) % 2) ? 'IN' : 'OUT';
+    const badge = a.gender === 'F' ? ['sb-f', '♀ ' + (a.type === 'emp' ? 'EMP' : 'CTR')]
+      : (a.type === 'emp' ? ['sb-tr', 'EMP'] : ['sb-ctr', 'CTR']);
     const now = new Date();
     const t = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
-    const el = document.createElement('div'); el.className = 'sfe'; el.style.borderColor = 'rgba(22,80,112,.35)';
-    el.innerHTML = '<span class="sfe-id">' + a.code + '</span><span style="color:var(--txt4)">' + sc.g + ' OUT</span>' +
-      '<span class="tr-mono" style="font-size:9px;color:var(--txt4)">' + t + '</span><span class="sfe-b ' + sc.b + '">' + sc.l + '</span>';
+    const el = document.createElement('div'); el.className = 'sfe sfe-in';
+    el.innerHTML = '<span class="sfe-id">' + a.code + '</span><span style="color:var(--txt4)">' + gate + ' ' + dir + '</span>' +
+      '<span class="tr-mono" style="font-size:12px;color:var(--txt4)">' + t + '</span><span class="sfe-b ' + badge[0] + '">' + badge[1] + '</span>';
     f.insertBefore(el, f.firstChild);
-    setTimeout(function () { el.style.borderColor = ''; }, 1600);
-    while (f.children.length > 5) f.removeChild(f.lastChild);
+    setTimeout(function () { el.classList.remove('sfe-in'); }, 600);
+    while (f.children.length > 6) f.removeChild(f.lastChild);
   }
   function trGkTriggerSOS() {
     const a = document.getElementById('tr-sos-alert');
@@ -11907,7 +11914,11 @@ function __kvOnReady(fn) {
     trRenderOperatorCard(); trRenderEvents();
     for (let i = 0; i < 4; i++) trGkAddScan();
     if (!TR_STATE._scanTimer) {
-      TR_STATE._scanTimer = setInterval(function () { if (document.getElementById('tr-scan-feed')) trGkAddScan(); }, 9000);
+      TR_STATE._scanTimer = setInterval(function () {
+        // only animate while the transport board is actually on screen
+        const sec = document.getElementById('sec-transport');
+        if (document.getElementById('tr-scan-feed') && sec && sec.classList.contains('active')) trGkAddScan();
+      }, 3800);
     }
   }
   __kvOnReady(initTr);
