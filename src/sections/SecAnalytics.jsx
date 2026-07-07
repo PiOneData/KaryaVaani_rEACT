@@ -53,6 +53,10 @@ export default function SecAnalytics() {
           Communications
         </div>
         {' '}
+        <div className="tab" id="an-tab-operators" onClick={(event) => { window.anTab('operators', event.currentTarget) }} data-onclick="anTab('operators', this)">
+          Transport operators
+        </div>
+        {' '}
         <div className="tab" id="an-tab-chat" onClick={(event) => { window.anTab('chat', event.currentTarget) }} data-onclick="anTab('chat', this)">
           Chat engagement analytics
         </div>
@@ -287,6 +291,28 @@ export default function SecAnalytics() {
             <tbody id="comm-log-body" />
           </table>
           <div id="comm-pagination" className="om-pagination" />
+        </div>
+      </div>
+      {' '}
+      {/* ── TRANSPORT OPERATOR COMPLIANCE + SLA PANE ── */}
+      <div id="an-pane-operators" className="an-pane" style={{ display: "none" }}>
+        <div id="an-ops-kpis" className="g4" style={{ margin: "4px 0 16px" }} />
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="card-h-title">Transport operator compliance &amp; SLA</div>
+              <div className="card-h-sub">
+                Each fleet operator scored on consent · boarding · on-time, minus logged incidents.
+                Operators below the SLA target of 85 are flagged; below 70 is a breach.
+              </div>
+            </div>
+          </div>
+          <table className="t">
+            <thead>
+              <tr><th>Operator</th><th>Routes</th><th>Consent</th><th>Boarding</th><th>On-time</th><th>Incidents</th><th>Score</th><th>SLA status</th></tr>
+            </thead>
+            <tbody id="an-ops-body" />
+          </table>
         </div>
       </div>
       {' '}

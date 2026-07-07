@@ -7736,6 +7736,7 @@ function __kvOnReady(fn) {
         if (typeof initExposureAnalytics === 'function') initExposureAnalytics();
         if (typeof initReadinessAnalytics === 'function') initReadinessAnalytics();
         if (typeof initCommsAnalytics === 'function') initCommsAnalytics();
+        if (typeof initTransportOps === 'function') initTransportOps();
         initChatAnalytics();
       }
       if (id === 'chat') {
@@ -11406,7 +11407,8 @@ function __kvOnReady(fn) {
       const s = trOperatorScore(TR_STATE.operatorFilter);
       host.innerHTML =
         '<div class="op-score"><div class="op-score-val" style="color:' + trBandColor(s.band) + '">' + s.score + '<small>/100</small></div>' +
-          '<div class="op-score-meta"><div class="op-score-name">' + s.operator + '</div><div class="op-score-sub">' + s.routes + ' routes · ' + s.incidents + ' incident' + (s.incidents === 1 ? '' : 's') + '</div></div></div>' +
+          '<div class="op-score-meta"><div class="op-score-name">' + s.operator + '</div><div class="op-score-sub">' + s.routes + ' routes · ' + s.incidents + ' incident' + (s.incidents === 1 ? '' : 's') + '</div>' +
+            '<div style="margin-top:4px"><span class="pill ' + (typeof trSlaStatus === 'function' ? trSlaStatus(s.score).band : 'outline') + ' tiny">' + (typeof trSlaStatus === 'function' ? trSlaStatus(s.score).label : '') + '</span></div></div></div>' +
         '<div class="op-bars">' + trOpBar('Consent · R.83', s.consentPct) + trOpBar('Boarding', s.boardingPct) + trOpBar('On-time', s.onTimePct) + '</div>';
     } else {
       host.innerHTML = TR_OPERATORS.map(function (op) {
@@ -11435,6 +11437,53 @@ function __kvOnReady(fn) {
           '<div class="tev-sub">' + (e.operator || '') + ' · ' + when + '</div></div></div>';
     }).join('');
   }
+
+  /* ── operator SLA + admin analytics (Governance → Transport operators) ──── */
+  const TR_SLA = { target: 85, breach: 70 };
+  function trSlaStatus(score) {
+    return score >= TR_SLA.target ? { label: 'Meets SLA', band: 'green' }
+      : score >= TR_SLA.breach ? { label: 'At risk', band: 'amber' }
+      : { label: 'SLA breach', band: 'red' };
+  }
+  function trOpsRender() {
+    const host = document.getElementById('an-ops-kpis');
+    if (!host) return;
+    const scores = TR_OPERATORS.map(trOperatorScore);
+    const total = scores.length || 1;
+    const avg = Math.round(scores.reduce(function (s, x) { return s + x.score; }, 0) / total);
+    const belowSla = scores.filter(function (x) { return x.score < TR_SLA.target; }).length;
+    const breaches = scores.filter(function (x) { return x.score < TR_SLA.breach; }).length;
+    const incidents = scores.reduce(function (s, x) { return s + x.incidents; }, 0);
+    const kpi = function (eye, val, sub, color) {
+      return '<div class="kpi"><div class="kpi-eye">' + eye + '</div><div class="kpi-val"' + (color ? ' style="color:' + color + '"' : '') + '>' + val + '</div><div class="kpi-sub">' + sub + '</div></div>';
+    };
+    host.innerHTML =
+      kpi('Operators', scores.length, 'fleet vendors on ' + TR_ROUTES.length + ' routes') +
+      kpi('Avg compliance', avg + '<small>/100</small>', 'across operators', avg >= 85 ? 'var(--green-dk)' : avg >= 70 ? 'var(--amber-dk)' : 'var(--red-dk)') +
+      kpi('Below SLA (' + TR_SLA.target + ')', belowSla, breaches + ' in breach (<' + TR_SLA.breach + ')', belowSla ? 'var(--amber-dk)' : 'var(--green-dk)') +
+      kpi('Incidents logged', incidents, 'off-route · late · SOS', incidents ? 'var(--red-dk)' : 'var(--green-dk)');
+    const tb = document.getElementById('an-ops-body');
+    if (tb) tb.innerHTML = scores.slice().sort(function (a, b) { return a.score - b.score; }).map(function (x) {
+      const sla = trSlaStatus(x.score);
+      const sc = x.band === 'green' ? 'var(--green-dk)' : x.band === 'amber' ? 'var(--amber-dk)' : 'var(--red-dk)';
+      return '<tr>' +
+        '<td class="t-strong">' + x.operator + '</td>' +
+        '<td>' + x.routes + '</td>' +
+        '<td>' + x.consentPct + '%</td>' +
+        '<td>' + x.boardingPct + '%</td>' +
+        '<td>' + x.onTimePct + '%</td>' +
+        '<td>' + (x.incidents ? '<span class="pill red tiny">' + x.incidents + '</span>' : '<span class="pill green tiny">0</span>') + '</td>' +
+        '<td><span class="mono t-strong" style="color:' + sc + '">' + x.score + '</span></td>' +
+        '<td><span class="pill ' + sla.band + ' tiny">' + sla.label + '</span></td>' +
+      '</tr>';
+    }).join('');
+  }
+  function initTransportOps() {
+    if (!document.getElementById('an-ops-kpis')) return;
+    trOpsRender();
+    Promise.all([trLoadConsents(), trLoadEvents()]).then(trOpsRender);
+  }
+
   /* today's boarding status for a worker, deterministic per code+date. */
   function trTodayBrd(code) {
     const n = trHash(code + '|brd|' + trTodayISO()) % 100;
@@ -14567,6 +14616,8 @@ function __kvOnReady(fn) {
       initReadinessAnalytics();
     } else if (name === 'comms') {
       initCommsAnalytics();
+    } else if (name === 'operators') {
+      if (typeof initTransportOps === 'function') initTransportOps();
     } else if (name === 'chat') {
       // Render now that the pane is visible (width-dependent charts need layout).
       try { initChatAnalytics(); } catch (e) {}
