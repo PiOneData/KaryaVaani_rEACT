@@ -15603,22 +15603,27 @@ function __kvOnReady(fn) {
       .map(function (r) { return { r: r, c: omWorkerCompliance(r) }; })
       .sort(function (a, b) { return a.c.score - b.c.score; });
     const label = dept === 'all' ? 'All departments' : dept;
-    const rows = list.map(function (x) {
-      const col = omComplyColor(x.c.score);
-      const fails = x.c.failing.map(function (f) { return f.label; }).join(', ') || '—';
-      return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + x.r.code + '\')">' +
-        '<td class="t-strong">' + x.r.name + '</td><td>' + x.r.code + '</td><td>' + x.r.desig + '</td>' +
-        '<td><span class="mono" style="color:' + col + '">' + x.c.score + '</span></td>' +
-        '<td><span class="pill ' + (x.c.status === 'compliant' ? 'green' : 'red') + ' tiny">' + (x.c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
-        '<td class="tiny">' + fails + '</td>' +
-        '<td style="text-align:right">' + (x.c.status !== 'compliant' ? '<button class="btn amber" onclick="event.stopPropagation();omOpenNotify(\'' + x.r.code + '\')">Notify</button>' : '') + '</td></tr>';
-    }).join('');
     drill.innerHTML =
-      '<div class="row-between" style="margin:14px 0 8px"><span class="card-h-title" style="font-size:0.9rem">' + label + ' · associates <span class="tiny muted">(' + list.length + ')</span></span>' +
+      '<div class="row-between" style="margin:14px 0 8px"><span class="card-h-title" style="font-size:0.9rem">' + label + ' · associates <span class="tiny muted">(<span id="expdept-count">' + list.length + '</span>)</span></span>' +
       '<span class="tiny muted">Click a row to open employee compliance detail</span></div>' +
-      '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Name</th><th>Code</th><th>Designation</th><th>Score</th><th>Status</th><th>Failing items</th><th></th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="7" class="tiny muted" style="padding:10px">No associates in this department.</td></tr>') +
-      '</tbody></table></div>';
+      '<div class="dir-controls" style="margin-bottom:10px"><input type="text" class="input" id="expdept-search" autocomplete="off" placeholder="Search name, code, designation, failing item…" style="max-width:360px"></div>' +
+      '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Name</th><th>Code</th><th>Designation</th><th>Score</th><th>Status</th><th>Failing items</th><th></th></tr></thead><tbody id="exp-dept-tbody"></tbody></table></div>' +
+      '<div id="expdept-pagination" class="om-pagination"></div>';
+    KVTABLE.set({
+      key: 'expdept', tbody: 'exp-dept-tbody', count: 'expdept-count', pager: 'expdept-pagination', pageSize: 12, cols: 7, rows: list,
+      empty: 'No associates in this department.',
+      text: function (x) { return x.r.name + ' ' + x.r.code + ' ' + x.r.desig + ' ' + x.c.score + ' ' + x.c.failing.map(function (f) { return f.label; }).join(' '); },
+      row: function (x) {
+        const col = omComplyColor(x.c.score);
+        const fails = x.c.failing.map(function (f) { return f.label; }).join(', ') || '—';
+        return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + x.r.code + '\')">' +
+          '<td class="t-strong">' + x.r.name + '</td><td>' + x.r.code + '</td><td>' + x.r.desig + '</td>' +
+          '<td><span class="mono" style="color:' + col + '">' + x.c.score + '</span></td>' +
+          '<td><span class="pill ' + (x.c.status === 'compliant' ? 'green' : 'red') + ' tiny">' + (x.c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
+          '<td class="tiny">' + fails + '</td>' +
+          '<td style="text-align:right">' + (x.c.status !== 'compliant' ? '<button class="btn amber" onclick="event.stopPropagation();omOpenNotify(\'' + x.r.code + '\')">Notify</button>' : '') + '</td></tr>';
+      }
+    });
     omExpDeptRender();   // refresh selection highlight
   }
 
