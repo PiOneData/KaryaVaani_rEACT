@@ -98,9 +98,10 @@ export default function SecTransport() {
                 <div className="rdl"><div className="rdl-swatch" style={{ background: "rgba(138,80,16,.3)" }} />Pending</div>
                 <span style={{ marginLeft: "auto", fontSize: "12.5px", color: "var(--txt4)" }}>click a worker for full details →</span>
               </div>
+              <div className="rd-timeline" id="tr-rd-timeline" />
               <div className="rd-table-wrap">
                 <table className="rt">
-                  <thead><tr><th>Name</th><th>ID</th><th>Type</th><th>Agency</th><th>Pickup point</th><th>Departs</th><th>Boarded</th><th>Consent · R.83</th></tr></thead>
+                  <thead><tr><th>Name</th><th>ID</th><th>Type</th><th>Agency</th><th>Pickup point</th><th>Pickup / Drop</th><th>Boarded</th><th>Consent · R.83</th></tr></thead>
                   <tbody id="tr-rd-tbody" />
                 </table>
               </div>

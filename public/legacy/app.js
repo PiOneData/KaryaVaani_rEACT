@@ -11339,7 +11339,8 @@ function __kvOnReady(fn) {
     const route = TR_ROUTES[h % TR_ROUTES.length];
     const town = (route.route.indexOf('·') !== -1 ? route.route.split('·')[1] : route.zone).trim();
     const pickups = (route.stops || []).slice(0, -1);     // drop the plant-arrival stop
-    const pickup = pickups.length ? pickups[(h >>> 4) % pickups.length].name : (route.stops[0] && route.stops[0].name) || town;
+    const pickupIdx = pickups.length ? (h >>> 4) % pickups.length : 0;
+    const pickup = pickups.length ? pickups[pickupIdx].name : (route.stops[0] && route.stops[0].name) || town;
     const shift = ((h >>> 9) % 10) < 6 ? 'morning' : 'general';   // ~60% morning
     const mobile = '9' + String(700000000 + (h % 89999999));
     const type = ((h >>> 12) % 4 === 0) ? 'emp' : 'ctr';          // ~25% Daikin direct
@@ -11353,11 +11354,58 @@ function __kvOnReady(fn) {
     const nightConsent = gender === 'F' ? (((h >>> 20) % 100) < 80 ? 'yes' : 'pending') : 'na';
     return {
       code: w.code, name: w.name, dept: w.department || '—', desig: w.designation || '',
-      locality: town, route: route.code, routeName: route.route, pickup: pickup,
+      locality: town, route: route.code, routeName: route.route, pickup: pickup, pickupIdx: pickupIdx,
       shift: shift, mobile: mobile, board: (route[shift] && route[shift].board) || '',
       type: type, gender: gender, plate: plate, agency: agency,
       operator: operator, nightConsent: nightConsent
     };
+  }
+
+  /* ── pickup / drop timing ─────────────────────────────────────────────────
+     Each shift has a plant arrival (workers reach the plant by shift start) and
+     a plant departure (drop leaves 15 min after shift end). Along a route the
+     bus reaches each town stop a few minutes apart, so no two stops share a
+     time: on PICKUP the bus stand boards first and the plant is last; on DROP
+     the plant leaves first, the nearest stop is dropped first and the bus stand
+     last. Times are derived per route (varied travel / gap) so they're stable. */
+  const TR_SHIFT_PLANT = {
+    A: { in: 6 * 60,  out: 14 * 60 + 15 },   // morning · in 06:00, drop out 14:15
+    B: { in: 14 * 60, out: 22 * 60 + 15 },   // general · in 14:00, drop out 22:15
+    C: { in: 22 * 60, out: 6 * 60 + 15 }      // night   · in 22:00, drop out 06:15
+  };
+  function trM2T(min) { min = ((Math.round(min) % 1440) + 1440) % 1440; return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+  function trRouteIdxC(code) { const i = TR_ROUTES.findIndex(function (r) { return r.code === code; }); return i < 0 ? 0 : i; }
+  function trTravelMin(code) { return 55 + (trRouteIdxC(code) % 6) * 4; }   // 55–75 min door-to-plant
+  function trTownGap(code) { return 5 + (trRouteIdxC(code) % 3); }          // 5–7 min between town stops
+  function trNumPickups(r) { return Math.max(1, (r.stops || []).length - 1); }
+  function trPickupMin(r, s, stopIdx) {
+    const p = TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A;
+    return p.in - trTravelMin(r.code) + stopIdx * trTownGap(r.code);
+  }
+  function trDropMin(r, s, stopIdx) {
+    const p = TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A;
+    const gap = trTownGap(r.code); const numP = trNumPickups(r);
+    const highway = trTravelMin(r.code) - (numP - 1) * gap;
+    return p.out + highway + ((numP - 1) - stopIdx) * gap;
+  }
+  function trPickupAt(r, s, stopIdx) { return trM2T(trPickupMin(r, s, stopIdx)); }
+  function trDropAt(r, s, stopIdx) { return trM2T(trDropMin(r, s, stopIdx)); }
+  /* shift letter for a worker's assigned (morning/general) shift */
+  function trShiftLetter(shift) { return shift === 'general' ? 'B' : 'A'; }
+  /* a two-line stop timeline: pickup (bus stand → plant) and drop (plant → bus
+     stand), each stop with its own progressive time so the two trips are clear. */
+  function trStopTimeline(r, s) {
+    const stops = r.stops || [];
+    if (!stops.length) return '';
+    const pickups = stops.slice(0, -1);
+    const plantName = (stops[stops.length - 1] || {}).name || 'Plant';
+    const plantIn = trM2T((TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A).in);
+    const plantOut = trM2T((TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A).out);
+    const chip = function (t, name) { return '<span class="tl-stop"><span class="tl-t">' + t + '</span>' + name + '</span>'; };
+    const up = pickups.map(function (st, i) { return chip(trPickupAt(r, s, i), st.name); }).join('<span class="tl-arrow">›</span>');
+    const down = pickups.slice().reverse().map(function (st, ri) { return chip(trDropAt(r, s, pickups.length - 1 - ri), st.name); }).join('<span class="tl-arrow">›</span>');
+    return '<div class="tl-line"><span class="tl-dir up">↑ Pickup</span>' + up + '<span class="tl-arrow">›</span>' + chip(plantIn, plantName) + '</div>' +
+           '<div class="tl-line"><span class="tl-dir dn">↓ Drop</span>' + chip(plantOut, plantName) + '<span class="tl-arrow">›</span>' + down + '</div>';
   }
   /* effective night-shift consent for a worker: stored override, else the base. */
   function trConsent(a) {
@@ -11578,6 +11626,13 @@ function __kvOnReady(fn) {
     const w = roster.find(function (x) { return x.code === code; }) || { code: code, name: code };
     const a = trAssign(w);
     if (!a) return null;
+    // pickup / drop times at this worker's stop, for their assigned shift
+    const routeObj = TR_ROUTES.find(function (x) { return x.code === a.route; }) || { code: a.route, stops: [] };
+    const sLetter = trShiftLetter(a.shift);
+    a.pickupTime = trPickupAt(routeObj, sLetter, a.pickupIdx || 0);
+    a.dropTime = trDropAt(routeObj, sLetter, a.pickupIdx || 0);
+    a.plantIn = trM2T((TR_SHIFT_PLANT[sLetter] || TR_SHIFT_PLANT.A).in);
+    a.plantOut = trM2T((TR_SHIFT_PLANT[sLetter] || TR_SHIFT_PLANT.A).out);
     const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const pad = function (n) { return String(n).padStart(2, '0'); };
@@ -11594,7 +11649,8 @@ function __kvOnReady(fn) {
       total++; if (boarded) present++;
       rows.push({ date: day.getDate() + ' ' + M[day.getMonth()], day: DOW[wd], iso: iso,
         route: a.route, routeName: a.routeName, shift: a.shift, pickup: a.pickup,
-        boarded: boarded, scan: boarded ? ((a.board || '') || '—') : '—' });
+        pickupTime: a.pickupTime, dropTime: a.dropTime,
+        boarded: boarded, scan: boarded ? a.pickupTime : '—' });
     }
     return { assignment: a, rows: rows, present: present, total: total, pct: total ? Math.round(present / total * 100) : 0 };
   }
@@ -11807,11 +11863,18 @@ function __kvOnReady(fn) {
       const empW = Math.round(emp / Math.max(batch.length, 1) * 100);
       const nightF = (s === 'C' && women > 0)
         ? '<div class="rc-night">♀ ' + women + ' women · ' + consented + '/' + women + ' consent' + (consented < women ? ' ⚠' : ' ✓') + '</div>' : '';
+      const plantIn = trM2T((TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A).in);
+      const plantOut = trM2T((TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A).out);
+      const firstPickup = trPickupAt(r, s, 0);   // bus stand (first boarded)
+      const lastDrop = trDropAt(r, s, 0);         // bus stand (last dropped)
       return '<div class="rc ' + cc + '" onclick="trGkOpenRoster(\'' + r.code + '\')" title="Click to view roster">' +
         '<div class="rc-top"><div class="rc-name">' + r.code + ' · ' + trTown(r) + '</div><div class="rc-badge ' + badge[0] + '">' + badge[1] + '</div></div>' +
         '<div class="rc-meta"><span class="tr-mono">' + (batch[0] ? batch[0].plate : 'AP-29-—') + '</span>' +
-          '<span style="color:var(--gk);font-weight:600">' + trGkBoardTime(r, s) + '</span>' +
-          '<span style="color:var(--txt4)">' + batch.length + ' pax · ' + rate + '%</span></div>' +
+          '<span style="color:var(--txt4)">' + batch.length + ' pax · ' + rate + '% boarded</span></div>' +
+        '<div class="rc-trips">' +
+          '<div class="rc-trip"><span class="rc-trip-b up">↑ Pickup</span><span class="tr-mono">' + firstPickup + ' → ' + plantIn + ' plant</span></div>' +
+          '<div class="rc-trip"><span class="rc-trip-b dn">↓ Drop</span><span class="tr-mono">' + plantOut + ' plant → ' + lastDrop + '</span></div>' +
+        '</div>' +
         '<div class="rc-op">🚌 ' + trRouteOperator(r.code) + '</div>' +
         '<div class="rc-split"><div class="rcs-emp" style="width:' + empW + '%"></div><div class="rcs-ctr" style="width:' + (100 - empW) + '%"></div></div>' +
         '<div class="rc-split-lbl"><div class="rsl"><div class="rsl-dot" style="background:var(--gk3)"></div>' + emp + ' EMP</div>' +
@@ -11827,11 +11890,15 @@ function __kvOnReady(fn) {
     const s = TR_STATE.gkShift || 'A';
     const batch = trGkBatch(code, s);
     TR_STATE.gkOpenRoute = code;
+    const plantIn = trM2T((TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A).in);
+    const plantOut = trM2T((TR_SHIFT_PLANT[s] || TR_SHIFT_PLANT.A).out);
     trTxt('tr-rd-title', r.code + ' · ' + trTown(r) + ' roster');
     trTxt('tr-rd-bus', batch[0] ? batch[0].plate : 'Bus —');
-    trTxt('tr-rd-dept', 'Departs ' + trGkBoardTime(r, s));
+    trTxt('tr-rd-dept', '↑ Pickup ' + trPickupAt(r, s, 0) + '–' + plantIn + '  ·  ↓ Drop ' + plantOut + '–' + trDropAt(r, s, 0));
     trTxt('tr-rd-total', batch.length + ' workers');
     trTxt('tr-rd-operator', 'Operated by ' + trRouteOperator(code));
+    const tl = document.getElementById('tr-rd-timeline');
+    if (tl) tl.innerHTML = trStopTimeline(r, s);
     const emp = batch.filter(function (a) { return a.type === 'emp'; }).length;
     const boarded = batch.filter(function (a) { return trTodayBrd(a.code) === 'ok'; }).length;
     trTxt('tr-rd-emp', emp + ' direct employees');
@@ -11847,13 +11914,15 @@ function __kvOnReady(fn) {
       const cons = trConsent(a);
       const consCell = cons === 'na' ? '<span class="pill outline tiny">—</span>'
         : trConsentPill(cons) + (cons === 'pending' ? ' <button class="rd-mini" onclick="event.stopPropagation();trCollectConsent(\'' + a.code + '\')">Collect</button>' : '');
+      const pu = trPickupAt(r, s, a.pickupIdx || 0);
+      const dp = trDropAt(r, s, a.pickupIdx || 0);
       return '<tr class="' + trCls + '" style="cursor:pointer" onclick="omOpenWorker(\'' + a.code + '\')" title="Open employee details · travel history · attendance">' +
         '<td style="font-weight:600;color:var(--txt)">' + a.name + g + '</td>' +
         '<td><span class="wid">' + a.code + '</span></td>' +
         '<td>' + typeBadge + '</td>' +
         '<td class="tr-agency">' + a.agency + '</td>' +
         '<td style="color:var(--txt3)">' + a.pickup + '</td>' +
-        '<td><span class="dep">' + trGkBoardTime(r, s) + '</span></td>' +
+        '<td><span class="dep">↑' + pu + '</span> <span class="tr-dim">/</span> <span class="dep dn">↓' + dp + '</span></td>' +
         '<td>' + brdCell + ' <button class="rd-mini warn" onclick="event.stopPropagation();trReportOffRoute(\'' + a.code + '\')" title="Log an off-route drop for this worker">⚠</button></td>' +
         '<td>' + consCell + '</td></tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--txt4);padding:16px">No workers on this route for shift ' + s + '.</td></tr>';
@@ -15323,23 +15392,26 @@ function __kvOnReady(fn) {
       const cap = function (s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
       const trows = travel.rows.map(function (t) {
         return '<tr><td>' + t.date + '</td><td class="muted">' + t.day + '</td>' +
-          '<td><span class="t-strong">' + t.route + '</span> ' + t.routeName + '</td>' +
-          '<td>' + cap(t.shift) + '</td><td>' + t.pickup + '</td><td class="mono">' + t.scan + '</td>' +
+          '<td><span class="t-strong">' + t.route + '</span></td>' +
+          '<td>' + t.pickup + '</td>' +
+          '<td class="mono">↑ ' + (t.pickupTime || '—') + '</td>' +
+          '<td class="mono">↓ ' + (t.dropTime || '—') + '</td>' +
           '<td style="text-align:center">' + (t.boarded ? '<span class="pill green tiny">Boarded</span>' : '<span class="pill red tiny">Absent</span>') + '</td></tr>';
       }).join('');
       attendance =
         '<div class="g2" style="gap:10px;margin-bottom:12px">' +
-          '<div class="kpi"><div class="kpi-eye">Assigned route</div><div class="kpi-val" style="font-size:1.1rem">' + a.route + '</div><div class="kpi-sub">' + a.routeName + '</div></div>' +
+          '<div class="kpi"><div class="kpi-eye">Assigned route · ' + cap(a.shift) + ' shift</div><div class="kpi-val" style="font-size:1.1rem">' + a.route + '</div><div class="kpi-sub">' + a.routeName + '</div></div>' +
           '<div class="kpi"><div class="kpi-eye">Boarding attendance</div><div class="kpi-val" style="color:' + (travel.pct >= 85 ? 'var(--green-dk)' : 'var(--amber-dk)') + '">' + travel.pct + '%</div><div class="kpi-sub">' + travel.present + '/' + travel.total + ' of last ' + travel.total + ' working days</div></div>' +
         '</div>' +
         kv2col(
           kvKV('Home locality', a.locality) + kvKV('Pickup point', a.pickup) +
-          kvKV('Shift', cap(a.shift) + ' shift') + kvKV('Boards at', a.board || '—') +
+          kvKV('Pickup', '↑ ' + (a.pickupTime || '—') + ' → plant ' + (a.plantIn || '—')) +
+          kvKV('Drop', '↓ plant ' + (a.plantOut || '—') + ' → ' + (a.dropTime || '—')) +
           kvKV('Transport operator', a.operator || (typeof trRouteOperator === 'function' ? trRouteOperator(a.route) : '—')) +
           kvKV('Night-shift consent · OSHC R.83', (typeof trConsentPill === 'function' && typeof trConsent === 'function') ? trConsentPill(trConsent(a)) : '—')
         ) +
         '<div class="card-h-title" style="font-size:0.9rem;margin:14px 0 4px">Travel history · last ' + travel.total + ' working days</div>' +
-        '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Date</th><th>Day</th><th>Route</th><th>Shift</th><th>Pickup</th><th>Scan</th><th style="text-align:center">Boarding</th></tr></thead><tbody>' + trows + '</tbody></table></div>' +
+        '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Date</th><th>Day</th><th>Route</th><th>Pickup point</th><th>Pickup</th><th>Drop</th><th style="text-align:center">Boarding</th></tr></thead><tbody>' + trows + '</tbody></table></div>' +
         '<div class="note amber" style="margin-top:10px;font-size:0.74rem">Boarding is captured from the ID-card provider’s turnstile scans — live API integration pending; the history reflects the roster + boarding record.</div>';
     } else {
       attendance = '<div class="tiny muted">No transport route is assigned to this associate.</div>';
