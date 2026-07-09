@@ -210,7 +210,7 @@ export default function SecVendor() {
             Tasks aggregated across contractors · click a contractor row above to filter
           </div>
           {' '}
-          <div id="ct-tasks-all" />
+          <div id="ct-tasks-all" className="ct-tasks-scroll" style={{ maxHeight: "330px", overflowY: "auto", paddingRight: "6px" }} />
         </div>
         {' '}
         <div className="card">
@@ -225,31 +225,33 @@ export default function SecVendor() {
           {' '}
           <div id="ct-liab-summary" style={{ marginTop: "12px" }} />
         </div>
-        {' '}
-        {/* ── VENDOR MANAGEMENT · manpower supply + compliance ── */}
-        <div className="card" style={{ marginTop: "16px" }}>
-          <div className="card-h">
-            <div>
-              <div className="card-h-title">Vendor management · manpower supply &amp; compliance</div>
-              <div className="card-h-sub">
-                Every manpower-supply vendor with its deployed headcount, skill mix and a compliance score —
-                scored from the contractor master where matched. Click a vendor to drill into its contractor compliance.
-              </div>
+      </div>
+      {' '}
+      {/* ── VENDOR MANAGEMENT · manpower supply + compliance (full width) ── */}
+      <div className="card" style={{ marginTop: "16px" }}>
+        <div className="card-h">
+          <div>
+            <div className="card-h-title">Vendor management · manpower supply &amp; compliance</div>
+            <div className="card-h-sub">
+              Every manpower-supply vendor with its deployed headcount, skill mix and a compliance score —
+              scored from the contractor master where matched. Click a vendor to drill into its contractor compliance.
             </div>
-            <span className="pill outline" id="vendor-mgmt-count">—</span>
           </div>
-          <div id="vendor-mgmt-kpis" className="g4" style={{ margin: "4px 0 14px" }} />
-          <div className="dir-controls" style={{ marginBottom: "10px" }}>
-            <input type="text" className="input" id="vendor-mgmt-search" autoComplete="off" placeholder="Search vendor, type, status…" style={{ maxWidth: "360px" }} />
-          </div>
+          <span className="pill outline" id="vendor-mgmt-count">—</span>
+        </div>
+        <div id="vendor-mgmt-kpis" className="g4" style={{ margin: "4px 0 14px" }} />
+        <div className="dir-controls" style={{ marginBottom: "10px" }}>
+          <input type="text" className="input" id="vendor-mgmt-search" autoComplete="off" placeholder="Search vendor, type, status…" style={{ maxWidth: "360px" }} />
+        </div>
+        <div style={{ overflowX: "auto" }}>
           <table className="t">
             <thead>
               <tr><th>Vendor</th><th>Type</th><th>Deployed</th><th>Skill mix (S / Semi / Un)</th><th>Compliance</th><th>Status</th></tr>
             </thead>
             <tbody id="vendor-mgmt-body" />
           </table>
-          <div id="vendor-mgmt-pagination" className="om-pagination" />
         </div>
+        <div id="vendor-mgmt-pagination" className="om-pagination" />
       </div>
     </section>
   );
