@@ -243,5 +243,14 @@ function dbDel(name, id) {
   return getPool().query(`DELETE FROM ${meta.table} WHERE row_id = $1`, [String(id)])
     .catch((err) => { console.error(`[db] del ${name} failed:`, err.message); try { fileWrite(_cache); } catch (e) {} });
 }
+/* empty an entire collection (both the in-memory cache and the DB table). */
+function dbClear(name) {
+  const meta = COLLECTIONS[name];
+  if (!meta) return Promise.resolve();
+  if (_cache && _cache.data) _cache.data[name] = (meta.kind === 'array') ? [] : {};
+  if (!DATABASE_URL) { try { fileWrite(_cache); } catch (e) {} return Promise.resolve(); }
+  return getPool().query(`DELETE FROM ${meta.table}`)
+    .catch((err) => { console.error(`[db] clear ${name} failed:`, err.message); });
+}
 
-module.exports = { STORE_PATH, readStore, writeStore, initDb, dbPut, dbDel };
+module.exports = { STORE_PATH, readStore, writeStore, initDb, dbPut, dbDel, dbClear };

@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-const { readStore, writeStore, initDb, dbPut, dbDel } = require('./db');
+const { readStore, writeStore, initDb, dbPut, dbDel, dbClear } = require('./db');
 const { hashPassword, verifyPassword, DEMO_ACCOUNTS } = require('./auth');
 
 const app = express();
@@ -463,46 +463,85 @@ const NLLB_MAP = {
 };
 const toNllb = (code) => NLLB_MAP[String(code).toUpperCase()] || code;
 
+/* ── number / time → English words ─────────────────────────────────────────
+   The translation model keeps Latin digits as-is, and the regional TTS then
+   won't speak them. Spelling numbers and times out in English BEFORE translation
+   means they get translated into the target language and read aloud correctly —
+   important for schedules where the times matter. */
+const _ONES = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+const _TENS = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+function numToWords(n) {
+  n = parseInt(n, 10); if (isNaN(n)) return '';
+  if (n < 0) return 'minus ' + numToWords(-n);
+  if (n < 20) return _ONES[n];
+  if (n < 100) return _TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + _ONES[n % 10] : '');
+  if (n < 1000) return _ONES[Math.floor(n / 100)] + ' hundred' + (n % 100 ? ' ' + numToWords(n % 100) : '');
+  if (n < 100000) return numToWords(Math.floor(n / 1000)) + ' thousand' + (n % 1000 ? ' ' + numToWords(n % 1000) : '');
+  if (n < 10000000) return numToWords(Math.floor(n / 100000)) + ' lakh' + (n % 100000 ? ' ' + numToWords(n % 100000) : '');
+  return String(n);
+}
+function timeToWords(h, m) {
+  h = parseInt(h, 10); m = parseInt(m, 10);
+  const period = h < 12 ? 'in the morning' : h < 17 ? 'in the afternoon' : h < 20 ? 'in the evening' : 'at night';
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  const mw = m === 0 ? " o'clock" : (m < 10 ? ' oh ' + numToWords(m) : ' ' + numToWords(m));
+  return numToWords(h12) + mw + ' ' + period;
+}
+function expandNumbers(text) {
+  if (!text) return text;
+  // times first (HH:MM), so their digits aren't caught by the number rule
+  text = String(text).replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, function (m, h, mn) { return timeToWords(h, mn); });
+  // standalone numbers (optionally comma-grouped), not part of a token like "B1"
+  text = text.replace(/(?<![A-Za-z0-9])(\d{1,3}(?:,\d{3})+|\d+)(?![A-Za-z0-9])/g, function (m) {
+    const n = parseInt(m.replace(/,/g, ''), 10); return isNaN(n) ? m : numToWords(n);
+  });
+  return text;
+}
+/* one upstream translate call for a single sentence */
+async function upstreamTranslate(text, srcNllb, tgtNllb) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 600000);
+  try {
+    const resp = await fetch(TRANSLATE_API_URL + '/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, source: srcNllb, target: tgtNllb }), signal: controller.signal
+    });
+    const body = await resp.text();
+    let json; try { json = body ? JSON.parse(body) : {}; } catch { json = { raw: body }; }
+    if (!resp.ok) throw new Error('translate ' + resp.status + (body ? ': ' + body.slice(0, 120) : ''));
+    return json.translation || json.translated_text || json.raw || '';
+  } finally { clearTimeout(timer); }
+}
+function splitSentences(text) {
+  const parts = String(text).match(/[^.!?।]+[.!?।]*/g);
+  return (parts && parts.length) ? parts.map((s) => s.trim()).filter(Boolean) : [String(text)];
+}
+/* full-message translate: expand numbers, split into sentences (so long text is
+   never truncated by the model's max length), translate each, and re-join. */
+async function translateFull(text, srcNllb, tgtNllb) {
+  const sentences = splitSentences(expandNumbers(text));
+  const out = [];
+  for (const s of sentences) {
+    try { const t = await upstreamTranslate(s, srcNllb, tgtNllb); out.push((t && t.trim()) || s); }
+    catch (e) { out.push(s); }   // keep the sentence rather than dropping the message
+  }
+  return out.join(' ');
+}
+
 app.post('/api/translate', async (req, res) => {
   const { text, source, target, targets } = req.body || {};
-  // Accept either frontend-style { text, targets: ["TE","HI"] }
-  // or legacy { text, source, target } for single-target callers.
   const toTargets = Array.isArray(targets) && targets.length ? targets : (target ? [target] : null);
   if (!text || !toTargets) {
     return res.status(400).json({ success: false, error: 'text and targets (or target) are required' });
   }
+  const src = toNllb(source || 'eng_Latn');
   try {
-    // The upstream FastAPI requires { text, source, target } — all required, target is a single
-    // string (not an array). Fan out one request per target language and aggregate.
-    const src = toNllb(source || 'eng_Latn');
-    const results = await Promise.all(
-      toTargets.map(async (tgt) => {
-        const nllbTgt = toNllb(tgt);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 600_000); // 10 min hard cap
-        let resp;
-        try {
-          resp = await fetch(TRANSLATE_API_URL + '/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, source: src, target: nllbTgt }),
-            signal: controller.signal
-          });
-        } finally {
-          clearTimeout(timer);
-        }
-        const body = await resp.text();
-        let json;
-        try { json = body ? JSON.parse(body) : {}; } catch { json = { raw: body }; }
-        return { target: tgt, httpStatus: resp.status, ...json };
-      })
-    );
-    // Single-target callers get the original flat response shape for backward compat.
+    const map = {};
+    for (const tgt of toTargets) { map[tgt] = await translateFull(text, src, toNllb(tgt)); }
     if (toTargets.length === 1) {
-      const { httpStatus, ...data } = results[0];
-      return res.status(httpStatus).json(data);
+      return res.json({ success: true, translation: map[toTargets[0]] });
     }
-    res.json({ results });
+    res.json({ success: true, translations: map });
   } catch (err) {
     console.error('translate error:', err.message);
     res.status(502).json({ success: false, error: 'translation service unreachable: ' + err.message });
@@ -616,16 +655,17 @@ const VOICE_DIRECT = [
   'మీరు సురక్షితంగా ఇంటికి చేరుకున్నారు. 23:14. శుభ రాత్రి.'
 ];
 const VOICE_PREWARM_TOTAL = VOICE_TEMPLATES.length * VOICE_LANGS.length + VOICE_DIRECT.length;
+/* Bump when the translate/TTS pipeline changes (e.g. number expansion, sentence
+   chunking) — on boot this invalidates every cached voice + warm marker so the
+   next prewarm regenerates them with the new pipeline. */
+const VOICE_PIPELINE_VERSION = '2-numwords-chunked';
 function srcKey(text, lang) { return lang + '|' + crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 12); }
 
 async function prewarmTranslate(text, code) {
-  const resp = await fetch(TRANSLATE_API_URL + '/translate', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, source: toNllb('eng_Latn'), target: toNllb(code) })
-  });
-  const body = await resp.text();
-  let json; try { json = body ? JSON.parse(body) : {}; } catch { json = {}; }
-  return json.translation || (json.translations && json.translations[code]) || null;
+  // same pipeline as /api/translate — number expansion + sentence chunking —
+  // so the prewarmed voices match exactly what a live translate produces.
+  const out = await translateFull(text, toNllb('eng_Latn'), toNllb(code));
+  return (out && out.trim()) || null;
 }
 async function prewarmTts(text) {
   const hash = ttsHash(text);
@@ -646,6 +686,14 @@ async function prewarmVoices() {
   if (!store || !store.data) return;
   VOICE_PREWARM_RUNNING = true;
   store.data.voiceWarm = store.data.voiceWarm || {};
+  // Pipeline changed? Drop the stale cache so voices regenerate with the new
+  // (number-expanded, sentence-chunked) translations instead of serving old ones.
+  if (store.data.voiceWarm.__ver !== VOICE_PIPELINE_VERSION) {
+    console.log('[voice] pipeline version changed (' + (store.data.voiceWarm.__ver || 'none') + ' → ' + VOICE_PIPELINE_VERSION + ') · clearing voice cache');
+    try { await dbClear('voiceCache'); await dbClear('voiceWarm'); } catch (e) { console.error('[voice] cache clear failed:', e.message); }
+    store.data.voiceWarm = { __ver: VOICE_PIPELINE_VERSION };
+    dbPut('voiceWarm', '__ver', VOICE_PIPELINE_VERSION);
+  }
   let generated = 0, cached = 0, failed = 0;
   console.log('[voice] prewarm starting · ' + VOICE_PREWARM_TOTAL + ' template voices (sequential)');
   for (let i = 0; i < VOICE_TEMPLATES.length; i++) {

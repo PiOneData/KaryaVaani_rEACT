@@ -6106,10 +6106,11 @@ function __kvOnReady(fn) {
   /* curated / simulated rendering used as a graceful fallback when the live
      service is unreachable, so the demo still works fully offline. */
   function vbSimTranslate(code) {
-    if (VB_STATE.preset !== 'custom' && VB_TRANSLATIONS[VB_STATE.preset]) {
-      return VB_TRANSLATIONS[VB_STATE.preset][code];
-    }
-    return VB_STATE.source + '  〔' + vbLang(code).name + ' · VAANI Mayura v1〕';
+    // curated translation for this preset+language, if we have one …
+    const curated = (VB_STATE.preset !== 'custom' && VB_TRANSLATIONS[VB_STATE.preset]) ? VB_TRANSLATIONS[VB_STATE.preset][code] : null;
+    if (curated) return curated;
+    // … otherwise never return undefined — show the source with a language tag.
+    return VB_STATE.source + '  〔' + vbLang(code).name + ' · VAANI〕';
   }
 
   /* ── translate via the live VAANI service (graceful fallback on failure) ── */
@@ -6131,12 +6132,14 @@ function __kvOnReady(fn) {
     // Nginx's proxy_read_timeout before the GPU finishes.  Sequential calls
     // keep each round-trip within the timeout window.
     for (const code of VB_STATE.langs) {
-      try {
-        out[code] = await vbTranslateOne(VB_STATE.source, code);
-      } catch (err) {
-        failed++;
-        out[code] = vbSimTranslate(code);
+      let t = null;
+      // the translation model can be cold on the first request and time out;
+      // retry once before falling back, so a single click is enough.
+      for (let attempt = 0; attempt < 2 && !t; attempt++) {
+        try { t = await vbTranslateOne(VB_STATE.source, code); }
+        catch (err) { if (attempt === 0) await new Promise(function (r) { setTimeout(r, 600); }); }
       }
+      if (t) { out[code] = t; } else { failed++; out[code] = vbSimTranslate(code); }
     }
 
     VB_STATE.translations = out;
@@ -6175,7 +6178,7 @@ function __kvOnReady(fn) {
             '</span>' +
           '</span>' +
         '</div>' +
-        '<div class="vb-tcard-body">' + VB_STATE.translations[code] + '</div>' +
+        '<div class="vb-tcard-body">' + (VB_STATE.translations[code] || '(translation unavailable — click Re-translate)') + '</div>' +
         '<div class="vb-voice-track" id="vb-voice-track-' + code + '" style="display:none;margin:2px 18px 8px"><span></span></div>' +
         '<div class="vb-tcard-foot">VAANI · open-source voice (IndicTrans2 + MMS-TTS / IndicF5) — Play to hear it aloud, or Download the .wav voice note</div>' +
       '</div>';
