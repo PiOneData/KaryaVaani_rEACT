@@ -24,7 +24,7 @@ const config = {
 
   aoc: {
     /* AOC portal ("BOT API") gateway — docs: https://developers.aoc-portal.com */
-    baseUrl: (process.env.AOC_BASE_URL || 'https://apis.aoc-portal.com').replace(/\/$/, ''),
+    baseUrl: (process.env.AOC_BASE_URL || 'https://api.aoc-portal.com').replace(/\/$/, ''),
     /* Account API key (portal login → API key); sent as the `apikey` header. */
     apiKey: process.env.AOC_API_KEY || '',
     /* Sender WhatsApp number ("From Id" in the portal), digits only,

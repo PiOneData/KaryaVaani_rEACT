@@ -30,12 +30,35 @@ const logger = require('./../logger');
 
 const { baseUrl, apiKey, fromId, webhookTokenHeader, webhookToken } = config.aoc;
 
-/* Normalise an Indian/free-form number to E.164 digits (no +), same policy
-   as the Meta provider so callers can pass 10-digit local numbers. */
+/* Normalise an Indian/free-form number to E.164 digits (no +). Used for the
+   inbound webhook records so stored numbers are consistent. */
 function normalize(to) {
   let n = String(to || '').replace(/[^\d]/g, '');
   if (n.length === 10) n = '91' + n;
   return n;
+}
+
+/* The AOC send API expects a `+`-prefixed MSISDN (e.g. +918220099940). */
+function toMsisdn(to) {
+  const n = normalize(to);
+  return n ? '+' + n : '';
+}
+
+/* Pull ordered body-variable values out of whatever `components` shape the
+   caller passed: either the Meta-style array
+   ([{ type:'body', parameters:[{ type:'text', text:'v1' }] }]) or the AOC
+   object ({ body:{ params:['v1','v2'] } }). Returns a flat array of strings. */
+function extractBodyParams(components) {
+  if (!components) return [];
+  if (Array.isArray(components)) {
+    const body = components.find((c) => String(c.type || '').toLowerCase() === 'body');
+    const params = (body && body.parameters) || [];
+    return params.map((p) => String((p && (p.text != null ? p.text : p)) || ''));
+  }
+  if (components.body && Array.isArray(components.body.params)) {
+    return components.body.params.map((p) => String(p == null ? '' : p));
+  }
+  return [];
 }
 
 async function post(payload) {
@@ -48,47 +71,48 @@ async function post(payload) {
     body: JSON.stringify(payload)
   });
   const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
+  /* AOC signals failure with a non-2xx status and/or a non-null `error`. */
+  if (!resp.ok || (json && json.error)) {
+    const e = json && json.error;
     const msg =
-      (json && (json.message || json.error && (json.error.message || json.error))) ||
+      (e && (e.message || (typeof e === 'string' ? e : JSON.stringify(e)))) ||
+      (json && json.message) ||
       `HTTP ${resp.status}`;
     const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     err.raw = json;
     throw err;
   }
-  /* Accept the id wherever the portal puts it (meta-style messages[0].id,
-     or a flat messageId / id / requestId). */
+  /* Response: { id, data:[{ recipient, messageId }], totalCount, message }. */
   const id =
-    (json.messages && json.messages[0] && json.messages[0].id) ||
-    json.messageId ||
+    (json.data && json.data[0] && json.data[0].messageId) ||
     json.id ||
-    json.requestId ||
     null;
   return { id, status: 'sent', provider: 'aoc', raw: json };
 }
 
+/* Free-form session text (only deliverable inside the 24h customer-service
+   window; business-initiated messages must use a template). */
 async function sendText({ to, body }) {
   return post({
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    from: normalize(fromId),
-    to: normalize(to),
+    from: toMsisdn(fromId),
+    to: toMsisdn(to),
     type: 'text',
-    text: { preview_url: false, body: String(body || '') }
+    text: String(body || '')
   });
 }
 
-async function sendTemplate({ to, template, language = 'en', components }) {
+/* Template send. `template` is the registered templateName; `components` may be
+   Meta-style or AOC-style — body variables are extracted either way and sent in
+   the AOC shape { components: { body: { params: [...] } } }. */
+async function sendTemplate({ to, template, components, campaignName }) {
+  const params = extractBodyParams(components);
   return post({
-    messaging_product: 'whatsapp',
-    from: normalize(fromId),
-    to: normalize(to),
+    from: toMsisdn(fromId),
+    to: toMsisdn(to),
+    templateName: template,
     type: 'template',
-    template: {
-      name: template,
-      language: { code: language },
-      ...(components ? { components } : {})
-    }
+    campaignName: campaignName || 'karyavaani',
+    components: { body: { params } }
   });
 }
 

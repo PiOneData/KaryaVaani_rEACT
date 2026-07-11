@@ -110,7 +110,7 @@ jobs:
             COMMS_API_KEY=${{ secrets.COMMS_API_KEY }}
             # AOC portal ("BOT API") WhatsApp gateway (active provider)
             WHATSAPP_PROVIDER=aoc
-            AOC_BASE_URL=https://apis.aoc-portal.com
+            AOC_BASE_URL=https://api.aoc-portal.com
             AOC_API_KEY=${{ secrets.AOC_API_KEY }}
             AOC_FROM_ID=918220099940
             AOC_WEBHOOK_TOKEN_HEADER=x-webhook-token

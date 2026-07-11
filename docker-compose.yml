@@ -64,7 +64,7 @@ services:
       - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}
       # AOC portal (BOT API) — apikey from the portal account, From Id is the
       # sender number registered there (KaryaVani: 918220099940).
-      - AOC_BASE_URL=${AOC_BASE_URL:-https://apis.aoc-portal.com}
+      - AOC_BASE_URL=${AOC_BASE_URL:-https://api.aoc-portal.com}
       - AOC_API_KEY=${AOC_API_KEY:-}
       - AOC_FROM_ID=${AOC_FROM_ID:-918220099940}
       # Shared secret the portal must send back on webhook calls (configure
