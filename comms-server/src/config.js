@@ -17,10 +17,25 @@ const config = {
      If unset, auth is disabled -- only do that on a trusted private network. */
   apiKey: process.env.COMMS_API_KEY || '',
 
-  /* Which provider drives WhatsApp: "meta" or "mock".
-     If "meta" is selected but credentials are missing, the server
+  /* Which provider drives WhatsApp: "aoc" (BOT API portal), "meta" or "mock".
+     If a live provider is selected but credentials are missing, the server
      automatically falls back to "mock" so callers never hard-fail. */
-  provider: (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase(),
+  provider: (process.env.WHATSAPP_PROVIDER || 'aoc').toLowerCase(),
+
+  aoc: {
+    /* AOC portal ("BOT API") gateway — docs: https://developers.aoc-portal.com */
+    baseUrl: (process.env.AOC_BASE_URL || 'https://apis.aoc-portal.com').replace(/\/$/, ''),
+    /* Account API key (portal login → API key); sent as the `apikey` header. */
+    apiKey: process.env.AOC_API_KEY || '',
+    /* Sender WhatsApp number ("From Id" in the portal), digits only,
+       e.g. 918220099940 for the KaryaVani number. */
+    fromId: process.env.AOC_FROM_ID || '',
+    /* Shared secret expected on inbound webhook calls. Add the same
+       header/value pair in the portal webhook's "Add Headers" dialog.
+       Leave the token empty to accept unauthenticated calls (dev only). */
+    webhookTokenHeader: process.env.AOC_WEBHOOK_TOKEN_HEADER || 'x-webhook-token',
+    webhookToken: process.env.AOC_WEBHOOK_TOKEN || ''
+  },
 
   meta: {
     apiVersion: process.env.META_API_VERSION || 'v21.0',
@@ -49,12 +64,16 @@ const config = {
   verifySignature: bool(process.env.COMMS_VERIFY_SIGNATURE, false)
 };
 
-/* Decide the effective provider. */
-config.effectiveProvider =
-  config.provider === 'meta' && config.meta.phoneNumberId && config.meta.accessToken
-    ? 'meta'
-    : config.provider === 'meta'
-      ? 'mock' /* meta requested but not configured */
-      : config.provider;
+/* Decide the effective provider: fall back to mock when the selected live
+   provider is missing its credentials, so callers never hard-fail. */
+config.effectiveProvider = (() => {
+  if (config.provider === 'aoc') {
+    return config.aoc.apiKey && config.aoc.fromId ? 'aoc' : 'mock';
+  }
+  if (config.provider === 'meta') {
+    return config.meta.phoneNumberId && config.meta.accessToken ? 'meta' : 'mock';
+  }
+  return config.provider;
+})();
 
 module.exports = config;

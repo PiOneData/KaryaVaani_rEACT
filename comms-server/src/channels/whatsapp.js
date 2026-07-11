@@ -1,11 +1,14 @@
 /* channels/whatsapp.js -- HTTP routes for the WhatsApp channel.
 
    Mounted at /v1/whatsapp. All routes are channel-only and app-agnostic:
-     GET    /webhook            Meta verification handshake
-     POST   /webhook            inbound messages + delivery statuses
+     GET    /webhook            provider verification/probe (Meta handshake or AOC ping)
+     POST   /webhook            ONE endpoint for every provider event: inbound
+                                messages, outbound delivery statuses and any
+                                other metric/account events
      POST   /send               send a text message to one or many recipients
      POST   /send-template      send an approved template message
-     GET    /messages           poll the in-memory message/status log
+     GET    /messages           poll the in-memory message/status/event log
+     GET    /metrics            lifetime counters (inbound/outbound/statuses)
 */
 const express = require('express');
 const provider = require('./../providers');
@@ -32,19 +35,31 @@ function resolveRecipient(requested) {
 
 /* ---- inbound webhook --------------------------------------------------- */
 
-/* GET: Meta calls this once to verify the callback URL. */
+/* GET: verification probe. Meta sends the hub.challenge handshake; the AOC
+   portal (and similar "Generic" webhook providers) may just ping the URL when
+   the configuration is saved, so anything without Meta params gets a 200. */
 router.get('/webhook', (req, res) => {
-  const challenge = provider.verifyWebhook({
-    mode: req.query['hub.mode'],
-    token: req.query['hub.verify_token'],
-    challenge: req.query['hub.challenge']
-  });
-  if (challenge) return res.status(200).send(challenge);
-  return res.sendStatus(403);
+  if (req.query['hub.mode']) {
+    const challenge = provider.verifyWebhook({
+      mode: req.query['hub.mode'],
+      token: req.query['hub.verify_token'],
+      challenge: req.query['hub.challenge']
+    });
+    if (challenge) return res.status(200).send(challenge);
+    return res.sendStatus(403);
+  }
+  return res.status(200).json({ ok: true, service: 'comms-server', channel: 'whatsapp' });
 });
 
-/* POST: inbound messages and delivery status callbacks. */
+/* POST: the single event endpoint — inbound messages, delivery statuses and
+   any other provider events all land here and go into the same log. */
 router.post('/webhook', (req, res) => {
+  /* Provider-specific authenticity checks: header token (AOC) and/or
+     HMAC signature (Meta). */
+  if (provider.verifyInbound && !provider.verifyInbound(req)) {
+    logger.warn('webhook token verification failed');
+    return res.sendStatus(401);
+  }
   if (provider.verifySignature && req.rawBody) {
     const ok = provider.verifySignature(req.rawBody, req.get('x-hub-signature-256'));
     if (!ok) {
@@ -52,7 +67,7 @@ router.post('/webhook', (req, res) => {
       return res.sendStatus(401);
     }
   }
-  let parsed = { messages: [], statuses: [] };
+  let parsed = { messages: [], statuses: [], events: [] };
   try {
     parsed = provider.parseWebhook(req.body || {});
   } catch (err) {
@@ -60,8 +75,12 @@ router.post('/webhook', (req, res) => {
   }
   parsed.messages.forEach((m) => store.add(m));
   parsed.statuses.forEach((s) => store.add(s));
-  if (parsed.messages.length || parsed.statuses.length) {
-    logger.info(`webhook: ${parsed.messages.length} message(s), ${parsed.statuses.length} status(es)`);
+  (parsed.events || []).forEach((e) => store.add(e));
+  const nEvents = (parsed.events || []).length;
+  if (parsed.messages.length || parsed.statuses.length || nEvents) {
+    logger.info(
+      `webhook: ${parsed.messages.length} message(s), ${parsed.statuses.length} status(es), ${nEvents} event(s)`
+    );
   }
   res.sendStatus(200);
 });
@@ -156,6 +175,13 @@ router.get('/messages', (req, res) => {
   const { since, direction, to, from, limit } = req.query;
   const items = store.list({ since, direction, to, from, channel: 'whatsapp', limit });
   res.json({ ok: true, provider: provider.name, count: items.length, items });
+});
+
+/* GET /metrics — lifetime counters (inbound / outbound / delivery statuses /
+   other events) accumulated from everything that hit the webhook or was sent
+   through this gateway since boot. */
+router.get('/metrics', (req, res) => {
+  res.json({ ok: true, provider: provider.name, metrics: store.metrics() });
 });
 
 module.exports = router;

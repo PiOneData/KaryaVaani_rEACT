@@ -11,10 +11,33 @@ const logger = require('./logger');
 const messages = []; // newest last
 let seq = 0;
 
+/* Lifetime counters — survive the rolling-window trim so the /metrics
+   endpoint reflects everything seen since boot, not just what's in the log. */
+const stats = {
+  since: new Date().toISOString(),
+  inbound: 0,
+  outbound: 0,
+  events: 0,
+  statuses: { sent: 0, delivered: 0, read: 0, failed: 0, other: 0 },
+  lastEventAt: null
+};
+
+function count(evt) {
+  if (evt.direction === 'in') stats.inbound++;
+  else if (evt.direction === 'out') stats.outbound++;
+  else if (evt.direction === 'status') {
+    const s = String(evt.status || '').toLowerCase();
+    if (s in stats.statuses) stats.statuses[s]++;
+    else stats.statuses.other++;
+  } else stats.events++;
+  stats.lastEventAt = new Date().toISOString();
+}
+
 function add(evt) {
   const record = { seq: ++seq, at: new Date().toISOString(), ...evt };
   messages.push(record);
   while (messages.length > config.storeLimit) messages.shift();
+  count(record);
   forward(record);
   return record;
 }
@@ -43,4 +66,8 @@ function forward(record) {
     .catch((err) => logger.warn('forward webhook failed:', err.message));
 }
 
-module.exports = { add, list };
+function metrics() {
+  return { ...stats, statuses: { ...stats.statuses }, logSize: messages.length };
+}
+
+module.exports = { add, list, metrics };

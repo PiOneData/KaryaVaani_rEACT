@@ -59,10 +59,17 @@
       }).catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
     },
 
-    /* poll the message log (inbound + outbound + statuses) */
+    /* poll the message log (inbound + outbound + statuses + events) */
     messages: function (params) {
       var qs = params ? '?' + new URLSearchParams(params).toString() : '';
       return fetch(base + '/api/whatsapp/messages' + qs)
+        .then(function (r) { return r.json(); })
+        .catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
+    },
+
+    /* lifetime gateway counters: inbound / outbound / delivery statuses */
+    metrics: function () {
+      return fetch(base + '/api/whatsapp/metrics')
         .then(function (r) { return r.json(); })
         .catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
     },
@@ -91,7 +98,7 @@
         .then(function (h) {
           var el = document.getElementById('kv-wa-status');
           if (el) {
-            var live = h && h.ok && h.provider === 'meta';
+            var live = h && h.ok && h.provider && h.provider !== 'mock';
             el.textContent = live
               ? '● WhatsApp Business · connected'
               : (h && h.ok ? '● WhatsApp gateway · mock mode' : '● WhatsApp gateway · offline');

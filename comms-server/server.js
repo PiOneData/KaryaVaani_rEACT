@@ -1,7 +1,8 @@
 /* server.js -- standalone communication server entry point.
 
    A small, reusable HTTP gateway for messaging channels. Today it exposes the
-   WhatsApp channel (Meta Cloud API, with a credential-free mock fallback).
+   WhatsApp channel (AOC portal "BOT API" gateway by default, legacy Meta
+   Cloud API optional, with a credential-free mock fallback).
    It holds the provider credentials server-side so that any number of client
    applications can send/receive WhatsApp messages through one shared service
    without ever embedding tokens in a browser or another codebase.
@@ -60,6 +61,9 @@ app.listen(config.port, () => {
   logger.info(`active WhatsApp provider: ${provider.name}`);
   if (config.testRecipient) {
     logger.warn(`TEST MODE: all outbound messages redirected to ${config.testRecipient}`);
+  }
+  if (provider.name === 'mock' && config.provider === 'aoc') {
+    logger.warn('AOC requested but credentials missing -- running in MOCK mode. Set AOC_API_KEY and AOC_FROM_ID to send real messages.');
   }
   if (provider.name === 'mock' && config.provider === 'meta') {
     logger.warn('META requested but credentials missing -- running in MOCK mode. Set META_PHONE_NUMBER_ID and META_ACCESS_TOKEN to send real messages.');

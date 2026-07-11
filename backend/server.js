@@ -834,6 +834,16 @@ app.get('/api/communications', (req, res) => {
   res.json({ ok: true, communications: store.data.communications || [] });
 });
 
+/* lifetime gateway metrics: inbound / outbound / delivery statuses / events */
+app.get('/api/whatsapp/metrics', async (req, res) => {
+  try {
+    const { status, json } = await commsFetch('/v1/whatsapp/metrics', { method: 'GET' });
+    res.status(status).json(json);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
+  }
+});
+
 /* poll the inbound/outbound message log (for the two-way chat surface) */
 app.get('/api/whatsapp/messages', async (req, res) => {
   try {

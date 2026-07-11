@@ -2,7 +2,9 @@
 const config = require('./../config');
 
 let provider;
-if (config.effectiveProvider === 'meta') {
+if (config.effectiveProvider === 'aoc') {
+  provider = require('./aoc');
+} else if (config.effectiveProvider === 'meta') {
   provider = require('./meta');
 } else {
   provider = require('./mock');
