@@ -33,6 +33,19 @@ function resolveRecipient(requested) {
   return requested;
 }
 
+/* Human-readable log line for a template send: the template name followed by
+   its body variable values, so the message log/chat shows the actual content
+   instead of an opaque "[template:trial]". */
+function templateLogText(template, components) {
+  const params = [];
+  (components || []).forEach((c) => {
+    (c.parameters || []).forEach((p) => {
+      if (p && p.text != null) params.push(String(p.text));
+    });
+  });
+  return params.length ? `[${template}] ${params.join(' · ')}` : `[template:${template}]`;
+}
+
 /* ---- inbound webhook --------------------------------------------------- */
 
 /* GET: verification probe. Meta sends the hub.challenge handshake; the AOC
@@ -148,7 +161,7 @@ router.post('/send-template', requireApiKey, async (req, res) => {
         messageId: r.id,
         to: provider.normalize(recipient),
         intendedFor: config.testRecipient ? provider.normalize(requested) : undefined,
-        text: `[template:${template}]`,
+        text: templateLogText(template, components),
         status: r.status
       });
       results.push({ to: recipient, intendedFor: requested, ok: true, id: r.id, provider: r.provider });

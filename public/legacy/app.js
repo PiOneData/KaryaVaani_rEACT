@@ -7968,23 +7968,26 @@ function __kvOnReady(fn) {
       const phone = m.to || m.from || m.intendedFor;
       let cid = CHAT_PHONE_IDX[chatLast4(phone)];
       if (!cid) {
-        /* Unknown number: synthesise a contact for a real inbound reply so it
-           always shows; ignore unknown-recipient outbound to keep the roster
-           clean. */
-        if (m.direction !== 'in') { CHAT_LIVE_SEEN[mid] = true; return; }
+        /* Unknown number — an inbound reply, or an outbound send to a
+           non-roster number such as the test recipient. Synthesise a contact
+           so the message is always visible in the chat. */
         cid = chatEnsureLiveContact(phone, m.name);
       }
       const th = CHAT_THREADS[cid] || (CHAT_THREADS[cid] = { lastSeen: 'now', msgs: [] });
       const stamp = m.at ? ('Live · ' + String(m.at).replace('T', ' ').slice(0, 16)) : 'Live';
 
       if (m.direction === 'out') {
-        /* broadcast leaving the gateway = the worker received it */
-        const preset = CHAT_PRESET_TEXT_IDX[chatNormTxt(m.text)] || 'holiday';
-        th.msgs.push({
-          id: cid + '-live-' + mid, msgId: mid, dir: 'in', preset: preset,
+        /* a message leaving the gateway. If the text matches a known broadcast
+           preset, render the localised broadcast; otherwise (free text or a
+           template send) show the raw text so the actual content is visible. */
+        const preset = CHAT_PRESET_TEXT_IDX[chatNormTxt(m.text)];
+        const rec = {
+          id: cid + '-live-' + mid, msgId: mid, dir: 'in',
           time: stamp, at: m.at || '', live: true,
           read: (m.status === 'read' || m.status === 'delivered'), acked: false
-        });
+        };
+        if (preset) rec.preset = preset; else rec.text = m.text || '';
+        th.msgs.push(rec);
         changed = true;
       } else if (m.direction === 'in') {
         /* worker reply = acknowledge the most recent open inbound delivery */
