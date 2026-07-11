@@ -59,6 +59,19 @@
       }).catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
     },
 
+    /* push the ONE approved WhatsApp template ('trial' — the minimum-wage
+       revision notice) with its five body variables, in order:
+         [period, effectiveDate, location, payPeriod, contact]
+       e.g. ['TE2026', '01 Aug 2026', 'Karya Vaani App', 'August 2026', 'Plant HR'].
+       Required for business-initiated messages outside the 24h window. */
+    sendApprovedTemplate: function (to, vars, templateName, language) {
+      var params = (vars || []).map(function (v) {
+        return { type: 'text', text: String(v == null ? '' : v) };
+      });
+      var components = [{ type: 'body', parameters: params }];
+      return KVWhatsApp.sendTemplate(to, templateName || 'trial', language || 'te', components);
+    },
+
     /* poll the message log (inbound + outbound + statuses + events) */
     messages: function (params) {
       var qs = params ? '?' + new URLSearchParams(params).toString() : '';

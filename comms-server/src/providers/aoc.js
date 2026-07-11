@@ -122,8 +122,11 @@ function pushMessage(out, m, extra = {}) {
     direction: 'in',
     provider: 'aoc',
     messageId: m.id || m.messageId || m.msgId || null,
+    wamid: m.id || m.wamid || m.messageId || null,
     from: normalize(m.from || m.mobile || m.sender || ''),
     name: extra.name || m.name || m.profileName || null,
+    conversationId:
+      (m.conversation && m.conversation.id) || m.conversationId || m.conversation_id || null,
     type: m.type || 'text',
     text:
       (m.text && (m.text.body != null ? m.text.body : m.text)) ||
@@ -145,8 +148,12 @@ function pushStatus(out, s) {
     direction: 'status',
     provider: 'aoc',
     messageId: s.id || s.messageId || s.msgId || null,
+    wamid: s.id || s.wamid || s.messageId || null,
     to: normalize(s.recipient_id || s.to || s.mobile || ''),
     status: String(s.status || s.event || '').toLowerCase(), // sent | delivered | read | failed
+    conversationId:
+      (s.conversation && s.conversation.id) || s.conversationId || s.conversation_id || null,
+    category: (s.pricing && s.pricing.category) || s.category || null,
     error:
       (Array.isArray(s.errors) && s.errors[0] && (s.errors[0].title || s.errors[0].message)) ||
       s.reason ||

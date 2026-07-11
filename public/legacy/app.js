@@ -7917,6 +7917,28 @@ function __kvOnReady(fn) {
     return idx;
   }
 
+  /* ensure a chat contact + thread exists for a live WhatsApp number that
+     isn't a seeded worker, so every genuinely-received inbound message is
+     visible instead of being silently dropped. Returns the contact id. */
+  function chatEnsureLiveContact(phone, name) {
+    const last4 = chatLast4(phone);
+    if (last4 && CHAT_PHONE_IDX[last4]) return CHAT_PHONE_IDX[last4];
+    const digitsOnly = String(phone == null ? '' : phone).replace(/\D/g, '');
+    const id = 'WA-' + (digitsOnly || last4 || Math.random().toString(36).slice(2, 8));
+    if (!CHAT_CONTACTS.some(function (c) { return c.id === id; })) {
+      CHAT_CONTACTS.push({
+        id: id,
+        name: name || (digitsOnly ? '+' + digitsOnly : 'WhatsApp contact'),
+        role: 'WhatsApp contact', zone: 'Inbound', dept: 'WhatsApp',
+        sup: '', type: 'Live', contractor: '', lang: 'EN',
+        phone: digitsOnly ? '+' + digitsOnly : String(phone || '')
+      });
+    }
+    if (!CHAT_THREADS[id]) CHAT_THREADS[id] = { lastSeen: 'now', msgs: [] };
+    if (last4) CHAT_PHONE_IDX[last4] = id;
+    return id;
+  }
+
   /* fold a batch of gateway records into the threads. Returns true if any
      thread changed (so the caller can re-render). */
   function chatIngestLiveComms(items) {
@@ -7944,8 +7966,14 @@ function __kvOnReady(fn) {
       }
 
       const phone = m.to || m.from || m.intendedFor;
-      const cid = CHAT_PHONE_IDX[chatLast4(phone)];
-      if (!cid) { CHAT_LIVE_SEEN[mid] = true; return; }   /* unknown recipient */
+      let cid = CHAT_PHONE_IDX[chatLast4(phone)];
+      if (!cid) {
+        /* Unknown number: synthesise a contact for a real inbound reply so it
+           always shows; ignore unknown-recipient outbound to keep the roster
+           clean. */
+        if (m.direction !== 'in') { CHAT_LIVE_SEEN[mid] = true; return; }
+        cid = chatEnsureLiveContact(phone, m.name);
+      }
       const th = CHAT_THREADS[cid] || (CHAT_THREADS[cid] = { lastSeen: 'now', msgs: [] });
       const stamp = m.at ? ('Live · ' + String(m.at).replace('T', ' ').slice(0, 16)) : 'Live';
 
