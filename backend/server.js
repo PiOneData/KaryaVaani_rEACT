@@ -38,7 +38,8 @@ app.get('/api/bootstrap', (req, res) => {
   // (password hashes), or the per-week transport roster/attendance to the
   // browser — those are fetched via their own routes.
   const { onboardingDocuments, communications, users, voiceCache, voiceWarm,
-          transportRoster, transportAttendance, nightConsents, transportEvents, ...rest } = s.data;
+          transportRoster, transportAttendance, nightConsents, transportEvents,
+          whatsappMessages, vendorWorkers, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -825,6 +826,64 @@ app.post('/api/whatsapp/send-template', async (req, res) => {
     logComm({ channel: 'whatsapp', kind: 'template', to: recips, recipients: recips.length, template: body.template, status: 'failed', error: err.message });
     res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
   }
+});
+
+/* ── Vendor workers: imported per-contractor deployment rosters ──────────────
+   The master worker roster has no contractor field, so the full list of workers
+   deployed under a vendor is sourced from an explicit vendor-data import. Stored
+   one row per worker in the vendorWorkers collection (Postgres-persisted). */
+app.get('/api/vendor/workers', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const all = store.data.vendorWorkers || [];
+  const contractor = (req.query.contractor || '').trim();
+  const items = contractor
+    ? all.filter((w) => String(w.contractor || '').toLowerCase() === contractor.toLowerCase())
+    : all;
+  res.json({ ok: true, contractor: contractor || null, count: items.length, workers: items });
+});
+
+/* Bulk-import workers for a contractor. Body: { contractor, workers:[...], replace }.
+   Each worker: { code, name, mobile, category, designation, department, esic,
+   clra, compliance, migrant }. `replace` clears this contractor's existing set. */
+app.post('/api/vendor/workers/import', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const { contractor, workers, replace } = req.body || {};
+  if (!contractor || !Array.isArray(workers) || !workers.length) {
+    return res.status(400).json({ ok: false, error: 'contractor and workers[] are required' });
+  }
+  store.data.vendorWorkers = store.data.vendorWorkers || [];
+  let arr = store.data.vendorWorkers;
+  const same = (w) => String(w.contractor || '').toLowerCase() === String(contractor).toLowerCase();
+  if (replace) {
+    arr.filter(same).forEach((w) => dbDel('vendorWorkers', w.id));
+    arr = store.data.vendorWorkers = arr.filter((w) => !same(w));
+  }
+  const clampPct = (v) => { const n = parseInt(v, 10); return isNaN(n) ? null : Math.max(0, Math.min(100, n)); };
+  let imported = 0;
+  workers.forEach((w, i) => {
+    const code = String(w.code || w.uan || w.mobile || (i + 1)).trim();
+    const id = 'VW|' + contractor + '|' + code;
+    const rec = {
+      id, contractor: String(contractor), code,
+      name: String(w.name || '').trim(),
+      mobile: String(w.mobile || '').trim(),
+      category: String(w.category || '').trim(),
+      designation: String(w.designation || '').trim(),
+      department: String(w.department || '').trim(),
+      esicStatus: String(w.esic != null ? w.esic : (w.esicStatus || '')).trim(),
+      clraStatus: String(w.clra != null ? w.clra : (w.clraStatus || '')).trim(),
+      compliancePct: clampPct(w.compliance != null ? w.compliance : w.compliancePct),
+      migrant: /^(y|yes|true|1)$/i.test(String(w.migrant || '')),
+      importedAt: new Date().toISOString()
+    };
+    const idx = arr.findIndex((x) => x.id === id);
+    if (idx >= 0) arr[idx] = rec; else arr.push(rec);
+    dbPut('vendorWorkers', id, rec);
+    imported++;
+  });
+  res.json({ ok: true, contractor, imported, total: arr.filter(same).length });
 });
 
 /* the logged communication history (drives the communication analytics) */

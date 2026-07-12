@@ -26,6 +26,8 @@ export default function SecVendor() {
         </div>
         {' '}
         <div className="page-h-right">
+          <button className="btn" onClick={() => { window.vwImportOpen && window.vwImportOpen() }} data-onclick="vwImportOpen()">⬆ Import vendor data</button>
+          {' '}
           <button className="btn">Invite contractor</button>
           {' '}
           <button className="btn amber">⚠ Open ESIC mismatch</button>

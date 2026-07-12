@@ -3281,50 +3281,275 @@ function __kvOnReady(fn) {
     document.getElementById('ct-pane-overview').innerHTML = html;
   }
 
+  /* ── Contractor "Workers deployed" pane — imported vendor roster ───────────
+     Shows ALL workers deployed under a contractor (sourced from vendor-data
+     import), in a paginated + searchable + column-sortable table (compliance
+     sortable), each row drilling into worker details. The onboarding ledger
+     cross-reference is kept as a secondary section below. */
+  var VW_STATE = { sortCol: 'name', sortDir: 1, workers: [], contractor: null };
+  var VW_IMPORT = { contractor: null, rows: [] };
+
+  function vwEsc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function vwStatusPill(s) {
+    var v = String(s || '').toLowerCase();
+    if (!v) return '<span class="pill tiny">—</span>';
+    var cls = /active|valid|ok|compliant|clear|good/.test(v) ? 'green'
+            : /pending|due|expiring|warn|review/.test(v) ? 'amber'
+            : /breach|expired|missing|fail|non|lapsed/.test(v) ? 'red' : '';
+    return '<span class="pill ' + cls + ' tiny">' + vwEsc(s) + '</span>';
+  }
+  function vwCompliance(p) {
+    if (p == null || isNaN(p)) return '<span class="tiny muted">—</span>';
+    var cls = p >= 80 ? 'green' : p >= 50 ? 'amber' : 'red';
+    return '<span class="pill ' + cls + ' tiny">' + p + '%</span>';
+  }
+  function vwHeader(col, label) {
+    var ind = VW_STATE.sortCol === col ? (VW_STATE.sortDir > 0 ? ' ▲' : ' ▼') : '';
+    return '<th class="sortable" style="cursor:pointer;white-space:nowrap" onclick="vwSort(\'' + col + '\')">' + label + ind + '</th>';
+  }
+  function vwSortVal(w, col) {
+    if (col === 'compliancePct') return w.compliancePct == null ? -1 : w.compliancePct;
+    return String(w[col] == null ? '' : w[col]).toLowerCase();
+  }
+  function vwSort(col) {
+    if (VW_STATE.sortCol === col) VW_STATE.sortDir *= -1;
+    else { VW_STATE.sortCol = col; VW_STATE.sortDir = 1; }
+    var c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS.find(function (x) { return x.name === VW_STATE.contractor; }) : null;
+    vwRenderTable(c || { name: VW_STATE.contractor, deployed: VW_STATE.workers.length });
+  }
+
   function renderCtPaneWorkers(c) {
-    const workers = CONTRACT_WORKERS.filter(w => w.contractor === c.name);
-    // newly onboarded contract workers tagged to this contractor (live, clickable)
-    const onboarded = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).map(function (r, i) { return { r: r, i: i }; })
+    var host = document.getElementById('ct-pane-workers');
+    if (!host) return;
+    VW_STATE.contractor = c.name;
+    VW_STATE.sortCol = 'name'; VW_STATE.sortDir = 1;
+    var safeCt = String(c.name).replace(/'/g, "\\'");
+    host.innerHTML =
+      '<div class="card-h" style="padding:0;margin-bottom:10px;align-items:flex-start">' +
+        '<div><div class="card-h-title" style="font-size:0.85rem">Workers deployed · ' + vwEsc(c.name) + '</div>' +
+          '<div class="card-h-sub" id="ctw-sub">Loading deployed workers…</div></div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">' +
+          '<input id="ctw-search" placeholder="Search workers…" style="padding:6px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:0.8rem;max-width:170px">' +
+          '<button class="btn tiny" onclick="vwImportOpen(\'' + safeCt + '\')">⬆ Import vendor data</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="overflow-x:auto"><table class="t"><thead><tr>' +
+        vwHeader('name', 'Worker') + vwHeader('code', 'Code') + vwHeader('category', 'Category') +
+        vwHeader('designation', 'Designation') + vwHeader('esicStatus', 'ESIC') + vwHeader('clraStatus', 'CLRA') +
+        vwHeader('compliancePct', 'Compliance') + '<th>Details</th>' +
+      '</tr></thead><tbody id="ctw-body"></tbody></table></div>' +
+      '<div id="ctw-pagination" class="om-pg"></div>' +
+      '<div id="ctw-onboarding"></div>';
+
+    var base = window.__KV_API_BASE || '';
+    fetch(base + '/api/vendor/workers?contractor=' + encodeURIComponent(c.name))
+      .then(function (r) { return r.json(); })
+      .then(function (j) { VW_STATE.workers = (j && j.workers) || []; vwRenderTable(c); })
+      .catch(function () { VW_STATE.workers = []; vwRenderTable(c); });
+
+    vwRenderOnboarding(c);
+  }
+
+  function vwRenderTable(c) {
+    var deployed = (c && c.deployed) || VW_STATE.workers.length;
+    var sub = document.getElementById('ctw-sub');
+    if (sub) sub.textContent = VW_STATE.workers.length
+      ? (VW_STATE.workers.length + ' of ' + deployed + ' deployed · imported vendor data · click a worker for details')
+      : ('No imported workers yet · ' + deployed + ' reported deployed. Use “Import vendor data” to upload the roster.');
+    var rows = VW_STATE.workers.slice().sort(function (a, b) {
+      var va = vwSortVal(a, VW_STATE.sortCol), vb = vwSortVal(b, VW_STATE.sortCol);
+      if (va < vb) return -1 * VW_STATE.sortDir;
+      if (va > vb) return 1 * VW_STATE.sortDir;
+      return 0;
+    });
+    KVTABLE.set({
+      key: 'ctw', tbody: 'ctw-body', pager: 'ctw-pagination', pageSize: 12, cols: 8, rows: rows,
+      text: function (w) { return [w.name, w.code, w.category, w.designation, w.department, w.esicStatus, w.clraStatus].join(' '); },
+      empty: 'No imported workers for this contractor yet — click “Import vendor data”.',
+      row: function (w) {
+        return '<tr style="cursor:pointer" onclick="vwWorkerDetail(\'' + String(w.id).replace(/'/g, "\\'") + '\')">' +
+          '<td class="t-strong">' + vwEsc(w.name || '—') + (w.migrant ? ' <span class="pill amber tiny">Migrant</span>' : '') + '</td>' +
+          '<td class="mono tiny">' + vwEsc(w.code || '—') + '</td>' +
+          '<td>' + vwEsc(w.category || '—') + '</td>' +
+          '<td>' + vwEsc(w.designation || '—') + '</td>' +
+          '<td>' + vwStatusPill(w.esicStatus) + '</td>' +
+          '<td>' + vwStatusPill(w.clraStatus) + '</td>' +
+          '<td>' + vwCompliance(w.compliancePct) + '</td>' +
+          '<td><button class="btn tiny">View</button></td>' +
+        '</tr>';
+      }
+    });
+  }
+
+  function vwRenderOnboarding(c) {
+    var host = document.getElementById('ctw-onboarding');
+    if (!host) return;
+    var onboarded = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).map(function (r, i) { return { r: r, i: i }; })
       .filter(function (x) { return x.r.type === 'contract' && (((x.r.employment && x.r.employment.contractor) || '') === c.name); });
-    let html = '';
-    if (workers.length === 0 && onboarded.length === 0) {
-      html = '<div class="muted tiny">No matching contract workers in current dataset. Workers may be deployed but not appear in the in-progress onboarding ledger if already pushed to HRIS.</div>';
-    } else if (workers.length) {
-      html += '<div class="card-h" style="padding:0;margin-bottom:10px">' +
-              '<div class="card-h-title" style="font-size:0.85rem">Workers in onboarding</div>' +
-              '<div class="card-h-sub">' + workers.length + ' of ' + c.deployed + ' deployed shown · Module 2 cross-reference</div></div>';
-      html += '<table class="t"><thead><tr><th>Worker</th><th>Category</th><th>ESIC</th><th>CLRA</th><th>PPE / Size</th><th>Induction</th><th>Action</th></tr></thead><tbody>';
-      workers.forEach(w => {
-        const urgent = w.esic.state === 'breach' || w.clra.state === 'expired';
-        const ctaCls = urgent ? 'notify-btn urgent' : 'notify-btn';
-        const safeName = w.name.replace(/'/g, "\\'");
-        html += '<tr>' +
-                '<td class="t-strong">' + w.name + '</td>' +
-                '<td>' + w.category + '</td>' +
-                '<td><span class="pill ' + w.esic.cls + '">' + w.esic.label + '</span></td>' +
-                '<td><span class="pill ' + w.clra.cls + '">' + w.clra.label + '</span></td>' +
-                '<td>' + ppePillHtml(w.name) + '</td>' +
-                '<td>' + indProgHtml(w.name) + '</td>' +
-                '<td><button class="' + ctaCls + '" onclick="openVendorEmail(\'' + safeName + '\')">Notify vendor</button></td>' +
-                '</tr>';
+    if (!onboarded.length) { host.innerHTML = ''; return; }
+    var html = '<div class="card-h" style="padding:0;margin:16px 0 8px"><div class="card-h-title" style="font-size:0.85rem">Newly onboarded · this contractor</div>' +
+      '<div class="card-h-sub">' + onboarded.length + ' captured in Onboarding · click a row to open the worker</div></div>';
+    html += '<table class="t"><thead><tr><th>Worker</th><th>Category</th><th>Aadhaar</th><th>Status</th></tr></thead><tbody>';
+    onboarded.forEach(function (x) {
+      html += '<tr style="cursor:pointer" onclick="obOpenCapture(' + x.i + ')">' +
+        '<td class="t-strong">' + vwEsc(x.r.name) + ' <span class="tiny muted">(' + vwEsc(x.r.id) + ')</span></td>' +
+        '<td>' + vwEsc(x.r.category || '—') + '</td>' +
+        '<td>' + (x.r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+        '<td>' + (x.r.status === 'confirmed' ? 'Confirmed' : 'Awaiting') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    host.innerHTML = html;
+  }
+
+  /* worker-detail drilldown */
+  function vwWorkerDetail(id) {
+    var w = VW_STATE.workers.find(function (x) { return String(x.id) === String(id); });
+    if (!w) return;
+    var rows = [
+      ['Name', w.name], ['Code', w.code], ['Contractor', w.contractor], ['Mobile', w.mobile],
+      ['Category', w.category], ['Designation', w.designation], ['Department', w.department],
+      ['ESIC', w.esicStatus], ['CLRA', w.clraStatus],
+      ['Compliance', w.compliancePct == null ? '—' : w.compliancePct + '%'], ['Migrant', w.migrant ? 'Yes' : 'No']
+    ];
+    vwModal('Worker · ' + vwEsc(w.name || ''),
+      '<table class="t"><tbody>' + rows.map(function (r) {
+        return '<tr><td class="tiny muted" style="width:130px">' + r[0] + '</td><td class="t-strong">' + vwEsc(r[1] == null || r[1] === '' ? '—' : r[1]) + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  /* ── generic modal (injected into body) ── */
+  function vwModal(title, bodyHtml) {
+    vwCloseModal();
+    var ov = document.createElement('div');
+    ov.id = 'vw-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.onclick = function (e) { if (e.target === ov) vwCloseModal(); };
+    ov.innerHTML = '<div style="background:var(--card,#fff);color:var(--ink,#111);border-radius:12px;max-width:680px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line,#e5e7eb)">' +
+        '<div class="card-h-title" style="font-size:0.95rem">' + title + '</div>' +
+        '<button class="btn tiny" onclick="vwCloseModal()">✕</button>' +
+      '</div><div style="padding:16px 18px">' + bodyHtml + '</div></div>';
+    document.body.appendChild(ov);
+  }
+  function vwCloseModal() { var m = document.getElementById('vw-modal'); if (m && m.parentNode) m.parentNode.removeChild(m); }
+
+  /* ── vendor-data import ── */
+  function vwImportOpen(contractor) {
+    VW_IMPORT = { contractor: contractor || VW_STATE.contractor || '', rows: [] };
+    vwModal('Import vendor data' + (VW_IMPORT.contractor ? ' · ' + vwEsc(VW_IMPORT.contractor) : ''),
+      '<div class="tiny muted" style="margin-bottom:10px;line-height:1.6">Upload a CSV of the workers deployed under this contractor. Required column: <span class="mono">name</span>. ' +
+        'Full column set: <span class="mono">contractor, code, name, mobile, category, designation, department, esic, clra, compliance, migrant</span>. ' +
+        '<code>compliance</code> is a number 0–100; <code>esic</code>/<code>clra</code> are status words (active / pending / breach / expired); <code>migrant</code> is yes/no. ' +
+        'If a row omits <code>contractor</code>, this contractor is assumed.</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">' +
+        '<button class="btn tiny" onclick="vwDownloadTemplate()">⬇ Download template</button>' +
+        '<button class="btn tiny" onclick="vwLoadSample()">Load sample data</button>' +
+        '<label class="btn tiny" style="cursor:pointer">⬆ Choose CSV<input type="file" accept=".csv,text/csv" style="display:none" onchange="vwFile(event)"></label>' +
+      '</div>' +
+      '<div id="vw-import-preview"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px">' +
+        '<label class="tiny" style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="vw-replace" checked> Replace existing workers for this contractor</label>' +
+        '<button class="btn primary tiny" id="vw-import-submit" onclick="vwSubmit()" disabled>Import</button>' +
+      '</div>');
+  }
+  function vwDownload(text, fname) {
+    var blob = new Blob([text], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  function vwDownloadTemplate() {
+    var ct = VW_IMPORT.contractor || 'R.K Enterprises';
+    var csv = 'contractor,code,name,mobile,category,designation,department,esic,clra,compliance,migrant\n' +
+      ct + ',EMP1001,Ramesh Naidu,9876543210,Skilled,Forklift Operator,Logistics,active,active,88,no\n' +
+      ct + ',EMP1002,Lalita Devi,9811122233,Semi-skilled,Packer,Packaging,pending,active,64,yes\n';
+    vwDownload(csv, 'vendor-workers-template.csv');
+    if (typeof toast === 'function') toast('Template downloaded', 'green');
+  }
+  function vwLoadSample() {
+    var ct = VW_IMPORT.contractor || 'R.K Enterprises';
+    VW_IMPORT.rows = [
+      { contractor: ct, code: 'EMP1001', name: 'Ramesh Naidu', mobile: '9876543210', category: 'Skilled', designation: 'Forklift Operator', department: 'Logistics', esic: 'active', clra: 'active', compliance: '88', migrant: 'no' },
+      { contractor: ct, code: 'EMP1002', name: 'Lalita Devi', mobile: '9811122233', category: 'Semi-skilled', designation: 'Packer', department: 'Packaging', esic: 'pending', clra: 'active', compliance: '64', migrant: 'yes' },
+      { contractor: ct, code: 'EMP1003', name: 'Suresh Kumar', mobile: '9700045566', category: 'Unskilled', designation: 'Loader', department: 'Inbound', esic: 'active', clra: 'expired', compliance: '41', migrant: 'no' }
+    ];
+    vwImportPreview();
+  }
+  function vwFile(ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function (e) { vwParse(e.target.result); };
+    rd.readAsText(f);
+  }
+  function vwParse(text) {
+    var lines = String(text).split(/\r?\n/).filter(function (l) { return l.trim(); });
+    if (lines.length < 2) { if (typeof toast === 'function') toast('That file has no worker rows', 'red'); return; }
+    var head = lines[0].split(',').map(function (h) { return h.trim().toLowerCase(); });
+    var ix = function (k) { return head.indexOf(k); };
+    var get = function (c, k) { var i = ix(k); return i >= 0 ? (c[i] || '').trim() : ''; };
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+      var c = lines[i].split(',');
+      rows.push({
+        contractor: get(c, 'contractor') || VW_IMPORT.contractor || '',
+        code: get(c, 'code'), name: get(c, 'name'), mobile: get(c, 'mobile'),
+        category: get(c, 'category'), designation: get(c, 'designation'), department: get(c, 'department'),
+        esic: get(c, 'esic'), clra: get(c, 'clra'), compliance: get(c, 'compliance'), migrant: get(c, 'migrant')
       });
-      html += '</tbody></table>';
-      html += '<div class="tiny muted" style="margin-top:8px">For the remaining ' + (c.deployed - workers.length) + ' workers already past onboarding, see Daikin HRIS or the master worker register. Click <strong>Induction training</strong> in the nav to drill into per-module progress.</div>';
     }
-    if (onboarded.length) {
-      html += '<div class="card-h" style="padding:0;margin:14px 0 8px"><div class="card-h-title" style="font-size:0.85rem">Newly onboarded · this contractor</div>' +
-              '<div class="card-h-sub">' + onboarded.length + ' captured in Onboarding · click a row to open the worker</div></div>';
-      html += '<table class="t"><thead><tr><th>Worker</th><th>Category</th><th>Aadhaar</th><th>Status</th></tr></thead><tbody>';
-      onboarded.forEach(function (x) {
-        html += '<tr style="cursor:pointer" onclick="obOpenCapture(' + x.i + ')">' +
-          '<td class="t-strong">' + x.r.name + ' <span class="tiny muted">(' + x.r.id + ')</span></td>' +
-          '<td>' + (x.r.category || '—') + '</td>' +
-          '<td>' + (x.r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
-          '<td>' + (x.r.status === 'confirmed' ? 'Confirmed' : 'Awaiting') + '</td></tr>';
-      });
-      html += '</tbody></table>';
+    VW_IMPORT.rows = rows;
+    vwImportPreview();
+  }
+  function vwImportPreview() {
+    var host = document.getElementById('vw-import-preview');
+    if (!host) return;
+    var rows = VW_IMPORT.rows || [];
+    var valid = rows.filter(function (r) { return r.name && r.name.trim(); });
+    host.innerHTML = rows.length
+      ? '<div class="tiny" style="margin-bottom:6px"><strong>' + valid.length + '</strong> of ' + rows.length + ' rows ready' +
+          (VW_IMPORT.contractor ? ' for <strong>' + vwEsc(VW_IMPORT.contractor) + '</strong>' : '') + '</div>' +
+        '<div style="max-height:240px;overflow:auto"><table class="t"><thead><tr><th>Name</th><th>Code</th><th>Category</th><th>ESIC</th><th>CLRA</th><th>Compliance</th></tr></thead><tbody>' +
+        rows.slice(0, 50).map(function (r) {
+          var p = (r.compliance === '' || r.compliance == null) ? null : parseInt(r.compliance, 10);
+          return '<tr><td class="t-strong">' + vwEsc(r.name || '—') + '</td><td class="mono tiny">' + vwEsc(r.code || '—') + '</td><td>' + vwEsc(r.category || '—') + '</td><td>' + vwStatusPill(r.esic) + '</td><td>' + vwStatusPill(r.clra) + '</td><td>' + vwCompliance(p) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' + (rows.length > 50 ? '<div class="tiny muted">Showing first 50 of ' + rows.length + '</div>' : '')
+      : '<div class="tiny muted">No rows loaded.</div>';
+    var btn = document.getElementById('vw-import-submit');
+    if (btn) btn.disabled = valid.length === 0;
+  }
+  function vwSubmit() {
+    var rows = (VW_IMPORT.rows || []).filter(function (r) { return r.name && r.name.trim(); });
+    if (!rows.length) { if (typeof toast === 'function') toast('No valid rows to import', 'red'); return; }
+    var byCt = {};
+    rows.forEach(function (r) { var ct = (r.contractor || VW_IMPORT.contractor || '').trim(); if (ct) (byCt[ct] = byCt[ct] || []).push(r); });
+    var cts = Object.keys(byCt);
+    if (!cts.length) { if (typeof toast === 'function') toast('No contractor specified for the rows', 'red'); return; }
+    var replace = !!(document.getElementById('vw-replace') && document.getElementById('vw-replace').checked);
+    var base = window.__KV_API_BASE || '';
+    var done = 0, total = 0, failed = 0;
+    cts.forEach(function (ct) {
+      fetch(base + '/api/vendor/workers/import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractor: ct, workers: byCt[ct], replace: replace })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        done++; if (j && j.ok) total += j.imported || 0; else failed++;
+        if (done === cts.length) vwSubmitDone(total, failed);
+      }).catch(function () { done++; failed++; if (done === cts.length) vwSubmitDone(total, failed); });
+    });
+  }
+  function vwSubmitDone(total, failed) {
+    if (typeof toast === 'function') {
+      if (failed) toast('Imported ' + total + ' worker(s); ' + failed + ' contractor group(s) failed', 'amber');
+      else toast('Imported ' + total + ' worker' + (total === 1 ? '' : 's'), 'green');
     }
-    document.getElementById('ct-pane-workers').innerHTML = html;
+    vwCloseModal();
+    if (VW_STATE.contractor) {
+      var c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS.find(function (x) { return x.name === VW_STATE.contractor; }) : null;
+      if (c) renderCtPaneWorkers(c);
+    }
   }
 
   function renderCtPaneTasks(c) {
