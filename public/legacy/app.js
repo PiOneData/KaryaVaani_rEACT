@@ -8109,6 +8109,11 @@ function __kvOnReady(fn) {
         return;
       }
 
+      /* only inbound replies and outbound sends render as chat bubbles; other
+         event records (delivery metrics, account events) are logged, not shown,
+         and must not spawn empty placeholder contacts. */
+      if (m.direction !== 'in' && m.direction !== 'out') { CHAT_LIVE_SEEN[mid] = true; return; }
+
       const phone = m.to || m.from || m.intendedFor;
       let cid = CHAT_PHONE_IDX[chatLast4(phone)];
       if (!cid) {
