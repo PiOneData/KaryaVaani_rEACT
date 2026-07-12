@@ -7936,7 +7936,7 @@ function __kvOnReady(fn) {
 
     /* focus (or create) the demo contact's conversation so the send is visible */
     var cid = (typeof chatEnsureLiveContact === 'function')
-      ? chatEnsureLiveContact(demoNumber, 'Sriramm Ramesh') : null;
+      ? chatEnsureLiveContact(demoNumber, 'Sriramm') : null;
     if (cid) { CHAT_STATE.activeId = cid; chatRenderList(); chatRenderConv(); }
 
     var bodyEl = document.getElementById('chat-conv-body');
@@ -8303,6 +8303,10 @@ function __kvOnReady(fn) {
      isn't a seeded worker, so every genuinely-received inbound message is
      visible instead of being silently dropped. Returns the contact id. */
   function chatEnsureLiveContact(phone, name) {
+    /* the phone index may not be built yet if no live poll has run; build it so
+       we reuse an existing (e.g. onboarded) contact for this number rather than
+       creating a duplicate — and so this never dereferences a null index. */
+    if (!CHAT_PHONE_IDX) CHAT_PHONE_IDX = chatBuildPhoneIdx();
     const last4 = chatLast4(phone);
     if (last4 && CHAT_PHONE_IDX[last4]) return CHAT_PHONE_IDX[last4];
     const digitsOnly = String(phone == null ? '' : phone).replace(/\D/g, '');
