@@ -53,6 +53,7 @@ const COLLECTIONS = {
   voiceCache:          { table: 'voice_cache',           kind: 'array', id: (r) => r.hash },
   voiceWarm:           { table: 'voice_warm',            kind: 'map' },
   communications:      { table: 'communications',        kind: 'array', id: (r) => r.id },
+  whatsappMessages:    { table: 'whatsapp_messages',      kind: 'array', id: (r) => r.id },
   chatThreads:         { table: 'chat_threads',          kind: 'map' },
   onboardingDocuments: { table: 'onboarding_documents',  kind: 'map' },
   workerCompliance:    { table: 'worker_compliance',     kind: 'map' },

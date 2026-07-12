@@ -844,8 +844,58 @@ app.get('/api/whatsapp/metrics', async (req, res) => {
   }
 });
 
-/* poll the inbound/outbound message log (for the two-way chat surface) */
+/* Stable natural key for a WhatsApp event so re-forwarded duplicates upsert
+   instead of piling up. A message has one row; each delivery status (sent /
+   delivered / read) for the same wamid is its own row. */
+function whatsappKey(r) {
+  const id = r.messageId || r.wamid || r.id || '';
+  const dir = r.direction || '';
+  const st = r.status || '';
+  if (id) return [id, dir, st].join('|');
+  return ['anon', dir, r.from || r.to || '', r.timestamp || r.at || '', String(r.text || '').slice(0, 24)].join('|');
+}
+
+/* ingest a forwarded message/status from the comms server and persist it to
+   Postgres, so the chat history survives comms-server / deploy restarts. */
+app.post('/api/whatsapp/ingest', (req, res) => {
+  if (COMMS_API_KEY && req.get('x-api-key') !== COMMS_API_KEY) {
+    return res.status(401).json({ ok: false, error: 'unauthorized' });
+  }
+  const rec = req.body || {};
+  if (!rec || typeof rec !== 'object' || !rec.channel) {
+    return res.status(400).json({ ok: false, error: 'invalid record' });
+  }
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'store not ready' });
+  store.data.whatsappMessages = store.data.whatsappMessages || [];
+  const arr = store.data.whatsappMessages;
+  const key = whatsappKey(rec);
+  const record = { ...rec, id: key, ingestedAt: new Date().toISOString() };
+  const idx = arr.findIndex((x) => (x.id || whatsappKey(x)) === key);
+  if (idx >= 0) arr[idx] = record; else arr.push(record);
+  while (arr.length > 5000) arr.shift();
+  dbPut('whatsappMessages', key, record);
+  res.json({ ok: true });
+});
+
+/* poll the inbound/outbound message log (for the two-way chat surface).
+   Reads the persisted DB log; falls back to the comms-server in-memory log if
+   the DB collection isn't available yet. */
 app.get('/api/whatsapp/messages', async (req, res) => {
+  const store = readStore();
+  const persisted = store && store.data && Array.isArray(store.data.whatsappMessages)
+    ? store.data.whatsappMessages : null;
+  if (persisted) {
+    const { direction, from, to, limit } = req.query;
+    let items = persisted.slice();
+    if (direction) items = items.filter((m) => m.direction === direction);
+    if (from) items = items.filter((m) => m.from === from);
+    if (to) items = items.filter((m) => m.to === to);
+    items.sort((a, b) => String(a.ingestedAt || a.at || '').localeCompare(String(b.ingestedAt || b.at || '')));
+    const n = parseInt(limit, 10);
+    if (n && items.length > n) items = items.slice(-n);
+    return res.json({ ok: true, source: 'db', count: items.length, items });
+  }
   try {
     const qs = new URLSearchParams(req.query).toString();
     const { status, json } = await commsFetch('/v1/whatsapp/messages' + (qs ? '?' + qs : ''), {

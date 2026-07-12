@@ -62,6 +62,9 @@ services:
       - PORT=4100
       - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-aoc}
       - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}
+      # Persist every message/status to the backend (Postgres) so the chat log
+      # survives restarts. The backend authenticates the call with COMMS_API_KEY.
+      - COMMS_FORWARD_URL=${COMMS_FORWARD_URL:-http://backend:3241/api/whatsapp/ingest}
       # AOC portal (BOT API) — apikey from the portal account, From Id is the
       # sender number registered there (KaryaVani: 918220099940).
       - AOC_BASE_URL=${AOC_BASE_URL:-https://api.aoc-portal.com}

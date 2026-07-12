@@ -59,7 +59,10 @@ function forward(record) {
     .then(() =>
       fetch(config.forwardUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign(
+          { 'Content-Type': 'application/json' },
+          config.apiKey ? { 'x-api-key': config.apiKey } : {}
+        ),
         body: JSON.stringify(record)
       })
     )
