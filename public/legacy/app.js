@@ -7923,48 +7923,61 @@ function __kvOnReady(fn) {
   /* "Send next broadcast" — pushes the next template into the active thread,
      after a brief typing indicator, in the worker's language */
   function chatSendNextBroadcast() {
-    const c = CHAT_CONTACTS.find(function (x) { return x.id === CHAT_STATE.activeId; });
-    if (!c) {
-      if (typeof toast === 'function') toast('Pick a worker from the chat list first', 'red');
-      return;
-    }
-    const preset = CHAT_BROADCAST_ROTATION[CHAT_BROADCAST_IDX % CHAT_BROADCAST_ROTATION.length];
-    CHAT_BROADCAST_IDX++;
-    /* show typing */
-    const body = document.getElementById('chat-conv-body');
-    if (body) {
-      const typing = document.createElement('div');
-      typing.className = 'cv-msg in';
-      typing.id = 'chat-typing';
+    /* DEMO: always send the one approved WhatsApp template ('trial') to the
+       fixed demo number 919500200300 — regardless of which worker is selected
+       or programmed — and show the sent message in that contact's chat thread.
+       Business-initiated WhatsApp requires an approved template, and only this
+       template is approved, so this is what actually delivers. */
+    var demoNumber = '919500200300';
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+    var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
+    var params = ['TE2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
+
+    /* focus (or create) the demo contact's conversation so the send is visible */
+    var cid = (typeof chatEnsureLiveContact === 'function')
+      ? chatEnsureLiveContact(demoNumber, 'Sriramm Ramesh') : null;
+    if (cid) { CHAT_STATE.activeId = cid; chatRenderList(); chatRenderConv(); }
+
+    var bodyEl = document.getElementById('chat-conv-body');
+    if (bodyEl) {
+      var typing = document.createElement('div');
+      typing.className = 'cv-msg in'; typing.id = 'chat-typing';
       typing.innerHTML = '<div class="cv-typing"><span></span><span></span><span></span></div>';
-      body.appendChild(typing);
-      body.scrollTop = body.scrollHeight;
+      bodyEl.appendChild(typing); bodyEl.scrollTop = bodyEl.scrollHeight;
     }
-    setTimeout(function () {
-      const t = document.getElementById('chat-typing');
-      if (t) t.remove();
-      const th = CHAT_THREADS[c.id] || (CHAT_THREADS[c.id] = { lastSeen: 'now', msgs: [] });
+
+    function renderSent(id) {
+      var t = document.getElementById('chat-typing'); if (t) t.remove();
+      if (!cid) return;
+      var th = CHAT_THREADS[cid] || (CHAT_THREADS[cid] = { lastSeen: 'now', msgs: [] });
       th.msgs.push({
-        id: c.id + '-m' + th.msgs.length,
-        dir: 'in', preset: preset,
-        time: 'Today · ' + chatNowStamp(),
-        at: chatFullStamp(),
-        read: true, acked: false
+        id: cid + '-tpl-' + (id || (th.msgs.length + '-' + now.getTime())),
+        msgId: id || null, dir: 'in',
+        template: { name: 'trial', params: params },
+        time: 'Live · ' + chatIstStamp(now.toISOString()),
+        at: now.toISOString(), live: true, read: true, acked: false
       });
-      chatRenderConv();
-      chatRenderList();
-      chatRenderAnalytics();
-      if (typeof toast === 'function') {
-        const lng = chatLang(c.lang);
-        toast('Broadcast "' + chatSubject(preset) + '" sent to ' + c.name +
-          ' in ' + lng.name, 'green');
-      }
-      /* real WhatsApp delivery via the communication gateway */
-      if (window.KVWhatsApp) {
-        const body = chatLocalised(preset, c.lang);
-        window.KVWhatsApp.send(c.phone, body);
-      }
-    }, 1100);
+      if (id) CHAT_LIVE_SEEN[id] = true;   /* the live poll won't re-ingest this send */
+      chatRenderConv(); chatRenderList();
+      if (typeof chatRenderAnalytics === 'function') { try { chatRenderAnalytics(); } catch (e) {} }
+    }
+
+    if (window.KVWhatsApp && typeof window.KVWhatsApp.sendApprovedTemplate === 'function') {
+      window.KVWhatsApp.sendApprovedTemplate(demoNumber, params).then(function (res) {
+        var id = (res && res.results && res.results[0] && res.results[0].id) || null;
+        renderSent(id);
+        if (typeof toast === 'function') {
+          if (res && res.ok) toast('Approved template sent to ' + demoNumber, 'green');
+          else toast('Template send failed: ' + ((res && res.error) || 'gateway error'), 'red');
+        }
+      }).catch(function () {
+        renderSent(null);
+        if (typeof toast === 'function') toast('Template send failed', 'red');
+      });
+    } else {
+      setTimeout(function () { renderSent(null); }, 800);
+    }
   }
 
   function chatNowStamp() {
