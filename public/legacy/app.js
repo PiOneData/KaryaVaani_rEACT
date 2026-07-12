@@ -7296,6 +7296,114 @@ function __kvOnReady(fn) {
     return max;
   }
 
+  /* full IST stamp "12 Jul 2026 · 15:24:09 IST" from an ISO value; if the value
+     is already a human stamp (seeded), return it unchanged. */
+  function chatIstFull(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('en-GB', {
+      timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).replace(',', ' ·') + ' IST';
+  }
+
+  function chatEsc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ── approved WhatsApp templates, in their source + translatable languages ──
+     Body text mirrors exactly what the gateway sends (with {{n}} placeholders);
+     the chat renders the real message content — not the "[trial] …" log line —
+     and a per-message language switcher (Telugu source ↔ English ↔ others via
+     the live /api/translate engine). */
+  var CHAT_TEMPLATES = {
+    trial: {
+      origLang: 'TE',
+      langs: {
+        TE: 'కనీస వేతన సవరణ – {{1}}\n\n{{2}} నుండి సవరించిన కనీస వేతన రేట్లు అమల్లోకి వచ్చాయి.\n\nసవరించిన రేట్లు మరియు VDA వివరాలు {{3}}లో అందుబాటులో ఉన్నాయి.\n\nకొత్త వేతన రేట్లు మీ {{4}} పే స్లిప్‌లో ప్రతిబింబిస్తాయి.\n\nఏవైనా సందేహాలు ఉంటే, దయచేసి {{5}}ను సంప్రదించండి.',
+        EN: 'Minimum Wage Revision – {{1}}\n\nThe revised minimum wage rates are effective from {{2}}.\n\nThe revised rates and VDA details are available in {{3}}.\n\nThe new wage rates will be reflected in your {{4}} pay slip.\n\nIf you have any questions, please contact {{5}}.'
+      }
+    }
+  };
+  /* languages offered by the switcher (static ones render instantly; the rest
+     are produced on demand by the translation engine and cached per message) */
+  var CHAT_TPL_LANGS = ['TE', 'EN', 'TA', 'HI', 'KN'];
+
+  function chatFillTemplate(body, params) {
+    return String(body || '').replace(/\{\{(\d+)\}\}/g, function (_, n) {
+      var i = parseInt(n, 10) - 1;
+      return (params && params[i] != null) ? params[i] : '';
+    });
+  }
+
+  /* rendered template body in `lang`, or null if it must be fetched */
+  function chatTplBody(m, lang) {
+    var tpl = CHAT_TEMPLATES[m.template.name];
+    if (tpl && tpl.langs[lang]) return chatFillTemplate(tpl.langs[lang], m.template.params);
+    if (m.tplCache && m.tplCache[lang] != null && m.tplCache[lang] !== '…') return m.tplCache[lang];
+    return null;
+  }
+
+  /* translate the English rendering into `lang` via the live engine, cache it
+     on the message, then re-render the conversation. */
+  function chatTplTranslate(m, lang) {
+    var tpl = CHAT_TEMPLATES[m.template.name] || { langs: {} };
+    var enBody = tpl.langs.EN ? chatFillTemplate(tpl.langs.EN, m.template.params) : (m.text || '');
+    m.tplCache = m.tplCache || {};
+    if (m.tplCache[lang] === '…') return;       /* already in flight */
+    m.tplCache[lang] = '…';
+    var base = window.__KV_API_BASE || '';
+    fetch(base + '/api/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: enBody, source: 'EN', target: lang })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        m.tplCache[lang] = (j && (j.translation || (j.translations && j.translations[lang]))) || enBody;
+        try { chatRenderConv(); } catch (e) { /* ignore */ }
+      })
+      .catch(function () { m.tplCache[lang] = enBody; try { chatRenderConv(); } catch (e) {} });
+    return;
+  }
+
+  /* render an outbound approved-template message: real content + language
+     switcher + English translation + IST send time. */
+  function chatRenderTemplateMsg(m, c) {
+    var tpl = CHAT_TEMPLATES[m.template.name] || { langs: {} };
+    var cur = m.langPref || tpl.origLang || 'EN';
+    var main = chatTplBody(m, cur);
+    if (main == null) { chatTplTranslate(m, cur); main = 'Translating…'; }
+    var enBody = chatTplBody(m, 'EN');
+    var chips = CHAT_TPL_LANGS.map(function (lg) {
+      return '<span class="cv-bub-lang-chip' + (lg === cur ? ' on' : '') +
+        '" onclick="chatSetMsgLang(\'' + m.id + '\',\'' + lg + '\')">' + lg + '</span>';
+    }).join('');
+    return '<div class="cv-msg in"><div class="cv-bub">' +
+      '<div class="cv-bub-lang-row">' + chips + '</div>' +
+      '<div class="cv-tpl-body">' + chatEsc(main) + '</div>' +
+      (cur !== 'EN' && enBody ? '<div class="cv-bub-bilingual">EN · ' + chatEsc(enBody) + '</div>' : '') +
+      '<div class="cv-bub-meta">' +
+        '<div class="cv-meta-row"><span class="cv-meta-k">Sent</span><span class="cv-meta-v">' + (m.at ? chatIstFull(m.at) : (m.time || '')) + '</span></div>' +
+        '<div class="cv-meta-row"><span class="cv-meta-k">Template</span><span class="cv-meta-v">' + chatEsc(m.template.name) + '</span></div>' +
+        '<div class="cv-meta-row"><span class="cv-meta-k">Channel</span><span class="cv-meta-v">WhatsApp · AOC gateway</span></div>' +
+      '</div>' +
+      '<div class="cv-bub-foot">' +
+        '<span class="cv-bub-time">' + (m.time || '') + '</span>' +
+        '<span class="cv-bub-tick read">✓✓</span>' +
+      '</div>' +
+    '</div></div>';
+  }
+
+  /* switch the display language of a single message (global for inline onclick) */
+  function chatSetMsgLang(mid, lang) {
+    var r = chatFindMsg(mid);
+    if (!r.msg) return;
+    r.msg.langPref = lang;
+    try { chatRenderConv(); } catch (e) { /* ignore */ }
+  }
+
   /* preview text for the chat list — the most recent inbound (bot) msg */
   function chatPreview(c) {
     const t = CHAT_THREADS[c.id];
@@ -7454,6 +7562,8 @@ function __kvOnReady(fn) {
   /* bubble for a bot-sent (inbound from worker perspective) message */
   function chatRenderInbound(m, c) {
     const lng = chatLang(c.lang);
+    /* approved-template send — real content + language switcher */
+    if (m.template) return chatRenderTemplateMsg(m, c);
     /* response-bot reminders render as a compact reminder bubble */
     if (m.isReminder) {
       const tickCls = m.read ? 'read' : 'delivered';
@@ -7465,7 +7575,7 @@ function __kvOnReady(fn) {
           (m.text || '') + '</div>' +
         (m.en ? '<div class="cv-bub-bilingual">EN · ' + m.en + '</div>' : '') +
         '<div class="cv-bub-meta">' +
-          '<div class="cv-meta-row"><span class="cv-meta-k">Sent</span><span class="cv-meta-v">' + (m.at || m.time) + '</span></div>' +
+          '<div class="cv-meta-row"><span class="cv-meta-k">Sent</span><span class="cv-meta-v">' + (m.at ? chatIstFull(m.at) : (m.time || '')) + '</span></div>' +
           '<div class="cv-meta-row"><span class="cv-meta-k">Origin</span><span class="cv-meta-v">Karya Vaani response-bot · auto-reminder</span></div>' +
           '<div class="cv-meta-row"><span class="cv-meta-k">Triggered by</span><span class="cv-meta-v">' +
             (m.reminderFor ? 'No acknowledgement on ' + m.reminderFor : 'compliance rule') + '</span></div>' +
@@ -7508,7 +7618,7 @@ function __kvOnReady(fn) {
     }
     /* origination block — module, originator, channel, message id, timestamp */
     const originBlock = '<div class="cv-bub-meta">' +
-      '<div class="cv-meta-row"><span class="cv-meta-k">Sent</span><span class="cv-meta-v">' + (m.at || m.time) + '</span></div>' +
+      '<div class="cv-meta-row"><span class="cv-meta-k">Sent</span><span class="cv-meta-v">' + (m.at ? chatIstFull(m.at) : (m.time || '')) + '</span></div>' +
       (origin ? '<div class="cv-meta-row"><span class="cv-meta-k">Origin</span><span class="cv-meta-v">' + origin.mod + ' · ' + origin.subMod + '</span></div>' : '') +
       (origin ? '<div class="cv-meta-row"><span class="cv-meta-k">By</span><span class="cv-meta-v">' + origin.by + '</span></div>' : '') +
       (origin ? '<div class="cv-meta-row"><span class="cv-meta-k">Channel</span><span class="cv-meta-v">' + origin.ch + '</span></div>' : '') +
@@ -8020,7 +8130,15 @@ function __kvOnReady(fn) {
           time: stamp, at: m.at || '', live: true,
           read: (m.status === 'read' || m.status === 'delivered'), acked: false
         };
-        if (preset) rec.preset = preset; else rec.text = m.text || '';
+        if (preset) {
+          rec.preset = preset;
+        } else {
+          /* recognise a template log line "[name] p1 · p2 · …" and render it as
+             the real, language-switchable template content */
+          var tm = /^\[([a-z0-9_]+)\]\s([\s\S]+)$/i.exec(m.text || '');
+          if (tm && CHAT_TEMPLATES[tm[1]]) rec.template = { name: tm[1], params: tm[2].split(' · ') };
+          else rec.text = m.text || '';
+        }
         th.msgs.push(rec);
         changed = true;
       } else if (m.direction === 'in') {
