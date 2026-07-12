@@ -114,7 +114,10 @@ jobs:
             AOC_API_KEY=${{ secrets.AOC_API_KEY }}
             AOC_FROM_ID=918220099940
             AOC_WEBHOOK_TOKEN_HEADER=x-webhook-token
-            AOC_WEBHOOK_TOKEN=${{ secrets.AOC_WEBHOOK_TOKEN }}
+            # TEMPORARILY DISABLED for inbound testing: blank token = accept all
+            # webhook calls without the x-webhook-token header. Restore to
+            # ${{ secrets.AOC_WEBHOOK_TOKEN }} before go-live.
+            AOC_WEBHOOK_TOKEN=
             # Legacy Meta Cloud API provider (only used when WHATSAPP_PROVIDER=meta)
             META_API_VERSION=v21.0
             META_PHONE_NUMBER_ID=${{ secrets.META_PHONE_NUMBER_ID }}
