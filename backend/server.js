@@ -886,6 +886,19 @@ app.post('/api/vendor/workers/import', (req, res) => {
   res.json({ ok: true, contractor, imported, total: arr.filter(same).length });
 });
 
+/* clear imported workers for a contractor (or all, if no contractor given). */
+app.delete('/api/vendor/workers', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
+  const contractor = (req.query.contractor || '').trim();
+  store.data.vendorWorkers = store.data.vendorWorkers || [];
+  const same = (w) => !contractor || String(w.contractor || '').toLowerCase() === contractor.toLowerCase();
+  const removed = store.data.vendorWorkers.filter(same);
+  removed.forEach((w) => dbDel('vendorWorkers', w.id));
+  store.data.vendorWorkers = store.data.vendorWorkers.filter((w) => !same(w));
+  res.json({ ok: true, cleared: removed.length });
+});
+
 /* the logged communication history (drives the communication analytics) */
 app.get('/api/communications', (req, res) => {
   const store = readStore();
