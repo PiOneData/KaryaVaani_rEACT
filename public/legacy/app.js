@@ -7265,6 +7265,37 @@ function __kvOnReady(fn) {
     return name.split(' ').map(function (p) { return p[0]; }).join('').slice(0, 2).toUpperCase();
   }
 
+  /* format an ISO/date value as IST "12 Jul · 15:16" for live message stamps */
+  function chatIstStamp(iso) {
+    var d = iso ? new Date(iso) : new Date();
+    if (isNaN(d.getTime())) return 'Live';
+    return d.toLocaleString('en-GB', {
+      timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).replace(',', ' ·');
+  }
+
+  /* best-effort epoch-ms for a message time, handling both ISO live stamps and
+     the seeded "25 May 2026 · 16:42:08 IST" human format, so the chat list can
+     be ordered most-recent-first like WhatsApp. */
+  function chatMsgTs(m) {
+    var a = m && m.at ? String(m.at) : '';
+    if (!a) return 0;
+    var t = Date.parse(a);
+    if (!isNaN(t)) return t;
+    t = Date.parse(a.replace(/·/g, ' ').replace(/\bIST\b/i, '').replace(/\s+/g, ' ').trim());
+    return isNaN(t) ? 0 : t;
+  }
+
+  /* latest activity time (epoch-ms) across a contact's thread */
+  function chatThreadTs(c) {
+    var t = CHAT_THREADS[c.id];
+    if (!t || !t.msgs || !t.msgs.length) return 0;
+    var max = 0;
+    t.msgs.forEach(function (m) { var v = chatMsgTs(m); if (v > max) max = v; });
+    return max;
+  }
+
   /* preview text for the chat list — the most recent inbound (bot) msg */
   function chatPreview(c) {
     const t = CHAT_THREADS[c.id];
@@ -7296,6 +7327,9 @@ function __kvOnReady(fn) {
       if (!q) return true;
       return (c.name + ' ' + c.role + ' ' + c.zone + ' ' + c.dept).toLowerCase().indexOf(q) > -1;
     });
+    /* WhatsApp-style: most recent conversation first (live chats float to the
+       top; contacts with no messages sink to the bottom) */
+    rows.sort(function (a, b) { return chatThreadTs(b) - chatThreadTs(a); });
     if (!CHAT_STATE.activeId && rows.length) CHAT_STATE.activeId = rows[0].id;
     list.innerHTML = rows.map(function (c) {
       const on = CHAT_STATE.activeId === c.id;
@@ -7974,7 +8008,7 @@ function __kvOnReady(fn) {
         cid = chatEnsureLiveContact(phone, m.name);
       }
       const th = CHAT_THREADS[cid] || (CHAT_THREADS[cid] = { lastSeen: 'now', msgs: [] });
-      const stamp = m.at ? ('Live · ' + String(m.at).replace('T', ' ').slice(0, 16)) : 'Live';
+      const stamp = 'Live · ' + chatIstStamp(m.at);
 
       if (m.direction === 'out') {
         /* a message leaving the gateway. If the text matches a known broadcast

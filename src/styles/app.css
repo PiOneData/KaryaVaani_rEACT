@@ -2472,6 +2472,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 .cv-chat-left {
   background: var(--card); display: flex; flex-direction: column;
   border-right: 1px solid var(--wa-divider);
+  min-height: 0; /* allow the chat list to scroll inside the grid row */
 }
 .cv-chat-left-h {
   background: var(--wa-list-h); padding: 12px 14px;
@@ -2547,6 +2548,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 /* === RIGHT · conversation === */
 .cv-chat-right {
   display: flex; flex-direction: column;
+  min-height: 0; /* allow the conversation body to scroll inside the grid row */
   background-color: var(--wa-canvas);
   background-image:
     radial-gradient(circle at 12% 22%, rgba(0,0,0,0.025) 1px, transparent 1.5px),
