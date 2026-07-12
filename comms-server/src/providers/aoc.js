@@ -215,9 +215,47 @@ function classifyFlat(evt, out) {
   });
 }
 
+/* AOC's real single-event webhook shape (as observed from the portal):
+     inbound  { event:'message_received', from:<business number>,
+                contacts:{ profileName, recipient:<customer number> },
+                messages:{ type, text:{ body }, timestamp } }
+     status   { event:'message_status', status, messageId, ... }
+   Note the customer/sender is contacts.recipient (NOT the top-level `from`,
+   which carries the business number), and both `messages` and `contacts` are
+   single objects rather than the Meta-style arrays. */
+function parseAocEvent(item, out) {
+  const c = item.contacts || {};
+  const msg = item.messages || {};
+  const ev = String(item.event || '').toLowerCase();
+  const customer = c.recipient || c.wa_id || item.from;
+  if (ev.includes('status') || item.status) {
+    pushStatus(out, {
+      id: item.messageId,
+      to: customer,
+      status: item.status || ev,
+      timestamp: msg.timestamp || item.timestamp
+    });
+    return;
+  }
+  pushMessage(
+    out,
+    {
+      id: item.messageId,
+      from: customer,
+      type: msg.type,
+      text: msg.text,
+      button: msg.button,
+      interactive: msg.interactive,
+      message: msg.caption,
+      timestamp: msg.timestamp
+    },
+    { name: c.profileName }
+  );
+}
+
 /* Flatten whatever the portal POSTs into simple message/status/event records.
    Handles: the Meta envelope (object/entry/changes/value), a bare `value`
-   object, a single flat event, or an array of any of those. */
+   object, the AOC single-event shape, a flat event, or an array of any. */
 function parseWebhook(body) {
   const out = { messages: [], statuses: [], events: [] };
   const items = Array.isArray(body) ? body : [body];
@@ -236,6 +274,11 @@ function parseWebhook(body) {
     /* Bare `value` object (some relays strip the envelope) */
     if (Array.isArray(item.messages) || Array.isArray(item.statuses)) {
       parseValue(item, null, out);
+      continue;
+    }
+    /* AOC single-event shape: `messages`/`contacts` are OBJECTS (not arrays). */
+    if (item.messages && typeof item.messages === 'object' && !Array.isArray(item.messages)) {
+      parseAocEvent(item, out);
       continue;
     }
     /* Flat single event */
