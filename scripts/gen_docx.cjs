@@ -47,7 +47,10 @@ function docHtml(d) {
 (async function () {
   const docs = JSON.parse(fs.readFileSync(SRC, 'utf8'));
   fs.mkdirSync(OUT, { recursive: true });
-  const opts = { orientation: 'portrait', margins: { top: 1000, right: 1000, bottom: 1000, left: 1000 }, table: { row: { cantSplit: true } }, footer: false, pageNumber: false };
+  /* all margin keys must be numeric — html-to-docx interpolates any missing
+     key (header/footer/gutter) into w:pgMar as the literal string "undefined",
+     which makes Word treat the .docx as corrupt. */
+  const opts = { orientation: 'portrait', margins: { top: 1000, right: 1000, bottom: 1000, left: 1000, header: 720, footer: 720, gutter: 0 }, table: { row: { cantSplit: true } }, footer: false, pageNumber: false };
   const zip = new JSZip();
   let n = 0;
   for (const d of docs) {
