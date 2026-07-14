@@ -1983,8 +1983,8 @@ function __kvOnReady(fn) {
      roster per contractor, seeded by its id (same every render). Imported
      vendor data (Vendor compliance → Import) takes precedence over this. */
   var CT_ROSTER_CACHE = {};
-  var CT_FIRST_NAMES = ['Ramesh', 'Suresh', 'Lalita', 'Naga', 'Praveen', 'Anand', 'Pooja', 'Bharath', 'Kiran', 'Sita', 'Mohan', 'Vijaya', 'Ravi', 'Deepa', 'Arjun', 'Meena', 'Gopal', 'Radha', 'Sanjay', 'Latha', 'Venkat', 'Divya', 'Prakash', 'Ganesh', 'Sunita', 'Rajesh', 'Kavya', 'Manoj', 'Sneha', 'Harish'];
-  var CT_LAST_NAMES = ['Naidu', 'Reddy', 'Kumar', 'Devi', 'Rao', 'Singh', 'Sharma', 'Das', 'Babu', 'Pillai', 'Shah', 'Nair', 'Yadav', 'Verma', 'Patel', 'Mishra', 'Gowda', 'Iyer', 'Chowdary', 'Prasad'];
+  var CT_FIRST_NAMES = ['Ramesh', 'Suresh', 'Lalita', 'Naga', 'Praveen', 'Anand', 'Pooja', 'Bharath', 'Kiran', 'Sita', 'Mohan', 'Vijaya', 'Ravi', 'Deepa', 'Arjun', 'Meena', 'Gopal', 'Radha', 'Sanjay', 'Latha', 'Venkat', 'Divya', 'Prakash', 'Ganesh', 'Sunita', 'Rajesh', 'Kavya', 'Manoj', 'Sneha', 'Harish', 'Anil', 'Bhavani', 'Chandra', 'Devendra', 'Geetha', 'Hemanth', 'Indira', 'Jagan', 'Krishna', 'Lakshmi', 'Madhavi', 'Naveen', 'Omkar', 'Padma', 'Raghu', 'Srinivas', 'Tejaswi', 'Uma', 'Varun', 'Yamini', 'Ashok', 'Bindu', 'Dinesh', 'Eshwar', 'Farhan', 'Gayatri', 'Hari', 'Ismail', 'Jyothi', 'Karthik', 'Lokesh', 'Mahesh', 'Nirmala', 'Pallavi', 'Ramya', 'Shiva', 'Tara', 'Usha', 'Vikas'];
+  var CT_LAST_NAMES = ['Naidu', 'Reddy', 'Kumar', 'Devi', 'Rao', 'Singh', 'Sharma', 'Das', 'Babu', 'Pillai', 'Shah', 'Nair', 'Yadav', 'Verma', 'Patel', 'Mishra', 'Gowda', 'Iyer', 'Chowdary', 'Prasad', 'Acharya', 'Bhat', 'Chauhan', 'Desai', 'Goud', 'Hegde', 'Jain', 'Khan', 'Menon', 'Nayak', 'Panda', 'Raju', 'Sastry', 'Thakur', 'Varma', 'Warrier', 'Bose', 'Dutta', 'Kulkarni', 'Swamy'];
   var CT_DEPTS = ['Logistics', 'Packaging', 'Production', 'Maintenance', 'Inbound', 'Quality', 'Warehouse', 'Assembly'];
   var CT_DESIGS = ['Operator', 'Helper', 'Loader', 'Fitter', 'Packer', 'Technician', 'Machine Operator', 'Material Handler'];
   var CT_CATS = ['Unskilled', 'Semi-skilled', 'Skilled', 'Highly skilled'];
@@ -2014,6 +2014,8 @@ function __kvOnReady(fn) {
       out.push({
         id: 'GEN|' + c.id + '|' + i,
         code: 'W' + String(1001 + i),
+        contractor: c.name,
+        mobile: '9' + String(700000000 + (ctHash(sd + 'm') % 300000000)),
         name: ctPick(CT_FIRST_NAMES, sd + 'f') + ' ' + ctPick(CT_LAST_NAMES, sd + 'l'),
         category: ctPick(CT_CATS, sd + 'c'),
         designation: ctPick(CT_DESIGS, sd + 'd'),
