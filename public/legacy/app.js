@@ -2037,6 +2037,16 @@ function __kvOnReady(fn) {
     return CT_ROSTER_CACHE[c.id];
   }
 
+  /* the contractor a worker is employed by. The OM roster carries no contractor
+     link, so derive a stable one from the worker's code (same every render) so
+     every worker drilldown can show who deployed them. */
+  function ctForWorkerCode(code) {
+    var list = (typeof CONTRACTORS !== 'undefined' && CONTRACTORS.length)
+      ? CONTRACTORS : ((window.__KVDATA && window.__KVDATA.contractors) || []);
+    if (!list.length) return '—';
+    return list[ctHash(String(code || '')) % list.length].name;
+  }
+
   function ctdWorkers(name) {
     if (typeof CONTRACT_WORKERS === 'undefined') return [];
     const n = name.trim().toLowerCase();
@@ -15973,7 +15983,9 @@ function __kvOnReady(fn) {
     const general =
       kv2col(
         kvKV('Associate code', r.code) + kvKV('Name', r.name) + kvKV('Designation', r.desig) +
-        kvKV('Department', r.dept) + kvKV('Reporting manager', r.mgr + (r.mgrCode ? ' · ' + r.mgrCode : '')) +
+        kvKV('Department', r.dept) +
+        kvKV('Contractor / employer', r.contractor || ctForWorkerCode(r.code)) +
+        kvKV('Reporting manager', r.mgr + (r.mgrCode ? ' · ' + r.mgrCode : '')) +
         kvKV('Preferred language', '<span class="pill outline">' + (r.lang || '—') + '</span>')
       ) +
       '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">From the OM Manpower attendance / mapping roster — the real workforce dataset.</div>';
@@ -16410,6 +16422,7 @@ function __kvOnReady(fn) {
       kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
       kvKV('Designation', rec.designation) +
       kvKV('Department', (rec.employment || {}).dept) +
+      kvKV('Contractor / employer', rec.type === 'direct' ? 'Daikin (direct)' : (((rec.employment || {}).contractor) || ctForWorkerCode(rec.id))) +
       kvKV('Category', rec.category) + kvKV('Gender', rec.gender) + kvKV('Date of birth', rec.dob) +
       kvKV('Mobile', rec.mobile) + kvKV('Emergency contact', rec.emergency) +
       kvKV('Reporting manager', rec.manager ? rec.manager + (rec.managerCode ? ' · ' + rec.managerCode : '') : '—') +
