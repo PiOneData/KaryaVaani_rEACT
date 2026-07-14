@@ -3484,20 +3484,61 @@ function __kvOnReady(fn) {
     host.innerHTML = html;
   }
 
-  /* worker-detail drilldown */
+  /* worker-detail drilldown — uses the same rich tabbed modal shell as the
+     worker directory (kvTabModal), populated with the vendor worker's real
+     fields, so both surfaces present the same level of detail. */
   function vwWorkerDetail(id) {
     var w = VW_STATE.workers.find(function (x) { return String(x.id) === String(id); });
     if (!w) return;
-    var rows = [
-      ['Name', w.name], ['Code', w.code], ['Contractor', w.contractor], ['Mobile', w.mobile],
-      ['Category', w.category], ['Designation', w.designation], ['Department', w.department],
-      ['ESIC', w.esicStatus], ['CLRA', w.clraStatus],
-      ['Compliance', w.compliancePct == null ? '—' : w.compliancePct + '%'], ['Migrant', w.migrant ? 'Yes' : 'No']
-    ];
-    vwModal('Worker · ' + vwEsc(w.name || ''),
-      '<table class="t"><tbody>' + rows.map(function (r) {
-        return '<tr><td class="tiny muted" style="width:130px">' + r[0] + '</td><td class="t-strong">' + vwEsc(r[1] == null || r[1] === '' ? '—' : r[1]) + '</td></tr>';
-      }).join('') + '</tbody></table>');
+    var isMigrant = !!(w.migrant && w.migrant !== '' && String(w.migrant).toLowerCase() !== 'no' && String(w.migrant).toLowerCase() !== 'false');
+    /* fallback for the rare case the directory modal helpers aren't present */
+    if (typeof kvTabModal !== 'function' || typeof kv2col !== 'function' || typeof kvKV !== 'function') {
+      var rows = [
+        ['Name', w.name], ['Code', w.code], ['Contractor', w.contractor], ['Mobile', w.mobile],
+        ['Category', w.category], ['Designation', w.designation], ['Department', w.department],
+        ['ESIC', w.esicStatus], ['CLRA', w.clraStatus],
+        ['Compliance', w.compliancePct == null ? '—' : w.compliancePct + '%'], ['Migrant', isMigrant ? 'Yes' : 'No']
+      ];
+      vwModal('Worker · ' + vwEsc(w.name || ''),
+        '<table class="t"><tbody>' + rows.map(function (r) {
+          return '<tr><td class="tiny muted" style="width:130px">' + r[0] + '</td><td class="t-strong">' + vwEsc(r[1] == null || r[1] === '' ? '—' : r[1]) + '</td></tr>';
+        }).join('') + '</tbody></table>');
+      return;
+    }
+    var comp = (w.compliancePct == null) ? null : w.compliancePct;
+    var compStatus = comp == null ? '—' : (comp >= 60 ? 'Compliant' : 'Non-compliant');
+    var compColor = comp == null ? 'var(--ink-3)' : (comp >= 80 ? 'var(--green-dk)' : comp >= 50 ? 'var(--amber-dk)' : 'var(--red-dk)');
+    var general = kv2col(
+      kvKV('Worker code', vwEsc(w.code || '—')) +
+      kvKV('Name', vwEsc(w.name || '—')) +
+      kvKV('Contractor', vwEsc(w.contractor || '—')) +
+      kvKV('Mobile', vwEsc(w.mobile || '—')) +
+      kvKV('Category', vwEsc(w.category || '—')) +
+      kvKV('Designation', vwEsc(w.designation || '—')) +
+      kvKV('Department', vwEsc(w.department || '—')) +
+      kvKV('Migrant', isMigrant ? '<span class="pill amber tiny">Yes</span>' : 'No')
+    ) + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Vendor deployment record — imported vendor data, or estimated from the contractor’s declared deployment.</div>';
+    var compliance =
+      '<div class="g2" style="gap:10px;margin-bottom:12px">' +
+        '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + compColor + '">' + (comp == null ? '—' : comp + '<small>/100</small>') + '</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (comp != null && comp >= 60 ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + compStatus + '</div></div>' +
+      '</div>' +
+      kv2col(
+        kvKV('ESIC coverage', vwStatusPill(w.esicStatus)) +
+        kvKV('CLRA compliance', vwStatusPill(w.clraStatus)) +
+        kvKV('Category', vwEsc(w.category || '—')) +
+        kvKV('Migrant worker', isMigrant ? 'Yes' : 'No')
+      );
+    kvTabModal({
+      eyebrow: 'Worker · ' + vwEsc(w.code || '') + (comp != null ? ' · ' + compStatus.toLowerCase() : ''),
+      title: vwEsc(w.name || '') + (w.designation ? ' · ' + vwEsc(w.designation) : ''),
+      tabs: [
+        { id: 'general', label: 'General information', html: general },
+        { id: 'compliance', label: 'Compliance', html: compliance }
+      ],
+      footer: '<div class="modal-footer-left"><span class="tiny muted">' + vwEsc(w.contractor || '') + '</span></div>' +
+        '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div>'
+    });
   }
 
   /* ── generic modal (injected into body) ── */
@@ -7259,6 +7300,12 @@ function __kvOnReady(fn) {
     vbRenderAudChips();
     vbPopulateKcTemplates();
     vbSyncPrewarmButton();
+    /* default the composer to the minimum-wage revision template on load */
+    var presetSel = document.getElementById('vb-preset');
+    if (presetSel && VB_KC_TEMPLATES['kc-301']) {
+      presetSel.value = 'kc-301';
+      if (typeof vbApplyPreset === 'function') vbApplyPreset();
+    }
   }
   /* the backend caches all template voices on boot; once that's complete, the
      manual "Pre-generate voices" button is no longer needed, so hide it. */

@@ -26,9 +26,9 @@ export default function SecOhs() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Voice incident (Saaras v3)</button>
+          <button className="btn" disabled title="Coming soon">Voice incident (Saaras v3)</button>
           {' '}
-          <button className="btn primary">+ Log incident</button>
+          <button className="btn primary" disabled title="Coming soon">+ Log incident</button>
         </div>
       </div>
       {' '}

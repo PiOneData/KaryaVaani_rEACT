@@ -26,7 +26,7 @@ export default function SecCompliance() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn primary">Export 90-day plan</button>
+          <button className="btn primary" disabled title="Coming soon">Export 90-day plan</button>
         </div>
       </div>
       {' '}

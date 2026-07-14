@@ -26,9 +26,9 @@ export default function SecInduction() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Schedule batch induction</button>
+          <button className="btn" disabled title="Coming soon">Schedule batch induction</button>
           {' '}
-          <button className="btn primary">+ Configure track</button>
+          <button className="btn primary" disabled title="Coming soon">+ Configure track</button>
         </div>
       </div>
       {' '}

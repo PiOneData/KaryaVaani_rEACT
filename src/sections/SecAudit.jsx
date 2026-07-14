@@ -25,9 +25,9 @@ export default function SecAudit() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Verify chain integrity</button>
+          <button className="btn" disabled title="Coming soon">Verify chain integrity</button>
           {' '}
-          <button className="btn primary">Open inspector mode</button>
+          <button className="btn primary" disabled title="Coming soon">Open inspector mode</button>
         </div>
       </div>
       {' '}
@@ -209,7 +209,7 @@ export default function SecAudit() {
               {"\n          Time-bounded, read-only access for a third party (inspector, auditor, parent-company reviewer). PII is scoped to the inspection's stated scope; the inspector's session is itself audited.\n        "}
             </div>
             {' '}
-            <button className="btn" style={{ marginTop: "10px", width: "100%" }}>Grant inspector access →</button>
+            <button className="btn" disabled title="Coming soon" style={{ marginTop: "10px", width: "100%" }}>Grant inspector access →</button>
           </div>
         </div>
       </div>

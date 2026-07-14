@@ -26,9 +26,9 @@ export default function SecRecruitment() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Configure ladder</button>
+          <button className="btn" disabled title="Coming soon">Configure ladder</button>
           {' '}
-          <button className="btn primary">+ New requisition</button>
+          <button className="btn primary" disabled title="Coming soon">+ New requisition</button>
         </div>
       </div>
       {' '}

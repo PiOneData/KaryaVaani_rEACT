@@ -25,9 +25,9 @@ export default function SecRules() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Customer policy editor</button>
+          <button className="btn" disabled title="Coming soon">Customer policy editor</button>
           {' '}
-          <button className="btn primary">Approve next bundle</button>
+          <button className="btn primary" disabled title="Coming soon">Approve next bundle</button>
         </div>
       </div>
       {' '}
@@ -219,7 +219,7 @@ export default function SecRules() {
               </div>
             </div>
             {' '}
-            <button className="btn primary" style={{ marginTop: "12px", width: "100%" }}>Approve & activate</button>
+            <button className="btn primary" disabled title="Coming soon" style={{ marginTop: "12px", width: "100%" }}>Approve & activate</button>
             {' '}
             <div className="tiny muted" style={{ marginTop: "6px", textAlign: "center" }}>
               Logged to audit trail with your identity

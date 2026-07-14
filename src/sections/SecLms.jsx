@@ -30,9 +30,9 @@ export default function SecLms() {
             ⤓ All documents (.zip)
           </button>
           {' '}
-          <button className="btn">SCORM upload</button>
+          <button className="btn" disabled title="Coming soon">SCORM upload</button>
           {' '}
-          <button className="btn primary">+ New track</button>
+          <button className="btn primary" disabled title="Coming soon">+ New track</button>
         </div>
       </div>
       {' '}

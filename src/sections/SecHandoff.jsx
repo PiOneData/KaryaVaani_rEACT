@@ -25,9 +25,9 @@ export default function SecHandoff() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Schema registry</button>
+          <button className="btn" disabled title="Coming soon">Schema registry</button>
           {' '}
-          <button className="btn primary">Replay event</button>
+          <button className="btn primary" disabled title="Coming soon">Replay event</button>
         </div>
       </div>
       {' '}

@@ -318,6 +318,10 @@ body {
   border: 1px solid var(--line-2); background: var(--card); color: var(--ink-2);
   transition: all .15s ease; white-space: nowrap;
 }
+/* non-functional / not-yet-wired buttons: greyed out and non-selectable */
+.btn:disabled, .btn.disabled {
+  opacity: 0.45; cursor: not-allowed; pointer-events: none; box-shadow: none;
+}
 .btn:hover { border-color: var(--ink-4); color: var(--ink); }
 .btn.primary {
   background: var(--indigo); border-color: var(--indigo); color: var(--card);

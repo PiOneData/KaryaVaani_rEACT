@@ -28,9 +28,9 @@ export default function SecLocale() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Glossary editor</button>
+          <button className="btn" disabled title="Coming soon">Glossary editor</button>
           {' '}
-          <button className="btn primary">+ Send draft</button>
+          <button className="btn primary" disabled title="Coming soon">+ Send draft</button>
         </div>
       </div>
       {' '}
@@ -172,11 +172,11 @@ export default function SecLocale() {
             </div>
             {' '}
             <div style={{ display: "flex", gap: "8px" }}>
-              <button className="btn">Edit inline</button>
+              <button className="btn" disabled title="Coming soon">Edit inline</button>
               {' '}
-              <button className="btn">Reject & comment</button>
+              <button className="btn" disabled title="Coming soon">Reject & comment</button>
               {' '}
-              <button className="btn primary">Approve & lock</button>
+              <button className="btn primary" disabled title="Coming soon">Approve & lock</button>
             </div>
           </div>
         </div>

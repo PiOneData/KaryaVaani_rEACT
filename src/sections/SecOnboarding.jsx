@@ -28,9 +28,9 @@ export default function SecOnboarding() {
         </div>
         {' '}
         <div className="page-h-right">
-          <button className="btn">Bulk import</button>
+          <button className="btn" disabled title="Coming soon">Bulk import</button>
           {' '}
-          <button className="btn primary">+ Start onboarding</button>
+          <button className="btn primary" disabled title="Coming soon">+ Start onboarding</button>
         </div>
       </div>
       {' '}
