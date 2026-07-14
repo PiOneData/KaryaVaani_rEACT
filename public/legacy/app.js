@@ -3508,6 +3508,8 @@ function __kvOnReady(fn) {
     var comp = (w.compliancePct == null) ? null : w.compliancePct;
     var compStatus = comp == null ? '—' : (comp >= 60 ? 'Compliant' : 'Non-compliant');
     var compColor = comp == null ? 'var(--ink-3)' : (comp >= 80 ? 'var(--green-dk)' : comp >= 50 ? 'var(--amber-dk)' : 'var(--red-dk)');
+
+    /* General information */
     var general = kv2col(
       kvKV('Worker code', vwEsc(w.code || '—')) +
       kvKV('Name', vwEsc(w.name || '—')) +
@@ -3518,23 +3520,56 @@ function __kvOnReady(fn) {
       kvKV('Department', vwEsc(w.department || '—')) +
       kvKV('Migrant', isMigrant ? '<span class="pill amber tiny">Yes</span>' : 'No')
     ) + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Vendor deployment record — imported vendor data, or estimated from the contractor’s declared deployment.</div>';
+
+    /* Documents */
+    var documents = kv2col(
+      kvKV('UAN (EPFO)', vwEsc(w.uan || '—')) +
+      kvKV('ESI (IP number)', vwEsc(w.esi || '—')) +
+      kvKV('Aadhaar eKYC', '<span class="pill amber tiny">Not on file</span>')
+    ) +
+      '<div class="card-h-title" style="font-size:0.9rem;margin:16px 0 4px">Uploaded documents</div>' +
+      '<div class="tiny muted">Identification and document proofs are captured during onboarding. Imported / estimated vendor workers carry no uploaded documents in this view — complete onboarding to attach ID proofs.</div>';
+
+    /* Compliance — score + statutory checklist */
+    var esicOk = /active|valid|ok|compliant|clear|good/i.test(w.esicStatus || '');
+    var clraOk = /active|valid|ok|compliant|clear|good/i.test(w.clraStatus || '');
+    var items = [
+      { label: 'ESIC coverage & contribution', ok: esicOk, sev: 'critical', law: 'Employees’ State Insurance Act, 1948 — ESIC registration and monthly contribution.' },
+      { label: 'CLRA licence coverage', ok: clraOk, sev: 'high', law: 'Contract Labour (Regulation & Abolition) Act, 1970 — covered under a valid contractor licence.' },
+      { label: 'Minimum wages', ok: comp == null ? false : comp >= 50, sev: 'critical', law: 'Code on Wages, 2019 — paid at or above the notified minimum wage.' },
+      { label: 'Inter-state migrant welfare', ok: !isMigrant, sev: 'medium', law: isMigrant ? 'ISMW Act, 1979 — migrant worker: verify displacement allowance & journey benefits.' : 'ISMW Act, 1979 — not an inter-state migrant worker.' }
+    ];
+    var itemsHtml = items.map(function (it) {
+      var ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
+      var sev = '<span class="pill ' + (it.sev === 'critical' ? 'red' : it.sev === 'high' ? 'amber' : 'outline') + ' tiny">' + it.sev + '</span>';
+      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">' +
+        '<div style="width:18px;text-align:center">' + ico + '</div>' +
+        '<div style="flex:1"><div style="font-size:0.85rem"><strong>' + it.label + '</strong> ' + sev +
+          ' <span class="tiny" style="color:' + (it.ok ? 'var(--green-dk)' : 'var(--red-dk)') + '">· ' + (it.ok ? 'compliant' : 'not met') + '</span></div>' +
+        '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div></div></div>';
+    }).join('');
     var compliance =
       '<div class="g2" style="gap:10px;margin-bottom:12px">' +
         '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + compColor + '">' + (comp == null ? '—' : comp + '<small>/100</small>') + '</div></div>' +
         '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (comp != null && comp >= 60 ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + compStatus + '</div></div>' +
       '</div>' +
-      kv2col(
-        kvKV('ESIC coverage', vwStatusPill(w.esicStatus)) +
-        kvKV('CLRA compliance', vwStatusPill(w.clraStatus)) +
-        kvKV('Category', vwEsc(w.category || '—')) +
-        kvKV('Migrant worker', isMigrant ? 'Yes' : 'No')
-      );
+      '<div class="g2" style="gap:10px;margin-bottom:12px">' +
+        '<div class="kpi"><div class="kpi-eye">ESIC</div><div class="kpi-val" style="font-size:0.95rem">' + vwStatusPill(w.esicStatus) + '</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">CLRA</div><div class="kpi-val" style="font-size:0.95rem">' + vwStatusPill(w.clraStatus) + '</div></div>' +
+      '</div>' +
+      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml);
+
+    /* Attendance & travel */
+    var attendance = '<div class="tiny muted">No transport route is assigned to this associate. The plant transport roster covers directly-rostered workers; contractor-deployed workers travel via their contractor’s arrangement. Boarding history will appear here once they are added to a route.</div>';
+
     kvTabModal({
       eyebrow: 'Worker · ' + vwEsc(w.code || '') + (comp != null ? ' · ' + compStatus.toLowerCase() : ''),
       title: vwEsc(w.name || '') + (w.designation ? ' · ' + vwEsc(w.designation) : ''),
       tabs: [
         { id: 'general', label: 'General information', html: general },
-        { id: 'compliance', label: 'Compliance', html: compliance }
+        { id: 'docs', label: 'Documents', html: documents },
+        { id: 'compliance', label: 'Compliance', html: compliance },
+        { id: 'attendance', label: 'Attendance & travel', html: attendance }
       ],
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + vwEsc(w.contractor || '') + '</span></div>' +
         '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div>'
