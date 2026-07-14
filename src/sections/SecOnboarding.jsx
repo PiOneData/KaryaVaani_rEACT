@@ -28,6 +28,8 @@ export default function SecOnboarding() {
         </div>
         {' '}
         <div className="page-h-right">
+          <button className="btn" id="ob-back-ct" onClick={(event) => { window.nav('ct-home', null) }} data-onclick="nav('ct-home', null)">← Contractor home</button>
+          {' '}
           <button className="btn" disabled title="Coming soon">Bulk import</button>
           {' '}
           <button className="btn primary" disabled title="Coming soon">+ Start onboarding</button>
@@ -606,6 +608,14 @@ export default function SecOnboarding() {
                     <div style={{ display: "flex", gap: "6px" }}>
                       <input className="input" id="cap-aadhaar" placeholder="XXXX XXXX XXXX" onInput={(event) => { window.capSync() }} style={{ flex: 1 }} />
                       <button type="button" className="btn" onClick={(event) => { window.capVerifyAadhaar() }} data-onclick="capVerifyAadhaar()" title="Upload Aadhaar document and auto-verify">Upload &amp; verify</button>
+                    </div>
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">PAN number</label>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <input className="input" id="cap-pan" placeholder="ABCDE1234F" onInput={(event) => { window.capSync() }} style={{ flex: 1, textTransform: "uppercase" }} />
+                      <button type="button" className="btn" onClick={(event) => { window.capVerifyPan() }} data-onclick="capVerifyPan()" title="Validate the PAN format">Verify</button>
                     </div>
                   </div>
                   {' '}

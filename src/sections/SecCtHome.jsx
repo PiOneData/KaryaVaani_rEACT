@@ -207,6 +207,15 @@ export default function SecCtHome() {
             </div>
             {' '}
             <div className="emp-qa">
+              <button className="emp-qa-btn" onClick={(event) => { window.ctOnboardOpen() }} data-onclick="ctOnboardOpen()">
+                <span className="emp-qa-ico" style={{ background: "var(--indigo)" }}>+</span>
+                {' '}
+                <span className="emp-qa-l">
+                  <strong>Onboard employees</strong>
+                  <span>Add workers, verify PAN &amp; Aadhaar, bulk import</span>
+                </span>
+              </button>
+              {' '}
               <button className="emp-qa-btn" onClick={(event) => { window.ctResolveAll() }} data-onclick="ctResolveAll()">
                 <span className="emp-qa-ico" style={{ background: "var(--green-dk)" }}>✓</span>
                 {' '}

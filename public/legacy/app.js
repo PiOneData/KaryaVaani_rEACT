@@ -13634,6 +13634,8 @@ function __kvOnReady(fn) {
       uan: capVal('cap-uan'), esi: capVal('cap-esi'),
       aadhaarVerified: !!CAP_STATE.aadhaarVerified,
       aadhaarLast4: aadhaar.replace(/\D/g, '').slice(-4),
+      pan: (capVal('cap-pan') || '').toUpperCase(),
+      panVerified: !!CAP_STATE.panVerified,
       gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
       address: { addr1: capVal('cap-addr1'), addr2: capVal('cap-addr2'), city: capVal('cap-city'), district: capVal('cap-district'), pin: capVal('cap-pin'), state: capVal('cap-homestate') },
       migrant: getC('cap-migrant'),
@@ -13689,6 +13691,7 @@ function __kvOnReady(fn) {
         'https://karyavaani.app/confirm/' + wid);
     }
     CAP_STATE.aadhaarVerified = false;
+    CAP_STATE.panVerified = false;
     CAP_STATE.docs = [];
     capRenderDocs();
     capReset(true);
@@ -13737,7 +13740,7 @@ function __kvOnReady(fn) {
 
   /* ── clear the single-profile form ── */
   function capReset(keep) {
-    ['cap-name','cap-dob','cap-mobile','cap-aadhaar','cap-emergency',
+    ['cap-name','cap-dob','cap-mobile','cap-aadhaar','cap-pan','cap-emergency',
      'cap-addr1','cap-addr2','cap-city','cap-district','cap-pin',
      'cap-spoken','cap-clra','cap-doj','cap-uan','cap-esi','cap-designation'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
@@ -13761,9 +13764,9 @@ function __kvOnReady(fn) {
 
   /* ════ BULK UPLOAD ════ */
   function capDownloadTemplate() {
-    const csv = 'name,type,mobile,aadhaar,language,category,uniform,shoe\n' +
-      'Ramesh Naidu,direct,9876543210,123456789012,Telugu,Skilled,L,9\n' +
-      'Lalita Devi,contract,9811122233,234567890123,Hindi,Semi-skilled,M,6\n';
+    const csv = 'name,type,mobile,aadhaar,pan,language,category,contractor,uniform,shoe\n' +
+      'Ramesh Naidu,direct,9876543210,123456789012,ABCDE1234F,Telugu,Skilled,,L,9\n' +
+      'Lalita Devi,contract,9811122233,234567890123,PQRSX6789K,Hindi,Semi-skilled,United Human Resource,M,6\n';
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -13794,8 +13797,10 @@ function __kvOnReady(fn) {
         type: ((c[idx('type')] || 'direct').trim().toLowerCase() === 'contract') ? 'contract' : 'direct',
         mobile: (c[idx('mobile')] || '').trim(),
         aadhaar: (c[idx('aadhaar')] || '').trim(),
+        pan: (c[idx('pan')] || '').trim(),
         language: (c[idx('language')] || 'Telugu').trim(),
         category: (c[idx('category')] || 'Unskilled').trim(),
+        contractor: (c[idx('contractor')] || '').trim(),
         uniform: (c[idx('uniform')] || '—').trim(),
         shoe: (c[idx('shoe')] || '—').trim()
       });
@@ -13855,12 +13860,26 @@ function __kvOnReady(fn) {
   function capBulkSend() {
     const valid = CAP_STATE.bulk.filter(capBulkRowValid);
     if (!valid.length) { toast('No valid rows to send', 'red'); return; }
+    const scope = kvOnboardScope();
     valid.forEach(function (r) {
-      const wid = (r.type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
-      CAP_STATE.recent.unshift({
-        id: wid, name: r.name, type: r.type, lang: r.language,
-        category: r.category, photo: null, mobile: r.mobile, status: 'sent'
-      });
+      const contractor = r.contractor || scope || '';
+      const type = contractor ? 'contract' : r.type;
+      const wid = (type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
+      const rec = {
+        id: wid, name: r.name, type: type, lang: r.language,
+        category: r.category, photo: null, mobile: r.mobile, status: 'sent',
+        pan: (r.pan || '').toUpperCase(), panVerified: false,
+        aadhaarLast4: String(r.aadhaar || '').replace(/\D/g, '').slice(-4), aadhaarVerified: false,
+        employment: { contractor: contractor }
+      };
+      CAP_STATE.recent.unshift(rec);
+      /* persist to the backend so bulk imports reflect in HR + survive reload */
+      fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ aadhaar: r.aadhaar }, rec, { photo: undefined }))
+      }).then(function (resp) { return resp.json().catch(function () { return {}; }); })
+        .then(function (j) { if (j && j.ok && j.capture) rec.backendId = j.capture.id; })
+        .catch(function () { /* offline — kept in session */ });
       /* real WhatsApp confirmation link via the communication gateway */
       if (window.KVWhatsApp && r.mobile) {
         window.KVWhatsApp.send(r.mobile,
@@ -13869,6 +13888,7 @@ function __kvOnReady(fn) {
       }
     });
     capRenderRecent();
+    if (typeof obRenderDirectory === 'function') obRenderDirectory();
     document.getElementById('cap-bulk-status').innerHTML =
       '<div class="tiny" style="color:var(--green-dk);font-weight:600">✓ ' + valid.length +
       ' confirmation links sent on WhatsApp</div>' +
@@ -16390,6 +16410,35 @@ function __kvOnReady(fn) {
     kvAadhaarVerify('cap-aadhaar', function () { CAP_STATE.aadhaarVerified = true; if (typeof capSync === 'function') capSync(); });
   }
 
+  /* PAN format validation (AAAAA9999A) + verify for the capture form */
+  function kvPanValid(p) { return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(p || '').toUpperCase().trim()); }
+  function capVerifyPan() {
+    var el = document.getElementById('cap-pan');
+    var v = (el ? el.value : '').toUpperCase().trim();
+    if (!kvPanValid(v)) { toast('Enter a valid PAN (format ABCDE1234F)', 'red'); return; }
+    if (el) el.value = v;
+    CAP_STATE.panVerified = true;
+    if (typeof capSync === 'function') capSync();
+    toast('PAN verified', 'green');
+  }
+
+  /* the firm a logged-in contractor is scoped to — they onboard only their own
+     workers, and the onboarding directory shows only their workers. */
+  function kvOnboardScope() {
+    var u = window.__KVUSER || {};
+    return u.role === 'contractor' ? (u.linkedName || u.name || null) : null;
+  }
+  /* contractor "Onboard employees" entry — opens the onboarding surface,
+     pre-scoped to the contractor's firm (contract type + contractor locked). */
+  function ctOnboardOpen() {
+    if (typeof nav === 'function') nav('onboarding', (typeof kvNavEl === 'function' ? kvNavEl('onboarding') : null));
+    var firm = kvOnboardScope();
+    if (typeof capSetType === 'function') capSetType('contract');
+    var cf = document.getElementById('cap-contractor');
+    if (cf && firm) cf.value = firm;
+    if (typeof obRenderDirectory === 'function') obRenderDirectory();
+  }
+
   /* compliance for a captured onboarding profile — links to the contractor
      record when present, mirrors the OM statutory checklist otherwise. */
   function obWorkerCompliance(rec) {
@@ -16398,7 +16447,7 @@ function __kvOnReady(fn) {
       ? (CONTRACTORS || []).find(function (x) { return x.name === rec.employment.contractor; }) : null;
     const items = OM_LAWS.map(function (law, i) {
       let ok;
-      if (law.key === 'aadhaarKyc') ok = !!rec.aadhaarVerified;
+      if (law.key === 'aadhaarKyc') ok = !!rec.aadhaarVerified && (rec.pan ? !!rec.panVerified : true);
       else if (law.key === 'appointmentLetter') ok = !!(rec.employment && (rec.employment.posId || rec.employment.workorder));
       else if (law.key === 'inductionSafety') ok = !!rec.ppeAckAt;
       // UAN/EPFO seeded → the worker must actually have a UAN on record (12-digit).
@@ -16439,9 +16488,15 @@ function __kvOnReady(fn) {
     const aadhaarRow = rec.aadhaarVerified
       ? '<span class="pill green tiny">Verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
       : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
+    const panRow = rec.pan
+      ? (rec.panVerified
+          ? '<span class="pill green tiny">Verified · ' + rec.pan + '</span>'
+          : '<span class="mono">' + rec.pan + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify</button>')
+      : '<span class="pill outline tiny">Not provided</span>';
     const identification =
       kv2col(
         kvKV('Aadhaar eKYC', aadhaarRow) +
+        kvKV('PAN', panRow) +
         kvKV('UAN (EPFO)', rec.uan) + kvKV('ESI (IP number)', rec.esi) +
         (rec.type === 'direct'
           ? kvKV('Position ID', e.posId) + kvKV('Department', e.dept)
@@ -16567,6 +16622,19 @@ function __kvOnReady(fn) {
       capRenderRecent(); obOpenCapture(i);
     });
   }
+  function obVerifyCapturePan(i) {
+    const rec = CAP_STATE.recent[i]; if (!rec) return;
+    if (!kvPanValid(rec.pan)) { toast('This worker has no valid PAN on record (format ABCDE1234F)', 'red'); return; }
+    rec.panVerified = true;
+    if (rec.backendId) {
+      fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rec.backendId, name: rec.name, pan: rec.pan, panVerified: true })
+      }).catch(function () {});
+    }
+    toast('PAN verified for ' + rec.name, 'green');
+    capRenderRecent(); obOpenCapture(i);
+  }
   function obNotifyCapture(i) {
     const rec = CAP_STATE.recent[i]; if (!rec || !rec.mobile) return;
     const c = obWorkerCompliance(rec);
@@ -16616,7 +16684,12 @@ function __kvOnReady(fn) {
   function obRenderDirectory() {
     const body = document.getElementById('ob-grid-body');
     if (!body) return;
-    const list = CAP_STATE.recent || [];
+    /* a logged-in contractor sees only the workers they onboarded */
+    const scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    const list = (CAP_STATE.recent || []).filter(function (r) {
+      if (!scope) return true;
+      return String((r.employment && r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
+    });
     const nr = document.getElementById('ob-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
     KVTABLE.set({
       key: 'ob', tbody: 'ob-grid-body', count: 'ob-count', noun: 'onboarded',
