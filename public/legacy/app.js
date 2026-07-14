@@ -121,6 +121,9 @@ function __kvOnReady(fn) {
     /* contractor mode — same idea, but the contractor sees only their group */
     document.body.classList.toggle('ct-mode', id === 'ct-home');
 
+    /* landing on the chat page always focuses the most-recent conversation */
+    if (id === 'chat' && typeof chatFocusRecent === 'function') chatFocusRecent();
+
     kvSyncUrl(id);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
@@ -8063,13 +8066,25 @@ function __kvOnReady(fn) {
     return hh + ':' + mm;
   }
 
-  function initChat() {
+  /* select the most-recent conversation (the top of the recency-sorted list)
+     and render it — used on load and every time the /chat page is opened, so
+     the screen always lands on the latest chat. */
+  function chatFocusRecent() {
     if (!document.getElementById('chat-list')) return;
     chatEnsureIds();
-    /* pick the first worker as default active */
-    if (!CHAT_STATE.activeId && CHAT_CONTACTS.length) CHAT_STATE.activeId = CHAT_CONTACTS[0].id;
+    var best = null, bestTs = -1;
+    CHAT_CONTACTS.forEach(function (c) {
+      var ts = (typeof chatThreadTs === 'function') ? chatThreadTs(c) : 0;
+      if (ts > bestTs) { bestTs = ts; best = c.id; }
+    });
+    CHAT_STATE.activeId = best || (CHAT_CONTACTS[0] && CHAT_CONTACTS[0].id) || CHAT_STATE.activeId;
     chatRenderList();
     chatRenderConv();
+  }
+
+  function initChat() {
+    if (!document.getElementById('chat-list')) return;
+    chatFocusRecent();
     chatRenderQueueStrip();
     /* render analytics if the analytics page is present in the DOM
        (the render functions guard against missing host elements) */
