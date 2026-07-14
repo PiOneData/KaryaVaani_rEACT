@@ -10593,10 +10593,12 @@ function __kvOnReady(fn) {
     if (!EMP_ACTIVE) EMP_ACTIVE = empDefaultWorker();
     const c = CHAT_CONTACTS.find(function (x) { return x.id === EMP_ACTIVE; });
     if (!c) { head.innerHTML = ''; body.innerHTML = ''; foot.innerHTML = ''; return; }
-    /* keep CHAT_STATE.activeId in sync so quick-reply / ack actions
-       (which call chatWorkerReply / chatAckMessage from the chat module)
-       operate on the same employee */
-    if (typeof CHAT_STATE !== 'undefined') CHAT_STATE.activeId = EMP_ACTIVE;
+    /* NOTE: do NOT set CHAT_STATE.activeId here. This renderer runs on every
+       chatRenderConv() (all sections stay mounted), so forcing activeId to the
+       employee-home worker would hijack the main /chat conversation on each
+       re-render (new message, translate, poll). The emp-chat interaction
+       handlers (empSetWorker / empWorkerReply / empOpenChat) set activeId when
+       the user actually acts on this surface, which is sufficient. */
     const t = CHAT_THREADS[c.id] || { msgs: [], lastSeen: '' };
     const lng = (typeof chatLang === 'function') ? chatLang(c.lang) : { glyph: c.lang, name: c.lang };
 
