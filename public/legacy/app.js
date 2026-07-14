@@ -1988,6 +1988,7 @@ function __kvOnReady(fn) {
   var CT_DEPTS = ['Logistics', 'Packaging', 'Production', 'Maintenance', 'Inbound', 'Quality', 'Warehouse', 'Assembly'];
   var CT_DESIGS = ['Operator', 'Helper', 'Loader', 'Fitter', 'Packer', 'Technician', 'Machine Operator', 'Material Handler'];
   var CT_CATS = ['Unskilled', 'Semi-skilled', 'Skilled', 'Highly skilled'];
+  var CT_LANGS = ['Telugu', 'Hindi', 'Tamil', 'Kannada'];
   function ctHash(str) {
     var h = 2166136261;
     for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -2020,6 +2021,7 @@ function __kvOnReady(fn) {
         category: ctPick(CT_CATS, sd + 'c'),
         designation: ctPick(CT_DESIGS, sd + 'd'),
         department: ctPick(CT_DEPTS, sd + 'p2'),
+        language: ctPick(CT_LANGS, sd + 'lg'),
         esic: { state: esicState, label: esicLabel, cls: esicState === 'ok' ? 'green' : esicState === 'pending' ? 'amber' : 'red' },
         clra: { state: clraState, label: clraLabel, cls: clraState === 'ok' ? 'green' : clraState === 'pending' ? 'amber' : 'red' },
         esicStatus: esicLabel,
@@ -3528,6 +3530,7 @@ function __kvOnReady(fn) {
       kvKV('Category', vwEsc(w.category || '—')) +
       kvKV('Designation', vwEsc(w.designation || '—')) +
       kvKV('Department', vwEsc(w.department || '—')) +
+      kvKV('Preferred language', w.language ? '<span class="pill outline">' + vwEsc(w.language) + '</span>' : '—') +
       kvKV('Migrant', isMigrant ? '<span class="pill amber tiny">Yes</span>' : 'No')
     ) + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Vendor deployment record — imported vendor data, or estimated from the contractor’s declared deployment.</div>';
 
@@ -3607,7 +3610,8 @@ function __kvOnReady(fn) {
     VW_IMPORT = { contractor: contractor || VW_STATE.contractor || '', rows: [] };
     vwModal('Import vendor data' + (VW_IMPORT.contractor ? ' · ' + vwEsc(VW_IMPORT.contractor) : ''),
       '<div class="tiny muted" style="margin-bottom:10px;line-height:1.6">Upload a CSV of the workers deployed under this contractor. Required column: <span class="mono">name</span>. ' +
-        'Full column set: <span class="mono">contractor, code, name, mobile, category, designation, department, esic, clra, compliance, migrant</span>. ' +
+        'Full column set: <span class="mono">contractor, code, name, mobile, language, category, designation, department, esic, clra, compliance, migrant</span>. ' +
+        '<code>language</code> is the worker’s preferred language (e.g. Telugu / Hindi / Tamil). ' +
         '<code>compliance</code> is a number 0–100; <code>esic</code>/<code>clra</code> are status words (active / pending / breach / expired); <code>migrant</code> is yes/no. ' +
         'If a row omits <code>contractor</code>, this contractor is assumed.</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">' +
@@ -3629,18 +3633,18 @@ function __kvOnReady(fn) {
   }
   function vwDownloadTemplate() {
     var ct = VW_IMPORT.contractor || 'R.K Enterprises';
-    var csv = 'contractor,code,name,mobile,category,designation,department,esic,clra,compliance,migrant\n' +
-      ct + ',EMP1001,Ramesh Naidu,9876543210,Skilled,Forklift Operator,Logistics,active,active,88,no\n' +
-      ct + ',EMP1002,Lalita Devi,9811122233,Semi-skilled,Packer,Packaging,pending,active,64,yes\n';
+    var csv = 'contractor,code,name,mobile,language,category,designation,department,esic,clra,compliance,migrant\n' +
+      ct + ',EMP1001,Ramesh Naidu,9876543210,Telugu,Skilled,Forklift Operator,Logistics,active,active,88,no\n' +
+      ct + ',EMP1002,Lalita Devi,9811122233,Hindi,Semi-skilled,Packer,Packaging,pending,active,64,yes\n';
     vwDownload(csv, 'vendor-workers-template.csv');
     if (typeof toast === 'function') toast('Template downloaded', 'green');
   }
   function vwLoadSample() {
     var ct = VW_IMPORT.contractor || 'R.K Enterprises';
     VW_IMPORT.rows = [
-      { contractor: ct, code: 'EMP1001', name: 'Ramesh Naidu', mobile: '9876543210', category: 'Skilled', designation: 'Forklift Operator', department: 'Logistics', esic: 'active', clra: 'active', compliance: '88', migrant: 'no' },
-      { contractor: ct, code: 'EMP1002', name: 'Lalita Devi', mobile: '9811122233', category: 'Semi-skilled', designation: 'Packer', department: 'Packaging', esic: 'pending', clra: 'active', compliance: '64', migrant: 'yes' },
-      { contractor: ct, code: 'EMP1003', name: 'Suresh Kumar', mobile: '9700045566', category: 'Unskilled', designation: 'Loader', department: 'Inbound', esic: 'active', clra: 'expired', compliance: '41', migrant: 'no' }
+      { contractor: ct, code: 'EMP1001', name: 'Ramesh Naidu', mobile: '9876543210', language: 'Telugu', category: 'Skilled', designation: 'Forklift Operator', department: 'Logistics', esic: 'active', clra: 'active', compliance: '88', migrant: 'no' },
+      { contractor: ct, code: 'EMP1002', name: 'Lalita Devi', mobile: '9811122233', language: 'Hindi', category: 'Semi-skilled', designation: 'Packer', department: 'Packaging', esic: 'pending', clra: 'active', compliance: '64', migrant: 'yes' },
+      { contractor: ct, code: 'EMP1003', name: 'Suresh Kumar', mobile: '9700045566', language: 'Tamil', category: 'Unskilled', designation: 'Loader', department: 'Inbound', esic: 'active', clra: 'expired', compliance: '41', migrant: 'no' }
     ];
     vwImportPreview();
   }
@@ -3663,6 +3667,7 @@ function __kvOnReady(fn) {
       rows.push({
         contractor: get(c, 'contractor') || VW_IMPORT.contractor || '',
         code: get(c, 'code'), name: get(c, 'name'), mobile: get(c, 'mobile'),
+        language: get(c, 'language') || get(c, 'lang'),
         category: get(c, 'category'), designation: get(c, 'designation'), department: get(c, 'department'),
         esic: get(c, 'esic'), clra: get(c, 'clra'), compliance: get(c, 'compliance'), migrant: get(c, 'migrant')
       });

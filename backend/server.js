@@ -869,6 +869,7 @@ app.post('/api/vendor/workers/import', (req, res) => {
       id, contractor: String(contractor), code,
       name: String(w.name || '').trim(),
       mobile: String(w.mobile || '').trim(),
+      language: String(w.language || '').trim(),
       category: String(w.category || '').trim(),
       designation: String(w.designation || '').trim(),
       department: String(w.department || '').trim(),
