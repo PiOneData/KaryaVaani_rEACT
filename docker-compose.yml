@@ -44,8 +44,8 @@ services:
       - SARVAM_API_KEY=${SARVAM_API_KEY:-}
       # Sarvam TTS — model, speaker (male default), and reading pace (<1 = slower)
       - SARVAM_TTS_MODEL=${SARVAM_TTS_MODEL:-bulbul:v3}
-      - SARVAM_TTS_SPEAKER=${SARVAM_TTS_SPEAKER:-abhilash}
-      - SARVAM_TTS_PACE=${SARVAM_TTS_PACE:-0.75}
+      - SARVAM_TTS_SPEAKER=${SARVAM_TTS_SPEAKER:-aditya}
+      - SARVAM_TTS_PACE=${SARVAM_TTS_PACE:-1.0}
     depends_on:
       postgres:
         condition: service_healthy

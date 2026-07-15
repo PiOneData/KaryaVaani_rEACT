@@ -634,8 +634,8 @@ function voiceCachePut(hash, buf, contentType) {
    bulbul:v2 caps each input string, so long text is chunked by sentence and
    the returned WAV chunks are concatenated into one clip. */
 const SARVAM_TTS_MODEL = process.env.SARVAM_TTS_MODEL || 'bulbul:v3';
-const SARVAM_TTS_SPEAKER = process.env.SARVAM_TTS_SPEAKER || 'abhilash'; // male voice
-const SARVAM_TTS_PACE = parseFloat(process.env.SARVAM_TTS_PACE || '0.75'); // <1 = slower reading
+const SARVAM_TTS_SPEAKER = process.env.SARVAM_TTS_SPEAKER || 'aditya'; // male voice for bulbul:v3 (aditya/ashutosh/rahul male; ritu/priya/neha female)
+const SARVAM_TTS_PACE = parseFloat(process.env.SARVAM_TTS_PACE || '1.0'); // normal speed (<1 slower, >1 faster)
 function sarvamTtsChunks(text, max) {
   max = max || 450;
   const sents = splitSentences(String(text));
