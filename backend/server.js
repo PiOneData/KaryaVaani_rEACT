@@ -633,18 +633,86 @@ function voiceCachePut(hash, buf, contentType) {
   }
 }
 
-/* POST /api/tts  { text }  → audio/wav bytes.
+/* ── Sarvam AI text-to-speech (optional voice engine) ──────────────────────
+   bulbul:v2 caps each input string, so long text is chunked by sentence and
+   the returned WAV chunks are concatenated into one clip. */
+const SARVAM_TTS_SPEAKER = process.env.SARVAM_TTS_SPEAKER || 'anushka';
+function sarvamTtsChunks(text, max) {
+  max = max || 450;
+  const sents = splitSentences(String(text));
+  const chunks = [];
+  let cur = '';
+  for (const s of sents) {
+    if (s.length > max) {
+      if (cur.trim()) { chunks.push(cur.trim()); cur = ''; }
+      for (let i = 0; i < s.length; i += max) chunks.push(s.slice(i, i + max));
+    } else if ((cur + ' ' + s).trim().length > max) {
+      if (cur.trim()) chunks.push(cur.trim());
+      cur = s;
+    } else {
+      cur = cur ? cur + ' ' + s : s;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks.length ? chunks : [String(text).slice(0, max)];
+}
+/* concatenate standard 44-byte-header PCM WAV buffers into one clip */
+function concatWavs(buffers) {
+  buffers = buffers.filter(Boolean);
+  if (buffers.length <= 1) return buffers[0] || Buffer.alloc(0);
+  const data = buffers.map((b) => b.slice(44));
+  const merged = Buffer.concat(data);
+  const header = Buffer.from(buffers[0].slice(0, 44));
+  header.writeUInt32LE(36 + merged.length, 4);   // RIFF chunk size
+  header.writeUInt32LE(merged.length, 40);        // data sub-chunk size
+  return Buffer.concat([header, merged]);
+}
+async function sarvamTtsOne(chunk, langCode) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120000);
+  try {
+    const resp = await fetch(SARVAM_API_URL + '/text-to-speech', {
+      method: 'POST',
+      headers: { 'api-subscription-key': SARVAM_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        inputs: [chunk],
+        target_language_code: toSarvam(langCode),
+        speaker: SARVAM_TTS_SPEAKER,
+        model: 'bulbul:v2',
+        speech_sample_rate: 22050,
+        enable_preprocessing: true
+      }),
+      signal: controller.signal
+    });
+    const bodyText = await resp.text();
+    let json; try { json = bodyText ? JSON.parse(bodyText) : {}; } catch { json = {}; }
+    if (!resp.ok) throw new Error('sarvam tts ' + resp.status + (bodyText ? ': ' + bodyText.slice(0, 160) : ''));
+    const b64 = json.audios && json.audios[0];
+    if (!b64) throw new Error('sarvam tts: empty audio');
+    return Buffer.from(b64, 'base64');
+  } finally { clearTimeout(timer); }
+}
+async function sarvamTts(text, langCode) {
+  const chunks = sarvamTtsChunks(text, 450);
+  const bufs = [];
+  for (const ch of chunks) bufs.push(await sarvamTtsOne(ch, langCode));
+  return concatWavs(bufs);
+}
+
+/* POST /api/tts  { text, provider?, lang? }  → audio/wav bytes.
    Voice synthesis is slow (single-worker model), and a given (already-translated)
    text always yields the same audio — so the result is cached persistently by a
    hash of the text. A cache hit returns the stored WAV immediately with no call
    to the voice service; a miss synthesises once and stores it. Header
    X-KV-Cache: hit|miss lets the client tell them apart. */
 app.post('/api/tts', async (req, res) => {
-  const { text } = req.body || {};
+  const { text, provider, lang } = req.body || {};
   if (!text) {
     return res.status(400).json({ ok: false, error: 'text is required' });
   }
-  const hash = ttsHash(text);
+  const useSarvam = provider === 'sarvam' && !!SARVAM_API_KEY;
+  /* cache per engine+language so the same text can hold a local and a Sarvam clip */
+  const hash = ttsHash(text + '|' + (useSarvam ? 'sarvam:' + (lang || '') : 'local'));
   const hit = voiceCacheGet(hash);
   if (hit && hit.audio) {
     res.set('Content-Type', hit.contentType || 'audio/wav');
@@ -655,18 +723,23 @@ app.post('/api/tts', async (req, res) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600000); // 10 min hard cap
   try {
-    const resp = await fetch(TTS_API_URL + '/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-      signal: controller.signal
-    });
-    if (!resp.ok) {
-      const detail = await resp.text().catch(() => '');
-      return res.status(resp.status).json({ ok: false, error: 'tts service ' + resp.status + (detail ? ': ' + detail.slice(0, 200) : '') });
+    let buf, contentType = 'audio/wav';
+    if (useSarvam) {
+      buf = await sarvamTts(text, lang);
+    } else {
+      const resp = await fetch(TTS_API_URL + '/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: controller.signal
+      });
+      if (!resp.ok) {
+        const detail = await resp.text().catch(() => '');
+        return res.status(resp.status).json({ ok: false, error: 'tts service ' + resp.status + (detail ? ': ' + detail.slice(0, 200) : '') });
+      }
+      buf = Buffer.from(await resp.arrayBuffer());
+      contentType = resp.headers.get('content-type') || 'audio/wav';
     }
-    const buf = Buffer.from(await resp.arrayBuffer());
-    const contentType = resp.headers.get('content-type') || 'audio/wav';
     try { voiceCachePut(hash, buf, contentType); } catch (e) { console.error('voice cache store failed:', e.message); }
     res.set('Content-Type', contentType);
     res.set('X-KV-Cache', 'miss');

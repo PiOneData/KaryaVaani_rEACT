@@ -6433,10 +6433,12 @@ function __kvOnReady(fn) {
      mixed-content / CORS. The model synthesises speech for the supplied
      (already-translated) text. */
   function vbEngineTts(text, code) {
+    var base = String(code).split('@')[0];
+    var provider = VB_STATE.provider === 'sarvam' ? 'sarvam' : 'local';
     return fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify({ text: text, provider: provider, lang: base })
     }).then(function (r) {
       if (!r.ok) throw new Error('tts ' + r.status);
       return r.blob();
