@@ -633,7 +633,9 @@ function voiceCachePut(hash, buf, contentType) {
 /* ── Sarvam AI text-to-speech (optional voice engine) ──────────────────────
    bulbul:v2 caps each input string, so long text is chunked by sentence and
    the returned WAV chunks are concatenated into one clip. */
-const SARVAM_TTS_SPEAKER = process.env.SARVAM_TTS_SPEAKER || 'anushka';
+const SARVAM_TTS_MODEL = process.env.SARVAM_TTS_MODEL || 'bulbul:v3';
+const SARVAM_TTS_SPEAKER = process.env.SARVAM_TTS_SPEAKER || 'abhilash'; // male voice
+const SARVAM_TTS_PACE = parseFloat(process.env.SARVAM_TTS_PACE || '0.75'); // <1 = slower reading
 function sarvamTtsChunks(text, max) {
   max = max || 450;
   const sents = splitSentences(String(text));
@@ -675,7 +677,8 @@ async function sarvamTtsOne(chunk, langCode) {
         text: chunk,
         target_language_code: toSarvam(langCode),
         speaker: SARVAM_TTS_SPEAKER,
-        model: 'bulbul:v2',
+        model: SARVAM_TTS_MODEL,
+        pace: SARVAM_TTS_PACE,
         speech_sample_rate: 22050,
         enable_preprocessing: true
       }),

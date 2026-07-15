@@ -6621,7 +6621,7 @@ function __kvOnReady(fn) {
     out.style.display = 'block';
     const sarvam = VB_STATE.provider === 'sarvam';
     const foot = sarvam
-      ? 'Sarvam AI · neural voice (bulbul:v2) — Play to hear it aloud, or Download the .wav voice note'
+      ? 'Sarvam AI · neural voice (bulbul:v3) — Play to hear it aloud, or Download the .wav voice note'
       : 'VAANI · open-source voice (IndicTrans2 + MMS-TTS / IndicF5) — Play to hear it aloud, or Download the .wav voice note';
     document.getElementById('vb-translation-cards').innerHTML = VB_STATE.langs.map(function (code) {
       const l = vbLang(code);

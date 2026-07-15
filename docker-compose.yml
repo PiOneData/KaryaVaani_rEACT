@@ -42,8 +42,10 @@ services:
       # IndicTrans2 model). Blank key = the Sarvam option falls back to our model.
       - SARVAM_API_URL=${SARVAM_API_URL:-https://api.sarvam.ai}
       - SARVAM_API_KEY=${SARVAM_API_KEY:-}
-      # Sarvam TTS (bulbul:v2) voice — anushka/abhilash/manisha/vidya/arya/karun/hitesh
-      - SARVAM_TTS_SPEAKER=${SARVAM_TTS_SPEAKER:-anushka}
+      # Sarvam TTS — model, speaker (male default), and reading pace (<1 = slower)
+      - SARVAM_TTS_MODEL=${SARVAM_TTS_MODEL:-bulbul:v3}
+      - SARVAM_TTS_SPEAKER=${SARVAM_TTS_SPEAKER:-abhilash}
+      - SARVAM_TTS_PACE=${SARVAM_TTS_PACE:-0.75}
     depends_on:
       postgres:
         condition: service_healthy
