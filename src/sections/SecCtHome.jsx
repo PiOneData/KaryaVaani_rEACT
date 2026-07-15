@@ -141,6 +141,33 @@ export default function SecCtHome() {
             <div id="ct-wk-list" />
           </div>
           {' '}
+          {/*  full deployed-worker roster (same table + detail as vendor compliance)  */}
+          {' '}
+          <div className="card ct-wk-card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Workers you have deployed</div>
+                {' '}
+                <div className="card-h-sub">Your full deployed roster · search, sort by column, click a worker for full details</div>
+              </div>
+              {' '}
+              <span className="pill outline tiny" id="ct-wkroster-cnt">—</span>
+            </div>
+            {' '}
+            <input id="ctwk-search" placeholder="Search workers…" className="sel" style={{ marginBottom: "10px", maxWidth: "220px" }} />
+            {' '}
+            <div style={{ overflowX: "auto" }}>
+              <table className="t">
+                <thead>
+                  <tr><th>Worker</th><th>Code</th><th>Category</th><th>Designation</th><th>ESIC</th><th>CLRA</th><th>Compliance</th><th>Details</th></tr>
+                </thead>
+                <tbody id="ctwk-body" />
+              </table>
+            </div>
+            {' '}
+            <div id="ctwk-pagination" className="om-pg" />
+          </div>
+          {' '}
           {/*  liability exposure  */}
           {' '}
           <div className="card ct-liab-card">

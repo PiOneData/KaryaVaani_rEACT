@@ -159,7 +159,15 @@ function __kvOnReady(fn) {
     }
     if (user.role === 'employee') {
       document.body.classList.add('role-employee');
-      if (user.linkedId && typeof empSetWorker === 'function') empSetWorker(user.linkedId);
+      if (typeof empSetWorker === 'function') {
+        /* prefer a real OM-roster associate so the login worker is consistent
+           with the employee details table; ignore a stale demo linkedId that
+           isn't in the roster. */
+        var _wid = user.linkedId;
+        var _real = (typeof empRosterDefault === 'function') ? empRosterDefault() : null;
+        if (!_wid || String(_wid).indexOf('OMC') !== 0) _wid = _real || _wid;
+        empSetWorker(_wid);
+      }
       nav('emp-home', kvNavEl('emp-home'));
     } else if (user.role === 'contractor') {
       document.body.classList.add('role-contractor');
@@ -10731,7 +10739,30 @@ function __kvOnReady(fn) {
 
   /* find current worker · default to first contact who has unacked criticals,
      else first contact */
+  var EMP_ROSTER_ID = null;
+  /* a real Telugu associate from the OM manpower roster (the employee details
+     table), surfaced as a chat contact so the worker-login demo is consistent
+     with that table — instead of the disjoint chatContacts[0] (Mohan Das). */
+  function empRosterDefault() {
+    if (EMP_ROSTER_ID) return EMP_ROSTER_ID;
+    var roster = (window.__KVDATA && window.__KVDATA.omMapping) || (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
+    var te = roster.find(function (r) { return String(r.language || '').toLowerCase() === 'telugu'; }) || roster[0];
+    if (!te) return null;
+    if (typeof CHAT_CONTACTS !== 'undefined' && !CHAT_CONTACTS.some(function (c) { return c.id === te.code; })) {
+      CHAT_CONTACTS.unshift({
+        id: te.code, name: te.name, role: te.designation || 'Associate',
+        zone: te.department || '—', dept: te.department || '—',
+        sup: te.managerName || '—', type: 'Contract',
+        contractor: (typeof ctForWorkerCode === 'function' ? ctForWorkerCode(te.code) : 'OM Manpower'),
+        lang: 'TE', phone: '••• ••• ' + String(te.code).slice(-4)
+      });
+    }
+    EMP_ROSTER_ID = te.code;
+    return te.code;
+  }
   function empDefaultWorker() {
+    var real = empRosterDefault();
+    if (real) return real;
     let pick = null;
     Object.keys(CHAT_THREADS).forEach(function (wid) {
       (CHAT_THREADS[wid].msgs || []).forEach(function (m) {
@@ -11494,6 +11525,7 @@ function __kvOnReady(fn) {
 
     /* WORKFORCE SUMMARY — derived from CHAT_CONTACTS filtered by this contractor */
     ctRenderWorkforce(c);
+    ctRenderRoster(c);
 
     /* LIABILITY EXPOSURE */
     ctRenderLiability(c);
@@ -11551,6 +11583,35 @@ function __kvOnReady(fn) {
       if (typeof toast === 'function') toast('Nothing pending — you are all caught up', 'green');
     }
     ctRender();
+  }
+
+  /* the contractor's full deployed-worker roster — same data + detail modal as
+     the vendor-compliance "Workers deployed" table, for consistency. */
+  function ctRenderRoster(c) {
+    if (!document.getElementById('ctwk-body') || !c) return;
+    var roster = (typeof ctRoster === 'function') ? ctRoster(c) : [];
+    VW_STATE.workers = roster;      /* so vwWorkerDetail(id) resolves the row */
+    VW_STATE.generated = true;
+    VW_STATE.contractor = c.name;
+    var cnt = document.getElementById('ct-wkroster-cnt');
+    if (cnt) cnt.textContent = roster.length + ' deployed';
+    KVTABLE.set({
+      key: 'ctwk', tbody: 'ctwk-body', pager: 'ctwk-pagination', pageSize: 12, cols: 8,
+      rows: roster,
+      text: function (w) { return [w.name, w.code, w.category, w.designation, w.esicStatus, w.clraStatus].join(' '); },
+      empty: 'No workers deployed for this contractor.',
+      row: function (w) {
+        return '<tr style="cursor:pointer" onclick="vwWorkerDetail(\'' + String(w.id).replace(/'/g, "\\'") + '\')">' +
+          '<td class="t-strong">' + w.name + (w.migrant ? ' <span class="pill amber tiny">Migrant</span>' : '') + '</td>' +
+          '<td class="mono tiny">' + w.code + '</td>' +
+          '<td>' + w.category + '</td>' +
+          '<td>' + w.designation + '</td>' +
+          '<td>' + vwStatusPill(w.esicStatus) + '</td>' +
+          '<td>' + vwStatusPill(w.clraStatus) + '</td>' +
+          '<td>' + vwCompliance(w.compliancePct) + '</td>' +
+          '<td><button class="btn tiny">View</button></td></tr>';
+      }
+    });
   }
 
   function ctRenderWorkforce(c) {
@@ -12218,16 +12279,26 @@ function __kvOnReady(fn) {
         '<div class="op-score"><div class="op-score-val" style="color:' + trBandColor(s.band) + '">' + s.score + '<small>/100</small></div>' +
           '<div class="op-score-meta"><div class="op-score-name">' + s.operator + '</div><div class="op-score-sub">' + s.routes + ' routes · ' + s.incidents + ' incident' + (s.incidents === 1 ? '' : 's') + '</div>' +
             '<div style="margin-top:4px"><span class="pill ' + (typeof trSlaStatus === 'function' ? trSlaStatus(s.score).band : 'outline') + ' tiny">' + (typeof trSlaStatus === 'function' ? trSlaStatus(s.score).label : '') + '</span></div></div></div>' +
-        '<div class="op-bars">' + trOpBar('Consent · R.83', s.consentPct) + trOpBar('Boarding', s.boardingPct) + trOpBar('On-time', s.onTimePct) + '</div>';
+        '<div class="op-bars">' + trOpBar('Consent · R.83', s.consentPct) + trOpBar('Boarding', s.boardingPct) + trOpBar('On-time', s.onTimePct) + '</div>' +
+        '<button class="btn tiny" style="margin-top:10px;width:100%" onclick="trToggleOperatorFilter(\'' + String(TR_STATE.operatorFilter).replace(/'/g, "\\'") + '\')">✕ Show all operators</button>';
     } else {
       host.innerHTML = TR_OPERATORS.map(function (op) {
         const s = trOperatorScore(op);
-        return '<div class="op-row"><span class="op-row-dot" style="background:' + trBandColor(s.band) + '"></span>' +
+        return '<div class="op-row" style="cursor:pointer" title="Filter routes by ' + op + '" onclick="trToggleOperatorFilter(\'' + op.replace(/'/g, "\\'") + '\')">' +
+          '<span class="op-row-dot" style="background:' + trBandColor(s.band) + '"></span>' +
           '<span class="op-row-name">' + op + '</span>' +
           '<span class="op-row-inc">' + (s.incidents ? '⚠ ' + s.incidents : '—') + '</span>' +
           '<span class="op-row-score" style="color:' + trBandColor(s.band) + '">' + s.score + '</span></div>';
       }).join('');
     }
+  }
+  /* click an operator in the sidebar → filter the routes list to that operator
+     (toggle off by clicking again or "Show all") */
+  function trToggleOperatorFilter(op) {
+    TR_STATE.operatorFilter = (TR_STATE.operatorFilter === op) ? null : op;
+    if (typeof trGkRenderRoutes === 'function') trGkRenderRoutes();
+    trRenderOperatorCard();
+    if (typeof trRenderEvents === 'function') trRenderEvents();
   }
   function trRenderEvents() {
     const host = document.getElementById('tr-events');
