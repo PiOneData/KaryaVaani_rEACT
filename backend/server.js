@@ -547,14 +547,11 @@ async function sarvamTranslateOne(text, srcCode, tgtCode, script) {
     const resp = await fetch(SARVAM_API_URL + '/translate', {
       method: 'POST',
       headers: { 'api-subscription-key': SARVAM_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: text,
-        source_language_code: toSarvam(srcCode || 'EN'),
-        target_language_code: toSarvam(tgtCode),
-        model: 'sarvam-translate:v1',
-        output_script: script === 'roman' ? 'roman' : null,
-        numerals_format: 'international'
-      }),
+      body: JSON.stringify(script === 'roman'
+        ? { input: text, source_language_code: toSarvam(srcCode || 'EN'), target_language_code: toSarvam(tgtCode),
+            model: 'mayura:v1', mode: 'code-mixed', output_script: 'roman', numerals_format: 'international' }
+        : { input: text, source_language_code: toSarvam(srcCode || 'EN'), target_language_code: toSarvam(tgtCode),
+            model: 'sarvam-translate:v1', numerals_format: 'international' }),
       signal: controller.signal
     });
     const body = await resp.text();
@@ -675,7 +672,7 @@ async function sarvamTtsOne(chunk, langCode) {
       method: 'POST',
       headers: { 'api-subscription-key': SARVAM_API_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        inputs: [chunk],
+        text: chunk,
         target_language_code: toSarvam(langCode),
         speaker: SARVAM_TTS_SPEAKER,
         model: 'bulbul:v2',
@@ -687,7 +684,7 @@ async function sarvamTtsOne(chunk, langCode) {
     const bodyText = await resp.text();
     let json; try { json = bodyText ? JSON.parse(bodyText) : {}; } catch { json = {}; }
     if (!resp.ok) throw new Error('sarvam tts ' + resp.status + (bodyText ? ': ' + bodyText.slice(0, 160) : ''));
-    const b64 = json.audios && json.audios[0];
+    const b64 = (json.audios && json.audios[0]) || json.audio;
     if (!b64) throw new Error('sarvam tts: empty audio');
     return Buffer.from(b64, 'base64');
   } finally { clearTimeout(timer); }

@@ -6296,19 +6296,17 @@ function __kvOnReady(fn) {
   function vbRenderLangs() {
     const wrap = document.getElementById('vb-langs');
     if (!wrap) return;
-    /* local model = native chips only; Sarvam AI = native + a romanised
-       (English-mixed) variant per language. */
+    /* both engines pick native target languages; Sarvam additionally offers a
+       code-mixed (Tanglish/Hinglish) voice per language in the voice section. */
     var codes = (VB_STATE.provider === 'sarvam')
-      ? VB_SARVAM_LANGS.reduce(function (a, c) { a.push(c); a.push(c + '@roman'); return a; }, [])
+      ? VB_SARVAM_LANGS.slice()
       : VB_LANGS.map(function (l) { return l.code; });
     wrap.innerHTML = codes.map(function (code) {
       var l = vbLang(code);
       var on = VB_STATE.langs.indexOf(code) > -1;
       var locked = !on && VB_STATE.langs.length >= 2;
-      var mixed = code.indexOf('@roman') > -1;
       return '<span class="lang-chip vb-lang-chip ' + (on ? 'on' : '') + (locked ? ' locked' : '') +
-        '" title="' + (mixed ? 'English-mixed (romanised) — Sarvam AI' : '') + '" onclick="vbToggleLang(\'' + code + '\')">' +
-        l.glyph + '&nbsp;' + l.name + (mixed ? ' <span class="pill outline tiny">Aa</span>' : '') + '</span>';
+        '" onclick="vbToggleLang(\'' + code + '\')">' + l.glyph + '&nbsp;' + l.name + '</span>';
     }).join('');
   }
   /* switch the translation engine (our model ↔ Sarvam AI) */
@@ -6320,7 +6318,7 @@ function __kvOnReady(fn) {
     if (typeof vbMarkDirty === 'function') vbMarkDirty();
     var hint = document.getElementById('vb-provider-hint');
     if (hint) hint.textContent = VB_STATE.provider === 'sarvam'
-      ? 'Sarvam AI · choose native or English-mixed (Tanglish / Hinglish) variants'
+      ? 'Sarvam AI · native translation + an added English-mixed (Tanglish / Hinglish) voice per language'
       : 'Our model (IndicTrans2) · native-script translation';
   }
 
@@ -6578,6 +6576,14 @@ function __kvOnReady(fn) {
         catch (err) { if (attempt === 0) await new Promise(function (r) { setTimeout(r, 600); }); }
       }
       if (t) { out[code] = t; } else { failed++; out[code] = vbSimTranslate(code); }
+      /* Sarvam AI: also produce a code-mixed (romanised) rendering so the voice
+         section can offer a Tanglish/Hinglish voice for this language. */
+      if (VB_STATE.provider === 'sarvam') {
+        try {
+          const rm = await vbTranslateOne(VB_STATE.source, code + '@roman');
+          if (rm) out[code + '@roman'] = rm;
+        } catch (e) { /* code-mixed unavailable for this language */ }
+      }
     }
 
     VB_STATE.translations = out;
@@ -6597,28 +6603,46 @@ function __kvOnReady(fn) {
     }
   }
 
+  /* one voice control (play + download + progress track) for a message code */
+  function vbVoiceControl(code, label) {
+    return '<span class="vb-voice-grp">' +
+      '<span class="vb-voice" id="vb-voice-' + code + '" onclick="vbPlayVoice(\'' + code + '\')">' +
+        '<span class="vb-voice-ico" id="vb-voice-ico-' + code + '">▶</span>' +
+        '<span id="vb-voice-label-' + code + '">' + label + '</span>' +
+      '</span>' +
+      '<span class="vb-voice-dl" id="vb-voice-dl-' + code + '" onclick="vbDownloadVoice(\'' + code + '\')" title="Download voice note">' +
+        '<span class="vb-voice-ico">⬇</span>' +
+      '</span>' +
+      '<span class="vb-voice-track" id="vb-voice-track-' + code + '" style="display:none;margin-left:6px;flex:1;min-width:40px"><span></span></span>' +
+    '</span>';
+  }
   function vbRenderTranslations() {
     const out = document.getElementById('vb-translation-out');
     out.style.display = 'block';
+    const sarvam = VB_STATE.provider === 'sarvam';
+    const foot = sarvam
+      ? 'Sarvam AI · neural voice (bulbul:v2) — Play to hear it aloud, or Download the .wav voice note'
+      : 'VAANI · open-source voice (IndicTrans2 + MMS-TTS / IndicF5) — Play to hear it aloud, or Download the .wav voice note';
     document.getElementById('vb-translation-cards').innerHTML = VB_STATE.langs.map(function (code) {
       const l = vbLang(code);
+      const mix = code + '@roman';
+      const hasMix = sarvam && VB_STATE.translations[mix];
       return '<div class="vb-tcard" id="vb-tcard-' + code + '">' +
+        /* native language + voice */
         '<div class="vb-tcard-h">' +
           '<span class="vb-tcard-lang"><span class="vb-tcard-glyph">' + l.glyph + '</span>' + l.name + '</span>' +
-          '<span class="vb-voice-grp">' +
-            '<span class="vb-voice" id="vb-voice-' + code + '" onclick="vbPlayVoice(\'' + code + '\')">' +
-              '<span class="vb-voice-ico" id="vb-voice-ico-' + code + '">▶</span>' +
-              '<span id="vb-voice-label-' + code + '">Play voice</span>' +
-            '</span>' +
-            '<span class="vb-voice-dl" id="vb-voice-dl-' + code + '" onclick="vbDownloadVoice(\'' + code + '\')" title="Download voice note">' +
-              '<span class="vb-voice-ico">⬇</span>' +
-              '<span id="vb-voice-dl-label-' + code + '">Download</span>' +
-            '</span>' +
-          '</span>' +
+          vbVoiceControl(code, 'Play voice') +
         '</div>' +
         '<div class="vb-tcard-body">' + (VB_STATE.translations[code] || '(translation unavailable — click Re-translate)') + '</div>' +
-        '<div class="vb-voice-track" id="vb-voice-track-' + code + '" style="display:none;margin:2px 18px 8px"><span></span></div>' +
-        '<div class="vb-tcard-foot">VAANI · open-source voice (IndicTrans2 + MMS-TTS / IndicF5) — Play to hear it aloud, or Download the .wav voice note</div>' +
+        /* Sarvam AI: code-mixed (Tanglish/Hinglish) rendering + its own voice */
+        (hasMix
+          ? '<div class="vb-tcard-h" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">' +
+              '<span class="vb-tcard-lang"><span class="pill outline tiny">Aa</span>&nbsp;' + vbLang(mix).name + ' · English-mixed voice</span>' +
+              vbVoiceControl(mix, 'Play ' + vbLang(mix).name) +
+            '</div>' +
+            '<div class="vb-tcard-body" style="font-style:italic;color:var(--ink-2)">' + VB_STATE.translations[mix] + '</div>'
+          : '') +
+        '<div class="vb-tcard-foot">' + foot + '</div>' +
       '</div>';
     }).join('');
     /* one-time capability hint */
