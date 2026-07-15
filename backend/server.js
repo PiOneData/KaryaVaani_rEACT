@@ -1281,7 +1281,15 @@ function ensureDemoUsers() {
   const byName = {};
   store.data.users.forEach((u) => { byName[u.username] = u; });
 
-  const worker = (store.data.chatContacts || [])[0] || (store.data.broadcastWorkers || [])[0] || null;
+  /* the worker demo account must map to a REAL person in the OM manpower roster
+     (the employee details table) — prefer a Telugu associate — so the login
+     worker, the profile name, and the roster row all refer to the same person.
+     (The old chatContacts[0] "Mohan Das" is not in that roster → inconsistency.) */
+  const roster = store.data.omMapping || [];
+  const rosterWorker = roster.find((r) => String(r.language || '').toLowerCase() === 'telugu') || roster[0];
+  const worker = rosterWorker
+    ? { id: rosterWorker.code, name: rosterWorker.name }
+    : ((store.data.chatContacts || [])[0] || (store.data.broadcastWorkers || [])[0] || null);
   const firm   = (store.data.contractors || [])[0] || null;
   const nowIso = new Date().toISOString();
   const seeded = [];
@@ -1295,9 +1303,14 @@ function ensureDemoUsers() {
         name: a.name, linkedType: a.linkedType, linkedId: '', linkedName: '',
         passwordHash: hashPassword(a.password), createdAt: nowIso
       };
-      if (a.linkedType === 'employee' && worker) { u.linkedId = worker.id; u.linkedName = worker.name; u.name = worker.name; }
-      else if (a.linkedType === 'contractor' && firm) { u.linkedId = firm.id; u.linkedName = firm.name; u.name = firm.name; }
       store.data.users.push(u); byName[a.username] = u; seeded.push(a.username); touched = true;
+    }
+    /* (re)sync the persona linkage on every startup so an updated worker/firm
+       mapping takes effect for already-created users too. */
+    if (a.linkedType === 'employee' && worker && (u.linkedId !== worker.id || u.name !== worker.name)) {
+      u.linkedId = worker.id; u.linkedName = worker.name; u.name = worker.name; touched = true;
+    } else if (a.linkedType === 'contractor' && firm && (u.linkedId !== firm.id || u.name !== firm.name)) {
+      u.linkedId = firm.id; u.linkedName = firm.name; u.name = firm.name; touched = true;
     }
     if (!u.email && a.email) { u.email = a.email; touched = true; } // backfill for older seeds
     if (touched) dbPut('users', u.username, u);
