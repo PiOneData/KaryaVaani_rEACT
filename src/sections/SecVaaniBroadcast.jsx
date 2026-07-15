@@ -97,6 +97,23 @@ export default function SecVaaniBroadcast() {
             </div>
           </div>
           {' '}
+          {/*  Translation engine: our model vs Sarvam AI  */}
+          {' '}
+          <div className="vbm-row">
+            <span className="vbm-row-k">Engine</span>
+            {' '}
+            <div className="vbm-row-v">
+              <select className="sel" id="vb-provider" onChange={(event) => { window.vbSetProvider(event.target.value) }} data-onchange="vbSetProvider(this.value)">
+                <option value="local">Our model · IndicTrans2</option>
+                <option value="sarvam">Sarvam AI</option>
+              </select>
+              {' '}
+              <div className="vbm-row-hint" id="vb-provider-hint">
+                Our model (IndicTrans2) · native-script translation
+              </div>
+            </div>
+          </div>
+          {' '}
           {/*  Languages: pick exactly two  */}
           {' '}
           <div className="vbm-row">

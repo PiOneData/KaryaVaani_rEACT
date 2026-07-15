@@ -6183,6 +6183,7 @@ function __kvOnReady(fn) {
     subject: VB_PRESETS.rain.subject,
     source: VB_PRESETS.rain.body,
     langs: ['TE', 'HI'],          /* exactly two */
+    provider: 'local',            /* 'local' (IndicTrans2) | 'sarvam' (Sarvam AI) */
     audiences: ['production'],    /* selected audience group ids */
     translations: null,           /* { TE:'…', HI:'…' } once translated */
     sent: false,
@@ -6191,7 +6192,21 @@ function __kvOnReady(fn) {
     playing: null                 /* language code currently "playing" */
   };
 
-  function vbLang(code) { return VB_LANGS.find(function (l) { return l.code === code; }) || { code: code, name: code, glyph: code }; }
+  /* Sarvam AI can produce English-mixed (romanised) output — a "@roman" suffix
+     on a language code marks a code-mixed variant (Tanglish/Hinglish/…). */
+  const VB_MIX = { HI: 'Hinglish', TA: 'Tanglish', TE: 'Tenglish', KN: 'Kanglish', ML: 'Manglish', BN: 'Banglish', MR: 'Marathi (Roman)', OR: 'Odia (Roman)', GU: 'Gujlish', PA: 'Punglish' };
+  const VB_SARVAM_NAMES = { HI: 'Hindi', TA: 'Tamil', TE: 'Telugu', KN: 'Kannada', ML: 'Malayalam', BN: 'Bengali', MR: 'Marathi', OR: 'Odia', GU: 'Gujarati', PA: 'Punjabi' };
+  /* languages Sarvam AI offers here (each with a native + romanised variant) */
+  const VB_SARVAM_LANGS = ['HI', 'TA', 'TE', 'KN', 'ML', 'BN', 'MR', 'OR'];
+  function vbLang(code) {
+    var parts = String(code).split('@');
+    var base = parts[0];
+    var found = VB_LANGS.find(function (l) { return l.code === base; });
+    var name = found ? found.name : (VB_SARVAM_NAMES[base] || base);
+    var glyph = found ? found.glyph : base.charAt(0);
+    if (parts[1] === 'roman') return { code: code, name: (VB_MIX[base] || (name + ' (Roman)')), glyph: glyph };
+    return { code: base, name: name, glyph: glyph };
+  }
   function vbAud(id)    { return VB_AUDIENCES.find(function (a) { return a.id === id; }); }
 
   /* resolve selected audiences → unique worker objects + total headcount */
@@ -6281,12 +6296,32 @@ function __kvOnReady(fn) {
   function vbRenderLangs() {
     const wrap = document.getElementById('vb-langs');
     if (!wrap) return;
-    wrap.innerHTML = VB_LANGS.map(function (l) {
-      const on = VB_STATE.langs.indexOf(l.code) > -1;
-      const locked = !on && VB_STATE.langs.length >= 2;
+    /* local model = native chips only; Sarvam AI = native + a romanised
+       (English-mixed) variant per language. */
+    var codes = (VB_STATE.provider === 'sarvam')
+      ? VB_SARVAM_LANGS.reduce(function (a, c) { a.push(c); a.push(c + '@roman'); return a; }, [])
+      : VB_LANGS.map(function (l) { return l.code; });
+    wrap.innerHTML = codes.map(function (code) {
+      var l = vbLang(code);
+      var on = VB_STATE.langs.indexOf(code) > -1;
+      var locked = !on && VB_STATE.langs.length >= 2;
+      var mixed = code.indexOf('@roman') > -1;
       return '<span class="lang-chip vb-lang-chip ' + (on ? 'on' : '') + (locked ? ' locked' : '') +
-        '" onclick="vbToggleLang(\'' + l.code + '\')">' + l.glyph + '&nbsp;' + l.name + '</span>';
+        '" title="' + (mixed ? 'English-mixed (romanised) — Sarvam AI' : '') + '" onclick="vbToggleLang(\'' + code + '\')">' +
+        l.glyph + '&nbsp;' + l.name + (mixed ? ' <span class="pill outline tiny">Aa</span>' : '') + '</span>';
     }).join('');
+  }
+  /* switch the translation engine (our model ↔ Sarvam AI) */
+  function vbSetProvider(p) {
+    VB_STATE.provider = (p === 'sarvam') ? 'sarvam' : 'local';
+    VB_STATE.langs = [];              /* codes differ between engines — reset */
+    VB_STATE.translations = null;
+    vbRenderLangs();
+    if (typeof vbMarkDirty === 'function') vbMarkDirty();
+    var hint = document.getElementById('vb-provider-hint');
+    if (hint) hint.textContent = VB_STATE.provider === 'sarvam'
+      ? 'Sarvam AI · choose native or English-mixed (Tanglish / Hinglish) variants'
+      : 'Our model (IndicTrans2) · native-script translation';
   }
 
   function vbToggleLang(code) {
@@ -6485,15 +6520,19 @@ function __kvOnReady(fn) {
     // Call backend proxy with frontend language code(s) in `targets` as the
     // VAANI engine expects. The engine maps frontend codes (TE/HI/...) to the
     // internal model identifiers.
+    var parts = String(code).split('@');
+    var base = parts[0];
+    var script = parts[1] === 'roman' ? 'roman' : null;
+    var provider = VB_STATE.provider === 'sarvam' ? 'sarvam' : 'local';
     const resp = await fetch('/api/translate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ text: text, targets: [code] })
+      body:    JSON.stringify({ text: text, targets: [base], provider: provider, script: script })
     });
     const json = await resp.json().catch(function () { return {}; });
     // The proxy returns the flat single-target shape { success, translation }
     // for one target; tolerate the multi shape { translations: { code } } too.
-    const translated = json.translation || (json.translations && json.translations[code]);
+    const translated = json.translation || (json.translations && json.translations[base]);
     if (!resp.ok || json.success === false || !translated) {
       throw new Error(json.error || ('HTTP ' + resp.status));
     }

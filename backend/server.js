@@ -529,20 +529,71 @@ async function translateFull(text, srcNllb, tgtNllb) {
   return out.join(' ');
 }
 
+/* ── Sarvam AI translation (optional alternative engine) ────────────────────
+   Configure via env:
+     SARVAM_API_KEY   Sarvam subscription key (sent as the api-subscription-key header)
+     SARVAM_API_URL   default https://api.sarvam.ai
+   output_script 'roman' produces English-mixed / romanised output
+   (Tanglish / Hinglish / …). */
+const SARVAM_API_URL = (process.env.SARVAM_API_URL || 'https://api.sarvam.ai').replace(/\/$/, '');
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY || '';
+const SARVAM_LANG = { EN: 'en-IN', HI: 'hi-IN', TA: 'ta-IN', TE: 'te-IN', KN: 'kn-IN', ML: 'ml-IN', BN: 'bn-IN', GU: 'gu-IN', MR: 'mr-IN', OR: 'od-IN', OD: 'od-IN', PA: 'pa-IN' };
+const toSarvam = (code) => SARVAM_LANG[String(code || '').toUpperCase()] || code;
+
+async function sarvamTranslateOne(text, srcCode, tgtCode, script) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+  try {
+    const resp = await fetch(SARVAM_API_URL + '/translate', {
+      method: 'POST',
+      headers: { 'api-subscription-key': SARVAM_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: text,
+        source_language_code: toSarvam(srcCode || 'EN'),
+        target_language_code: toSarvam(tgtCode),
+        model: 'sarvam-translate:v1',
+        output_script: script === 'roman' ? 'roman' : null,
+        numerals_format: 'international'
+      }),
+      signal: controller.signal
+    });
+    const body = await resp.text();
+    let json; try { json = body ? JSON.parse(body) : {}; } catch { json = {}; }
+    if (!resp.ok) throw new Error('sarvam ' + resp.status + (body ? ': ' + body.slice(0, 160) : ''));
+    return json.translated_text || '';
+  } finally { clearTimeout(timer); }
+}
+/* chunk by sentence (Sarvam caps input length) and translate each */
+async function sarvamTranslateFull(text, srcCode, tgtCode, script) {
+  const sentences = splitSentences(String(text));
+  const out = [];
+  for (const s of sentences) {
+    try { const t = await sarvamTranslateOne(s, srcCode, tgtCode, script); out.push((t && t.trim()) || s); }
+    catch (e) { out.push(s); }
+  }
+  return out.join(' ');
+}
+
 app.post('/api/translate', async (req, res) => {
-  const { text, source, target, targets } = req.body || {};
+  const { text, source, target, targets, provider, script } = req.body || {};
   const toTargets = Array.isArray(targets) && targets.length ? targets : (target ? [target] : null);
   if (!text || !toTargets) {
     return res.status(400).json({ success: false, error: 'text and targets (or target) are required' });
   }
+  const useSarvam = provider === 'sarvam' && !!SARVAM_API_KEY;
   const src = toNllb(source || 'eng_Latn');
   try {
     const map = {};
-    for (const tgt of toTargets) { map[tgt] = await translateFull(text, src, toNllb(tgt)); }
-    if (toTargets.length === 1) {
-      return res.json({ success: true, translation: map[toTargets[0]] });
+    for (const tgt of toTargets) {
+      map[tgt] = useSarvam
+        ? await sarvamTranslateFull(text, source || 'EN', tgt, script)
+        : await translateFull(text, src, toNllb(tgt));
     }
-    res.json({ success: true, translations: map });
+    const engine = useSarvam ? 'sarvam' : 'local';
+    if (toTargets.length === 1) {
+      return res.json({ success: true, translation: map[toTargets[0]], provider: engine });
+    }
+    res.json({ success: true, translations: map, provider: engine });
   } catch (err) {
     console.error('translate error:', err.message);
     res.status(502).json({ success: false, error: 'translation service unreachable: ' + err.message });
