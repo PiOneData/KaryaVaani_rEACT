@@ -17081,6 +17081,12 @@ function __kvOnReady(fn) {
     return '<div style="margin:9px 0"><div class="row-between" style="font-size:0.8rem;margin-bottom:3px"><span>' + label + '</span><span class="mono">' + n + ' · ' + pct + '%</span></div>' +
       '<div class="bar"><span style="width:' + pct + '%;background:' + color + '"></span></div></div>';
   }
+  /* "mock" means no live gateway. A real-gateway send that was redirected to a
+     test recipient (test mode) is not mock — show it as "test". Older records
+     may still carry 'mock' with a real provider, so relabel on read too. */
+  function commStatus(x) {
+    return (x && x.status === 'mock' && x.provider && x.provider !== 'mock') ? 'test' : (x && x.status);
+  }
   function commRender(list) {
     const host = document.getElementById('comm-kpis');
     if (!host) return;
@@ -17093,23 +17099,24 @@ function __kvOnReady(fn) {
     }
     const email = list.filter(function (x) { return x.channel === 'email'; }).length;
     const wa = list.filter(function (x) { return x.channel === 'whatsapp'; }).length;
-    const sent = list.filter(function (x) { return x.status === 'sent'; }).length;
-    const mock = list.filter(function (x) { return x.status === 'mock'; }).length;
-    const failed = list.filter(function (x) { return x.status === 'failed'; }).length;
+    const sent = list.filter(function (x) { return commStatus(x) === 'sent'; }).length;
+    const test = list.filter(function (x) { return commStatus(x) === 'test'; }).length;
+    const mock = list.filter(function (x) { return commStatus(x) === 'mock'; }).length;
+    const failed = list.filter(function (x) { return commStatus(x) === 'failed'; }).length;
     const recips = list.reduce(function (s, x) { return s + (x.recipients || 1); }, 0);
 
     host.innerHTML =
       '<div class="kpi"><div class="kpi-eye">Total communications</div><div class="kpi-val">' + total + '</div><div class="kpi-sub">' + recips + ' recipient message(s)</div></div>' +
       '<div class="kpi"><div class="kpi-eye">Email</div><div class="kpi-val" style="color:var(--indigo)">' + email + '</div><div class="kpi-sub">via the VAANI mailer</div></div>' +
       '<div class="kpi"><div class="kpi-eye">WhatsApp</div><div class="kpi-val" style="color:var(--green-dk)">' + wa + '</div><div class="kpi-sub">via the gateway</div></div>' +
-      '<div class="kpi"><div class="kpi-eye">Delivery</div><div class="kpi-val" style="font-size:1.05rem">' + sent + ' <small>sent · ' + mock + ' mock · ' + failed + ' failed</small></div><div class="kpi-sub">mock = gateway in test mode</div></div>';
+      '<div class="kpi"><div class="kpi-eye">Delivery</div><div class="kpi-val" style="font-size:1.05rem">' + sent + ' <small>sent · ' + test + ' test · ' + mock + ' mock · ' + failed + ' failed</small></div><div class="kpi-sub">test = real send to the test recipient(s)</div></div>';
 
     const bd = document.getElementById('comm-breakdown');
     if (bd) bd.innerHTML =
       '<div class="card-h-title" style="font-size:0.82rem;margin-bottom:2px">By channel</div>' +
       commBar('Email', email, total, 'var(--indigo)') + commBar('WhatsApp', wa, total, 'var(--green)') +
       '<div class="card-h-title" style="font-size:0.82rem;margin:12px 0 2px">By delivery status</div>' +
-      commBar('Sent', sent, total, 'var(--green)') + commBar('Mock (test mode)', mock, total, 'var(--amber)') + commBar('Failed', failed, total, 'var(--red)');
+      commBar('Sent', sent, total, 'var(--green)') + commBar('Test recipient', test, total, 'var(--amber)') + commBar('Mock (no gateway)', mock, total, 'var(--ink-3)') + commBar('Failed', failed, total, 'var(--red)');
 
     // timeline by day
     const byDay = {};
@@ -17130,14 +17137,15 @@ function __kvOnReady(fn) {
         text: function (x) { return (x.channel || '') + ' ' + (Array.isArray(x.to) ? x.to.join(' ') : (x.to || '')) + ' ' + (x.subject || x.template || x.preview || '') + ' ' + (x.status || ''); },
         row: function (x) {
           const to = Array.isArray(x.to) ? (x.to.length > 1 ? x.to[0] + ' +' + (x.to.length - 1) : (x.to[0] || '—')) : (x.to || '—');
-          const statusCls = x.status === 'sent' ? 'green' : x.status === 'mock' ? 'amber' : 'red';
+          const st = commStatus(x);
+          const statusCls = st === 'sent' ? 'green' : (st === 'test' || st === 'mock') ? 'amber' : st === 'failed' ? 'red' : 'outline';
           const desc = x.subject || x.template || x.preview || '—';
           const when = x.at ? new Date(x.at).toLocaleString('en-IN') : '—';
           return '<tr><td class="tiny">' + when + '</td>' +
             '<td><span class="pill ' + (x.channel === 'email' ? 'blue' : 'green') + ' tiny">' + (x.channel || '—') + '</span></td>' +
             '<td class="tiny">' + to + (x.recipients > 1 ? ' <span class="muted">(' + x.recipients + ')</span>' : '') + '</td>' +
             '<td class="tiny">' + String(desc).slice(0, 70) + '</td>' +
-            '<td><span class="pill ' + statusCls + ' tiny">' + (x.status || '—') + '</span></td></tr>';
+            '<td><span class="pill ' + statusCls + ' tiny">' + (st || '—') + '</span></td></tr>';
         }
       });
     }

@@ -914,7 +914,8 @@ app.get('/api/whatsapp/health', async (req, res) => {
 /* classify a comms-server result into sent / mock / failed for the log */
 function waStatus(json) {
   if (!json || json.ok === false) return 'failed';
-  if (json.testMode || json.provider === 'mock') return 'mock';
+  if (json.provider === 'mock') return 'mock';   // no live gateway configured
+  if (json.testMode) return 'test';              // real send, redirected to the test recipient(s)
   return 'sent';
 }
 
