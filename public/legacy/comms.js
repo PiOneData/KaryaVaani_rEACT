@@ -40,13 +40,15 @@
     cleanNumber: cleanNumber,
 
     /* send(to, message)  — `to` may be a string, a number, or an array of either */
-    send: function (to, message) {
+    send: function (to, message, lang) {
       var list = Array.isArray(to) ? to : [to];
       var recipients = list.map(cleanNumber).filter(function (n) { return n; });
       if (!recipients.length || !message) {
         return Promise.resolve({ ok: false, error: 'missing recipient or message' });
       }
-      return post('/api/whatsapp/send', { to: recipients, message: message })
+      var payload = { to: recipients, message: message };
+      if (lang) payload.lang = lang;   /* per-language test-recipient routing */
+      return post('/api/whatsapp/send', payload)
         .catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
     },
 

@@ -23,15 +23,19 @@ const router = express.Router();
    sent to ALL of those numbers so nothing reaches real recipients.
    Returns the array of numbers to actually send to. */
 function testActive() { return !!(config.testRecipients && config.testRecipients.length); }
-function resolveRecipients(requested) {
-  if (testActive()) {
-    const forced = config.testRecipients.map((n) => provider.normalize(n));
-    if (!forced.includes(provider.normalize(requested))) {
-      logger.warn(`[test-mode] redirecting ${requested} -> ${forced.join(', ')}`);
-    }
-    return forced;
+function resolveRecipients(requested, lang) {
+  if (!testActive()) return [requested];
+  const want = String(lang || '').toLowerCase();
+  /* untagged numbers always receive; a language-opted number receives only when
+     the message language matches (or when no language is supplied, e.g. a
+     transactional send → everyone gets it). Never send to nobody. */
+  let list = config.testRecipients.filter((r) => !r.lang || !want || r.lang === want);
+  if (!list.length) list = config.testRecipients;
+  const forced = list.map((r) => provider.normalize(r.number));
+  if (!forced.includes(provider.normalize(requested))) {
+    logger.warn(`[test-mode] redirecting ${requested}${want ? ' (' + want + ')' : ''} -> ${forced.join(', ')}`);
   }
-  return [requested];
+  return forced;
 }
 
 /* Human-readable log line for a template send: the template name followed by
@@ -103,7 +107,7 @@ router.post('/webhook', (req, res) => {
 
 /* POST /send  Body: { to: string|string[], message: string } */
 router.post('/send', requireApiKey, async (req, res) => {
-  const { to, message, body } = req.body || {};
+  const { to, message, body, lang } = req.body || {};
   const text = message != null ? message : body;
   const recipients = Array.isArray(to) ? to : to != null ? [to] : [];
   if (!recipients.length || !text) {
@@ -112,7 +116,7 @@ router.post('/send', requireApiKey, async (req, res) => {
 
   const results = [];
   for (const requested of recipients) {
-    for (const recipient of resolveRecipients(requested)) {
+    for (const recipient of resolveRecipients(requested, lang)) {
       try {
         const r = await provider.sendText({ to: recipient, body: text });
         store.add({
@@ -146,14 +150,14 @@ router.post('/send', requireApiKey, async (req, res) => {
 
 /* POST /send-template  Body: { to, template, language?, components? } */
 router.post('/send-template', requireApiKey, async (req, res) => {
-  const { to, template, language = 'en', components } = req.body || {};
+  const { to, template, language = 'en', components, lang } = req.body || {};
   const recipients = Array.isArray(to) ? to : to != null ? [to] : [];
   if (!recipients.length || !template) {
     return res.status(400).json({ ok: false, error: '`to` and `template` are required' });
   }
   const results = [];
   for (const requested of recipients) {
-    for (const recipient of resolveRecipients(requested)) {
+    for (const recipient of resolveRecipients(requested, lang)) {
       try {
         const r = await provider.sendTemplate({ to: recipient, template, language, components });
         store.add({

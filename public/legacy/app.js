@@ -7128,7 +7128,7 @@ function __kvOnReady(fn) {
       const tr = VB_STATE.translations || {};
       workers.forEach(function (w) {
         const body = tr[w.lang] || VB_STATE.source || VB_STATE.subject || '';
-        if (w.phone && body) window.KVWhatsApp.send(w.phone, body);
+        if (w.phone && body) window.KVWhatsApp.send(w.phone, body, w.lang);
       });
     }
 
@@ -8693,8 +8693,8 @@ function __kvOnReady(fn) {
     CHAT_LIVE_STARTED = true;
     if (window.KVWhatsApp && typeof window.KVWhatsApp.send === 'function' && !window.KVWhatsApp.__kvLiveTracked) {
       const _send = window.KVWhatsApp.send.bind(window.KVWhatsApp);
-      window.KVWhatsApp.send = function (to, msg) {
-        return _send(to, msg).then(function (r) {
+      window.KVWhatsApp.send = function (to, msg, lang) {
+        return _send(to, msg, lang).then(function (r) {
           try { ((r && r.results) || []).forEach(function (x) { if (x && x.id) CHAT_LIVE_SEEN[x.id] = true; }); } catch (e) { /* ignore */ }
           return r;
         });

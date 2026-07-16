@@ -49,7 +49,7 @@ app.get('/health', (req, res) => {
     forwarding: !!config.forwardUrl,
     testMode: !!(config.testRecipients && config.testRecipients.length),
     testRecipient: config.testRecipient || null,
-    testRecipients: config.testRecipients || []
+    testRecipients: (config.testRecipients || []).map((r) => (r.lang ? r.number + ':' + r.lang : r.number))
   });
 });
 
@@ -61,7 +61,7 @@ app.listen(config.port, () => {
   logger.info(`comms-server listening on http://localhost:${config.port}`);
   logger.info(`active WhatsApp provider: ${provider.name}`);
   if (config.testRecipients && config.testRecipients.length) {
-    logger.warn(`TEST MODE: all outbound messages sent to ${config.testRecipients.join(', ')}`);
+    logger.warn(`TEST MODE: all outbound messages sent to ${config.testRecipients.map((r) => (r.lang ? r.number + ':' + r.lang : r.number)).join(', ')}`);
   }
   if (provider.name === 'mock' && config.provider === 'aoc') {
     logger.warn('AOC requested but credentials missing -- running in MOCK mode. Set AOC_API_KEY and AOC_FROM_ID to send real messages.');

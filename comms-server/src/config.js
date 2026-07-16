@@ -60,8 +60,13 @@ const config = {
      single number regardless of the requested recipient. Use during testing
      so nothing reaches real workers. Leave empty in production. */
   testRecipient: process.env.WHATSAPP_TEST_RECIPIENT || '',
-  /* comma-separated list — in test mode every outbound is sent to ALL of these */
-  testRecipients: (process.env.WHATSAPP_TEST_RECIPIENT || '').split(',').map((s) => s.trim()).filter(Boolean),
+  /* comma-separated list; in test mode every outbound is sent to these. An
+     optional ":<lang>" suffix opts a number into ONE language only (e.g.
+     "9880947594:ta" receives only Tamil sends); untagged numbers receive all. */
+  testRecipients: (process.env.WHATSAPP_TEST_RECIPIENT || '').split(',').map((s) => {
+    const parts = String(s).trim().split(':');
+    return { number: (parts[0] || '').trim(), lang: (parts[1] || '').trim().toLowerCase() };
+  }).filter((r) => r.number),
 
   verifySignature: bool(process.env.COMMS_VERIFY_SIGNATURE, false)
 };
