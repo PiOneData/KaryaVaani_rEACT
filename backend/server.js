@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 const { readStore, writeStore, initDb, dbPut, dbDel, dbClear } = require('./db');
 const { hashPassword, verifyPassword, DEMO_ACCOUNTS } = require('./auth');
 
@@ -950,6 +951,121 @@ app.post('/api/whatsapp/send-template', async (req, res) => {
   } catch (err) {
     logComm({ channel: 'whatsapp', kind: 'template', to: recips, recipients: recips.length, template: body.template, status: 'failed', error: err.message });
     res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
+  }
+});
+
+/* ── WhatsApp voice notes (Vaani chat) ──────────────────────────────────────
+   Send a synthesized voice note over WhatsApp. WhatsApp only accepts audio
+   messages that it can fetch from a public HTTPS URL, and only in a supported
+   format (WAV is rejected — a true voice note is OGG/Opus). So the pipeline is:
+   translate → TTS (WAV) → transcode to OGG/Opus (ffmpeg) → cache + host at a
+   public /api/voice/<hash> URL → hand that link to the comms /send-audio route.
+
+   NOTE (WhatsApp policy): audio cannot be a template header, so a voice note is
+   only deliverable inside the recipient's 24h customer-service window — i.e. the
+   recipient must have messaged the business number in the last 24h. This is a
+   CHAT feature; the Vaani broadcast channel uses email with voice attachments. */
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://karyavaani.pionedata.com').replace(/\/$/, '');
+
+/* Transcode a PCM WAV buffer to mono OGG/Opus (the WhatsApp voice-note format)
+   using the ffmpeg binary bundled in the backend image. */
+function transcodeToOpus(wavBuf) {
+  return new Promise((resolve, reject) => {
+    let ff;
+    try {
+      ff = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'wav', '-i', 'pipe:0',
+        '-ac', '1', '-c:a', 'libopus', '-b:a', '32k', '-application', 'voip', '-f', 'ogg', 'pipe:1']);
+    } catch (e) { return reject(e); }
+    const out = [], err = [];
+    ff.stdout.on('data', (d) => out.push(d));
+    ff.stderr.on('data', (d) => err.push(d));
+    ff.on('error', reject);
+    ff.on('close', (code) => code === 0
+      ? resolve(Buffer.concat(out))
+      : reject(new Error('ffmpeg exit ' + code + ': ' + Buffer.concat(err).toString().slice(0, 200))));
+    ff.stdin.on('error', () => {});
+    ff.stdin.write(wavBuf);
+    ff.stdin.end();
+  });
+}
+
+/* Synthesize a WAV clip for `text` in `lang` using the chosen engine, reusing
+   the same translate + TTS pipeline as /api/translate and /api/tts. Returns the
+   WAV buffer plus the final (native-script) text that was actually spoken. */
+async function synthVoiceWav(text, lang, provider) {
+  const useSarvam = provider === 'sarvam' && !!SARVAM_API_KEY;
+  const code = String(lang || 'EN').toUpperCase();
+  let finalText = String(text || '');
+  if (code && code !== 'EN' && code !== 'ENG_LATN') {
+    finalText = useSarvam
+      ? await sarvamTranslateFull(text, 'EN', code)
+      : await translateFull(text, toNllb('eng_Latn'), toNllb(code));
+    if (!finalText || !finalText.trim()) finalText = String(text || '');
+  }
+  let wav;
+  if (useSarvam) {
+    wav = await sarvamTts(finalText, code);
+  } else {
+    /* reuse a pre-warmed / previously synthesized WAV for this exact text
+       (the boot-time prewarm caches under ttsHash(translatedText)) — makes a
+       voice note for a known broadcast template instant. */
+    const cached = voiceCacheGet(ttsHash(finalText));
+    if (cached && cached.audio && String(cached.contentType || '').includes('wav')) {
+      wav = Buffer.from(cached.audio, 'base64');
+    } else {
+      const resp = await fetch(TTS_API_URL + '/tts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: finalText })
+      });
+      if (!resp.ok) throw new Error('tts service ' + resp.status);
+      wav = Buffer.from(await resp.arrayBuffer());
+    }
+  }
+  return { wav, finalText };
+}
+
+/* Public GET so WhatsApp/AOC can fetch a synthesized voice note by hash. No
+   auth — the URL holds an opaque content hash and only serves cached audio. */
+app.get('/api/voice/:id', (req, res) => {
+  const hash = String(req.params.id || '').replace(/\.(ogg|opus|mp3|wav)$/i, '');
+  const hit = voiceCacheGet(hash);
+  if (!hit || !hit.audio) return res.status(404).json({ ok: false, error: 'voice not found' });
+  res.set('Content-Type', hit.contentType || 'audio/ogg');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(hit.audio, 'base64'));
+});
+
+/* POST /api/whatsapp/send-voice  Body: { to, text, lang?, provider?, caption? }
+   Translate → synthesize → transcode → host → send over WhatsApp as audio. */
+app.post('/api/whatsapp/send-voice', async (req, res) => {
+  const { to, text, lang, provider: prov, caption } = req.body || {};
+  const recips = Array.isArray(to) ? to : (to ? [to] : []);
+  if (!recips.length || !text) {
+    return res.status(400).json({ ok: false, error: '`to` and `text` are required' });
+  }
+  try {
+    const { wav, finalText } = await synthVoiceWav(text, lang, prov);
+    let audio, contentType;
+    try {
+      audio = await transcodeToOpus(wav);
+      contentType = 'audio/ogg';
+    } catch (e) {
+      console.error('opus transcode failed, hosting WAV fallback:', e.message);
+      audio = wav; contentType = 'audio/wav';   // still served; WhatsApp may reject WAV
+    }
+    const ext = contentType === 'audio/ogg' ? 'ogg' : 'wav';
+    const hash = ttsHash(finalText + '|wa-voice|' + ext);
+    voiceCachePut(hash, audio, contentType);
+    const link = PUBLIC_BASE_URL + '/api/voice/' + hash + '.' + ext;
+    const { status, json } = await commsFetch('/v1/whatsapp/send-audio', {
+      method: 'POST',
+      body: JSON.stringify({ to, link, lang, caption: caption || finalText.slice(0, 60) })
+    });
+    logComm({ channel: 'whatsapp', kind: 'voice', to: recips, recipients: recips.length, preview: finalText.slice(0, 140), status: waStatus(json), provider: json && json.provider });
+    res.status(status).json({ ...json, link, text: finalText });
+  } catch (err) {
+    console.error('send-voice error:', err.message);
+    logComm({ channel: 'whatsapp', kind: 'voice', to: recips, recipients: recips.length, preview: String(text).slice(0, 140), status: 'failed', error: err.message });
+    res.status(502).json({ ok: false, error: 'voice send failed: ' + err.message });
   }
 });
 

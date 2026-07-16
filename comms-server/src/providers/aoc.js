@@ -101,6 +101,21 @@ async function sendText({ to, body }) {
   });
 }
 
+/* Free-form audio / voice note. WhatsApp fetches the media from a public HTTPS
+   `link` (must be a supported audio type — OGG/Opus for a true voice note, or
+   MP3/AAC for a plain audio file; WAV is NOT accepted). Like sendText this is a
+   session message: business-initiated audio is only deliverable inside the 24h
+   customer-service window — audio cannot be a template header, so there is no
+   business-initiated path for it. Meta-Cloud shape: type:'audio', audio:{link}. */
+async function sendAudio({ to, link }) {
+  return post({
+    from: toMsisdn(fromId),
+    to: toMsisdn(to),
+    type: 'audio',
+    audio: { link: String(link || '') }
+  });
+}
+
 /* Template send. `template` is the registered templateName; `components` may be
    Meta-style or AOC-style — body variables are extracted either way and sent in
    the AOC shape { components: { body: { params: [...] } } }. */
@@ -311,6 +326,7 @@ logger.info(
 module.exports = {
   name: 'aoc',
   sendText,
+  sendAudio,
   sendTemplate,
   verifyWebhook,
   verifyInbound,

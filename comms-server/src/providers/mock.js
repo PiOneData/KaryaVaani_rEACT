@@ -26,6 +26,11 @@ async function sendTemplate({ to, template, language = 'en', components }) {
   return { id: fakeId(), status: 'sent', provider: 'mock', raw: { to: normalize(to), template, language, components } };
 }
 
+async function sendAudio({ to, link }) {
+  logger.info(`[mock][whatsapp][audio] -> ${normalize(to)} :: ${String(link || '').slice(0, 120)}`);
+  return { id: fakeId(), status: 'sent', provider: 'mock', raw: { to: normalize(to), link } };
+}
+
 function verifyWebhook({ mode, token, challenge }) {
   if (mode === 'subscribe' && token === config.meta.verifyToken) return challenge;
   return null;
@@ -67,6 +72,7 @@ logger.info('WhatsApp provider: mock (no live credentials — messages are logge
 module.exports = {
   name: 'mock',
   sendText,
+  sendAudio,
   sendTemplate,
   verifyWebhook,
   verifySignature,

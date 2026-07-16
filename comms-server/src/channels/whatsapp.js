@@ -188,6 +188,54 @@ router.post('/send-template', requireApiKey, async (req, res) => {
   });
 });
 
+/* POST /send-audio  Body: { to, link, lang?, caption? }
+   Send a voice note / audio file. `link` must be a public HTTPS URL to a
+   WhatsApp-supported audio type (OGG/Opus voice note or MP3/AAC). Audio is a
+   session message — only deliverable inside the recipient's 24h window (audio
+   cannot be a template), so this is used from the Vaani CHAT, not broadcast. */
+router.post('/send-audio', requireApiKey, async (req, res) => {
+  const { to, link, lang, caption } = req.body || {};
+  const recipients = Array.isArray(to) ? to : to != null ? [to] : [];
+  if (!recipients.length || !link) {
+    return res.status(400).json({ ok: false, error: '`to` and `link` are required' });
+  }
+  if (typeof provider.sendAudio !== 'function') {
+    return res.status(501).json({ ok: false, error: `audio send not supported by provider ${provider.name}` });
+  }
+  const results = [];
+  for (const requested of recipients) {
+    for (const recipient of resolveRecipients(requested, lang)) {
+      try {
+        const r = await provider.sendAudio({ to: recipient, link });
+        store.add({
+          channel: 'whatsapp',
+          direction: 'out',
+          provider: r.provider,
+          messageId: r.id,
+          to: provider.normalize(recipient),
+          intendedFor: testActive() ? provider.normalize(requested) : undefined,
+          type: 'audio',
+          text: caption ? `🎧 ${caption}` : '🎧 [voice note]',
+          status: r.status
+        });
+        results.push({ to: recipient, intendedFor: requested, ok: true, id: r.id, provider: r.provider });
+      } catch (err) {
+        logger.error('send-audio error:', err.message);
+        results.push({ to: recipient, intendedFor: requested, ok: false, error: err.message });
+      }
+    }
+  }
+  const okCount = results.filter((r) => r.ok).length;
+  res.status(okCount ? 200 : 502).json({
+    ok: okCount > 0,
+    provider: provider.name,
+    testMode: testActive(),
+    sent: okCount,
+    failed: results.length - okCount,
+    results
+  });
+});
+
 /* ---- read log ---------------------------------------------------------- */
 
 /* GET /messages?since=&direction=&to=&from=&limit= */

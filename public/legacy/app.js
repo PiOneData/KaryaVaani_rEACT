@@ -8367,8 +8367,49 @@ function __kvOnReady(fn) {
         '<button class="cv-qsd-btn primary" onclick="cvQSendNow(\'' + q.preset + '\')">Send now to all workers</button>' +
         '<button class="cv-qsd-btn" onclick="cvQSendToActive(\'' + q.preset + '\')">Send to current worker only</button>' +
         '<button class="cv-qsd-btn" onclick="cvQClose()">Cancel</button>' +
+      '</div>' +
+      /* Voice note over WhatsApp: translate this broadcast to the chosen
+         language, synthesize speech, and send it as an audio message to the
+         WhatsApp test recipients (test mode redirects to the configured
+         numbers; language routing applies). */
+      '<div class="cv-qsd-acts" style="margin-top:8px;border-top:1px dashed var(--kv-border,#e2e8f0);padding-top:10px">' +
+        '<span style="font-size:12px;color:var(--kv-muted,#64748b);align-self:center">🎧 Voice note on WhatsApp:</span>' +
+        '<select id="cv-qsd-vlang" class="cv-qsd-sel" style="padding:6px 8px;border:1px solid var(--kv-border,#cbd5e1);border-radius:6px;font-size:13px">' +
+          VB_LANGS.map(function (l) { return '<option value="' + l.code + '"' + (l.code === 'TE' ? ' selected' : '') + '>' + l.name + '</option>'; }).join('') +
+        '</select>' +
+        '<button class="cv-qsd-btn" id="cv-qsd-vbtn" onclick="cvQSendVoice(\'' + q.preset + '\')">Send voice note to test recipients</button>' +
       '</div>';
   }
+
+  /* Translate the broadcast body to the chosen language, synthesize a voice
+     note, and send it over WhatsApp (audio message) to the test recipients.
+     The backend does translate → TTS → OGG/Opus transcode → host → send. */
+  function cvQSendVoice(preset) {
+    var body = chatEn(preset);
+    if (!body) { if (typeof toast === 'function') toast('No template body to voice', 'red'); return; }
+    var sel = document.getElementById('cv-qsd-vlang');
+    var code = (sel && sel.value) || 'TE';
+    var lang = String(code).toLowerCase();
+    var btn = document.getElementById('cv-qsd-vbtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Synthesizing & sending…'; }
+    if (typeof toast === 'function') toast('Synthesizing ' + code + ' voice note & sending on WhatsApp…', 'blue');
+    fetch('/api/whatsapp/send-voice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      /* `to` is nominal — test mode redirects to the configured test recipients */
+      body: JSON.stringify({ to: '919500200300', text: body, lang: lang, provider: 'local' })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send voice note to test recipients'; }
+      if (j && j.ok) {
+        if (typeof toast === 'function') toast('Voice note sent on WhatsApp → ' + (j.sent || 1) + ' recipient(s)' + (j.testMode ? ' (test)' : ''), 'green');
+      } else {
+        if (typeof toast === 'function') toast('Voice send failed: ' + ((j && j.error) || 'gateway error'), 'red');
+      }
+    }).catch(function (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send voice note to test recipients'; }
+      if (typeof toast === 'function') toast('Voice send failed: ' + e.message, 'red');
+    });
+  }
+  window.cvQSendVoice = cvQSendVoice;
 
   /* send a queued broadcast now — dispatch to every contact + remove from queue */
   function cvQSendNow(preset) {

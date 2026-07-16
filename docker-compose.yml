@@ -38,6 +38,9 @@ services:
       # WhatsApp gateway (standalone comms server, shared across apps)
       - COMMS_BASE_URL=http://comms-server:4100
       - COMMS_API_KEY=${COMMS_API_KEY:-change-me-shared-secret}
+      # Public origin the backend uses to build fetchable media URLs (voice
+      # notes) that WhatsApp/AOC download when sending audio messages.
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://karyavaani.pionedata.com}
       # Sarvam AI translation engine (optional alternative to the self-hosted
       # IndicTrans2 model). Blank key = the Sarvam option falls back to our model.
       - SARVAM_API_URL=${SARVAM_API_URL:-https://api.sarvam.ai}
