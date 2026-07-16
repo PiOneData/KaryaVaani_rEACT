@@ -8395,8 +8395,10 @@ function __kvOnReady(fn) {
     if (typeof toast === 'function') toast('Synthesizing ' + code + ' voice note & sending on WhatsApp…', 'blue');
     fetch('/api/whatsapp/send-voice', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      /* `to` is nominal — test mode redirects to the configured test recipients */
-      body: JSON.stringify({ to: '919500200300', text: body, lang: lang, provider: 'local' })
+      /* `to` is nominal — test mode redirects to the configured test recipients.
+         Sarvam (bulbul:v3) is the voice engine: reliable Indic TTS + code-mixed
+         translation; the self-hosted MMS-TTS endpoint is the fallback only. */
+      body: JSON.stringify({ to: '919500200300', text: body, lang: lang, provider: 'sarvam' })
     }).then(function (r) { return r.json(); }).then(function (j) {
       if (btn) { btn.disabled = false; btn.textContent = 'Send voice note to test recipients'; }
       if (j && j.ok) {
