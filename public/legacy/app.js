@@ -7122,16 +7122,10 @@ function __kvOnReady(fn) {
 
     const workers = res.workers;
 
-    /* real WhatsApp fan-out via the communication gateway — each worker gets
-       the message in their own language when a translation is available */
-    if (window.KVWhatsApp) {
-      const tr = VB_STATE.translations || {};
-      workers.forEach(function (w) {
-        const body = tr[w.lang] || VB_STATE.source || VB_STATE.subject || '';
-        if (w.phone && body) window.KVWhatsApp.send(w.phone, body, w.lang);
-      });
-    }
-
+    /* The Vaani broadcast channel delivers via EMAIL with voice attachments
+       (the "Send via email" action → /api/send-email). WhatsApp is not a
+       broadcast channel — it is handled in the Vaani chat. So no WhatsApp
+       fan-out happens here. */
     workers.forEach(function (w, idx) {
       const row = VB_STATE.rows.find(function (r) { return r.id === w.id; });
       setTimeout(function () { row.stage = 'sending'; vbRenderBroadcastRows(); }, 250 + idx * 420);
