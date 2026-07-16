@@ -8378,8 +8378,31 @@ function __kvOnReady(fn) {
           VB_LANGS.map(function (l) { return '<option value="' + l.code + '"' + (l.code === 'TE' ? ' selected' : '') + '>' + l.name + '</option>'; }).join('') +
         '</select>' +
         '<button class="cv-qsd-btn" id="cv-qsd-vbtn" onclick="cvQSendVoice(\'' + q.preset + '\')">Send voice note to test recipients</button>' +
+        '<button class="cv-qsd-btn" id="cv-qsd-vtbtn" onclick="cvQSendVoiceWithTemplate(\'' + q.preset + '\')">+ approved template (trial)</button>' +
       '</div>';
   }
+
+  /* Send the Meta-approved 'trial' template (business-initiated) AND the
+     session voice note together to the test recipients. The template needs no
+     session window; the voice note delivers inside the recipient's 24h window
+     (a voice note is a session message — it is NOT itself template-approved). */
+  function cvQSendVoiceWithTemplate(preset) {
+    var demoNumber = '919500200300';
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+    var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
+    var params = ['TE2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
+    if (window.KVWhatsApp && typeof window.KVWhatsApp.sendApprovedTemplate === 'function') {
+      window.KVWhatsApp.sendApprovedTemplate(demoNumber, params).then(function (res) {
+        if (typeof toast === 'function') {
+          if (res && res.ok) toast('Approved template "trial" sent', 'green');
+          else toast('Template send failed: ' + ((res && res.error) || 'gateway'), 'red');
+        }
+      }).catch(function () { if (typeof toast === 'function') toast('Template send failed', 'red'); });
+    }
+    cvQSendVoice(preset);
+  }
+  window.cvQSendVoiceWithTemplate = cvQSendVoiceWithTemplate;
 
   /* Translate the broadcast body to the chosen language, synthesize a voice
      note, and send it over WhatsApp (audio message) to the test recipients.
