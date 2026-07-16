@@ -133,11 +133,25 @@ jobs:
             EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
             ENVEOF
 
+            # Reclaim disk from previous deploys before building — many redeploys
+            # accumulate dangling images + build cache and can fill the server
+            # disk ("no space left on device"). NEVER prune volumes: the Postgres
+            # data lives in the named volume postgres_data and must survive.
+            docker image prune -f || true
+            docker builder prune -f || true
+
             # Build images from the freshly pulled source instead of pulling
             # the registry tag. This guarantees the running containers reflect
             # the latest committed code, even if the CI build/push step lagged
             # or the :latest tag is stale. --pull refreshes the base images.
             docker compose build --pull
-            docker compose up -d --force-recreate
+
+            # Recreate from a clean state. A previous interrupted --force-recreate
+            # can leave a stale/renamed container (e.g. "<hash>_karyavaani-comms"),
+            # which makes "up --force-recreate" fail with "No such container".
+            # `down` clears the project's containers + network; the named volume
+            # postgres_data (the DB) is preserved. Then `up` starts fresh.
+            docker compose down --remove-orphans || true
+            docker compose up -d
 
             echo "Deployment completed"
