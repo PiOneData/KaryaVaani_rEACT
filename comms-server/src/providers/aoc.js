@@ -194,9 +194,11 @@ function pushStatus(out, s) {
       (s.conversation && s.conversation.id) || s.conversationId || s.conversation_id || null,
     category: (s.pricing && s.pricing.category) || s.category || null,
     error:
+      (s.error && (s.error.title || s.error.message || (s.error.code != null ? 'error ' + s.error.code : null))) ||
       (Array.isArray(s.errors) && s.errors[0] && (s.errors[0].title || s.errors[0].message)) ||
       s.reason ||
       undefined,
+    errorCode: (s.error && s.error.code) || (Array.isArray(s.errors) && s.errors[0] && s.errors[0].code) || undefined,
     timestamp: s.timestamp || s.time || null,
     raw: s
   });
@@ -289,6 +291,23 @@ function parseWebhook(body) {
     /* Bare `value` object (some relays strip the envelope) */
     if (Array.isArray(item.messages) || Array.isArray(item.statuses)) {
       parseValue(item, null, out);
+      continue;
+    }
+    /* AOC single STATUS-event shape: `statuses` is an OBJECT carrying the REAL
+       delivery status + error (delivered/sent/read/failed{code,title}). The
+       top-level `status` is only the event name ("message_status"), so the true
+       state must be unwrapped from here or it is lost. */
+    if (item.statuses && typeof item.statuses === 'object' && !Array.isArray(item.statuses)) {
+      const st = item.statuses;
+      pushStatus(out, {
+        id: item.messageId,
+        to: st.recipient || st.recipient_id || st.to || item.to || '',
+        status: st.status || item.status || item.event,
+        error: st.error,
+        category: st.category,
+        conversationId: st.conversationId,
+        timestamp: st.timestamp || item.timestamp
+      });
       continue;
     }
     /* AOC single-event shape: `messages`/`contacts` are OBJECTS (not arrays). */

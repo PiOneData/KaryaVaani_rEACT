@@ -8114,7 +8114,9 @@ function __kvOnReady(fn) {
       actionRow +
       '<div class="cv-bub-foot">' +
         '<span class="cv-bub-time">' + (m.time || '') + '</span>' +
-        '<span class="cv-bub-tick ' + tickCls + '">✓✓</span>' +
+        (m.failed
+          ? '<span class="cv-bub-tick" style="color:#C9372C;font-weight:600" title="' + (m.failReason || 'not delivered') + (m.failCode ? ' (' + m.failCode + ')' : '') + '">✗ Not delivered' + (m.failCode === 131047 ? ' · outside 24h window' : '') + '</span>'
+          : '<span class="cv-bub-tick ' + tickCls + '">✓✓</span>') +
       '</div>' +
     '</div></div>';
   }
@@ -8657,19 +8659,35 @@ function __kvOnReady(fn) {
     let changed = false;
 
     items.forEach(function (m) {
-      const mid = m.messageId || ('seq-' + m.seq);
+      /* Status callbacks share the originating message's id, so they must NOT
+         dedupe against the sent bubble — key them separately (per status value)
+         so each transition (sent → delivered → read, or → failed) applies once. */
+      const mid = m.direction === 'status'
+        ? ('status-' + (m.messageId || m.seq) + '-' + (m.status || ''))
+        : (m.messageId || ('seq-' + m.seq));
       if (!mid || CHAT_LIVE_SEEN[mid]) return;
 
-      /* delivery status callback → mark the originating message read */
+      /* delivery status callback → update the originating message's delivery
+         state (delivered/read → tick; failed/undelivered → surface the reason,
+         e.g. WhatsApp 131047 "Re-engagement message" = sent outside the 24h
+         session window). */
       if (m.direction === 'status') {
-        if (m.status === 'read' || m.status === 'delivered') {
-          const tgt = m.messageId;
-          Object.keys(CHAT_THREADS).some(function (wid) {
-            const hit = (CHAT_THREADS[wid].msgs || []).find(function (x) { return x.msgId === tgt; });
-            if (hit && hit.dir === 'in') { hit.read = true; changed = true; return true; }
-            return false;
-          });
-        }
+        const tgt = m.messageId;
+        Object.keys(CHAT_THREADS).some(function (wid) {
+          const hit = (CHAT_THREADS[wid].msgs || []).find(function (x) { return x.msgId === tgt; });
+          if (!hit) return false;
+          if (m.status === 'read' || m.status === 'delivered') {
+            hit.read = true; hit.delivered = true; hit.failed = false; changed = true;
+          } else if (m.status === 'failed' || m.status === 'undelivered' || m.status === 'expired') {
+            hit.failed = true;
+            hit.failReason = m.error || 'not delivered';
+            hit.failCode = m.errorCode || null;
+            changed = true;
+          } else if (m.status === 'sent' && !hit.delivered) {
+            hit.sentAck = true; changed = true;
+          }
+          return true;
+        });
         CHAT_LIVE_SEEN[mid] = true;
         return;
       }
