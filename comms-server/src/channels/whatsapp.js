@@ -19,18 +19,19 @@ const { requireApiKey } = require('./../auth');
 
 const router = express.Router();
 
-/* TEST SAFETY VALVE: if config.testRecipient is set, every outbound message
-   is redirected to that single number so nothing reaches real recipients.
-   Returns the number actually used; logs when a redirect happens. */
-function resolveRecipient(requested) {
-  if (config.testRecipient) {
-    const forced = provider.normalize(config.testRecipient);
-    if (provider.normalize(requested) !== forced) {
-      logger.warn(`[test-mode] redirecting ${requested} -> ${forced}`);
+/* TEST SAFETY VALVE: if config.testRecipients is set, every outbound message is
+   sent to ALL of those numbers so nothing reaches real recipients.
+   Returns the array of numbers to actually send to. */
+function testActive() { return !!(config.testRecipients && config.testRecipients.length); }
+function resolveRecipients(requested) {
+  if (testActive()) {
+    const forced = config.testRecipients.map((n) => provider.normalize(n));
+    if (!forced.includes(provider.normalize(requested))) {
+      logger.warn(`[test-mode] redirecting ${requested} -> ${forced.join(', ')}`);
     }
     return forced;
   }
-  return requested;
+  return [requested];
 }
 
 /* Human-readable log line for a template send: the template name followed by
@@ -111,23 +112,24 @@ router.post('/send', requireApiKey, async (req, res) => {
 
   const results = [];
   for (const requested of recipients) {
-    const recipient = resolveRecipient(requested);
-    try {
-      const r = await provider.sendText({ to: recipient, body: text });
-      store.add({
-        channel: 'whatsapp',
-        direction: 'out',
-        provider: r.provider,
-        messageId: r.id,
-        to: provider.normalize(recipient),
-        intendedFor: config.testRecipient ? provider.normalize(requested) : undefined,
-        text,
-        status: r.status
-      });
-      results.push({ to: recipient, intendedFor: requested, ok: true, id: r.id, provider: r.provider });
-    } catch (err) {
-      logger.error('send error:', err.message);
-      results.push({ to: recipient, intendedFor: requested, ok: false, error: err.message });
+    for (const recipient of resolveRecipients(requested)) {
+      try {
+        const r = await provider.sendText({ to: recipient, body: text });
+        store.add({
+          channel: 'whatsapp',
+          direction: 'out',
+          provider: r.provider,
+          messageId: r.id,
+          to: provider.normalize(recipient),
+          intendedFor: testActive() ? provider.normalize(requested) : undefined,
+          text,
+          status: r.status
+        });
+        results.push({ to: recipient, intendedFor: requested, ok: true, id: r.id, provider: r.provider });
+      } catch (err) {
+        logger.error('send error:', err.message);
+        results.push({ to: recipient, intendedFor: requested, ok: false, error: err.message });
+      }
     }
   }
 
@@ -135,7 +137,7 @@ router.post('/send', requireApiKey, async (req, res) => {
   res.status(okCount ? 200 : 502).json({
     ok: okCount > 0,
     provider: provider.name,
-    testMode: !!config.testRecipient,
+    testMode: testActive(),
     sent: okCount,
     failed: results.length - okCount,
     results
@@ -151,30 +153,31 @@ router.post('/send-template', requireApiKey, async (req, res) => {
   }
   const results = [];
   for (const requested of recipients) {
-    const recipient = resolveRecipient(requested);
-    try {
-      const r = await provider.sendTemplate({ to: recipient, template, language, components });
-      store.add({
-        channel: 'whatsapp',
-        direction: 'out',
-        provider: r.provider,
-        messageId: r.id,
-        to: provider.normalize(recipient),
-        intendedFor: config.testRecipient ? provider.normalize(requested) : undefined,
-        text: templateLogText(template, components),
-        status: r.status
-      });
-      results.push({ to: recipient, intendedFor: requested, ok: true, id: r.id, provider: r.provider });
-    } catch (err) {
-      logger.error('send-template error:', err.message);
-      results.push({ to: recipient, intendedFor: requested, ok: false, error: err.message });
+    for (const recipient of resolveRecipients(requested)) {
+      try {
+        const r = await provider.sendTemplate({ to: recipient, template, language, components });
+        store.add({
+          channel: 'whatsapp',
+          direction: 'out',
+          provider: r.provider,
+          messageId: r.id,
+          to: provider.normalize(recipient),
+          intendedFor: testActive() ? provider.normalize(requested) : undefined,
+          text: templateLogText(template, components),
+          status: r.status
+        });
+        results.push({ to: recipient, intendedFor: requested, ok: true, id: r.id, provider: r.provider });
+      } catch (err) {
+        logger.error('send-template error:', err.message);
+        results.push({ to: recipient, intendedFor: requested, ok: false, error: err.message });
+      }
     }
   }
   const okCount = results.filter((r) => r.ok).length;
   res.status(okCount ? 200 : 502).json({
     ok: okCount > 0,
     provider: provider.name,
-    testMode: !!config.testRecipient,
+    testMode: testActive(),
     sent: okCount,
     failed: results.length - okCount,
     results

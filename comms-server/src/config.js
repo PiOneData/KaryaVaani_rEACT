@@ -60,6 +60,8 @@ const config = {
      single number regardless of the requested recipient. Use during testing
      so nothing reaches real workers. Leave empty in production. */
   testRecipient: process.env.WHATSAPP_TEST_RECIPIENT || '',
+  /* comma-separated list — in test mode every outbound is sent to ALL of these */
+  testRecipients: (process.env.WHATSAPP_TEST_RECIPIENT || '').split(',').map((s) => s.trim()).filter(Boolean),
 
   verifySignature: bool(process.env.COMMS_VERIFY_SIGNATURE, false)
 };
