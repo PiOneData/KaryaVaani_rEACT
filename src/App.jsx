@@ -55,18 +55,40 @@ function AuthedApp({ user, onLogout }) {
   // role-application (kvApplyRole) can lock a worker/contractor into their home.
   window.__KVUSER = user;
   useLegacyApp();
+  // Hold a loading overlay until the legacy layer has applied the role and
+  // navigated to the correct home — otherwise the default dashboard flashes
+  // for a moment before a contractor/worker view takes over.
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     window.__KVUSER = user;
-    let tries = 0;
+    let tries = 0, done = false;
+    const finish = () => { if (!done) { done = true; setReady(true); } };
     const apply = () => {
-      if (window.kvApplyRole && window.__kvLegacyReady) { try { window.kvApplyRole(user); } catch (e) { /* keep app rendering */ } }
-      else if (tries++ < 150) { setTimeout(apply, 60); }
+      if (done) return;
+      if (window.kvApplyRole && window.__kvLegacyReady) {
+        try { window.kvApplyRole(user); } catch (e) { /* keep app rendering */ }
+        // give the DOM a beat to settle on the target view before revealing
+        setTimeout(finish, 120);
+      } else if (tries++ < 150) { setTimeout(apply, 60); }
+      else { finish(); }
     };
     apply();
+    return () => { done = true; };
   }, [user]);
 
   return (
     <>
+      {!ready && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '18px', background: '#f6f7fb', color: '#334155' }}>
+          <style>{'@keyframes kvspin{to{transform:rotate(360deg)}}'}</style>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', border: '4px solid #e2e8f0',
+            borderTopColor: '#2563eb', animation: 'kvspin 0.8s linear infinite' }} />
+          <div style={{ fontSize: '0.95rem', letterSpacing: '0.02em', fontWeight: 600 }}>
+            Loading your Karya Vaani workspace…
+          </div>
+        </div>
+      )}
       {/*  ════ TOP BAR ════  */}
       <TopBar user={user} onLogout={onLogout} />
       {/*  ════ TOP NAV BAR ════  */}

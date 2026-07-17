@@ -3929,44 +3929,50 @@ function __kvOnReady(fn) {
   }
 
   function renderCtPaneComms(c) {
-    /* mock communications log */
+    const base = 884000 + parseInt(c.id.slice(-3));
+    const lead = c.complianceLead.split(' ·')[0];
+    /* communications log (paginated + searchable) */
     const comms = [
-      { ts: '23 Apr 2026 · 16:42 IST', dir: 'OUT', channel: 'Email', who: 'HR · Priya M.',
-        subject: c.esic.state === 'breach' ? '[URGENT] ESIC challan shortfall — May 2026' : 'Routine compliance check-in',
-        ref: 'PV-COMM-' + (884000 + parseInt(c.id.slice(-3))) },
-      { ts: '21 Apr 2026 · 11:08 IST', dir: 'IN',  channel: 'Portal', who: c.complianceLead.split(' ·')[0],
-        subject: 'Acknowledgement · CLRA renewal pack received',
-        ref: 'PV-COMM-' + (884000 + parseInt(c.id.slice(-3)) - 1) },
-      { ts: '19 Apr 2026 · 09:30 IST', dir: 'OUT', channel: 'Email', who: 'system · Karya Vaani',
-        subject: 'Auto-reminder · CLRA renewal due in 30 days',
-        ref: 'PV-COMM-' + (884000 + parseInt(c.id.slice(-3)) - 2) },
-      { ts: '15 Apr 2026 · 14:15 IST', dir: 'IN',  channel: 'Email', who: c.complianceLead.split(' ·')[0],
-        subject: 'May deployment plan · headcount confirmation',
-        ref: 'PV-COMM-' + (884000 + parseInt(c.id.slice(-3)) - 3) },
-      { ts: '10 Apr 2026 · 10:00 IST', dir: 'OUT', channel: 'WhatsApp', who: 'HR · Priya M.',
-        subject: 'Monthly check-in · please confirm wages have been credited',
-        ref: 'PV-COMM-' + (884000 + parseInt(c.id.slice(-3)) - 4) },
+      { ts: '23 Apr 2026 · 16:42 IST', dir: 'OUT', channel: 'Email', who: 'HR · Priya M.', subject: c.esic.state === 'breach' ? '[URGENT] ESIC challan shortfall — May 2026' : 'Routine compliance check-in', ref: 'PV-COMM-' + base },
+      { ts: '21 Apr 2026 · 11:08 IST', dir: 'IN', channel: 'Portal', who: lead, subject: 'Acknowledgement · CLRA renewal pack received', ref: 'PV-COMM-' + (base - 1) },
+      { ts: '19 Apr 2026 · 09:30 IST', dir: 'OUT', channel: 'Email', who: 'system · Karya Vaani', subject: 'Auto-reminder · CLRA renewal due in 30 days', ref: 'PV-COMM-' + (base - 2) },
+      { ts: '15 Apr 2026 · 14:15 IST', dir: 'IN', channel: 'Email', who: lead, subject: 'May deployment plan · headcount confirmation', ref: 'PV-COMM-' + (base - 3) },
+      { ts: '10 Apr 2026 · 10:00 IST', dir: 'OUT', channel: 'WhatsApp', who: 'HR · Priya M.', subject: 'Monthly check-in · please confirm wages have been credited', ref: 'PV-COMM-' + (base - 4) },
+      { ts: '06 Apr 2026 · 15:20 IST', dir: 'OUT', channel: 'Email', who: 'HR · Priya M.', subject: 'PF ECR filing reminder · March 2026', ref: 'PV-COMM-' + (base - 5) },
+      { ts: '02 Apr 2026 · 09:05 IST', dir: 'IN', channel: 'Portal', who: lead, subject: 'Minimum-wage revision acknowledgement', ref: 'PV-COMM-' + (base - 6) },
+      { ts: '28 Mar 2026 · 12:40 IST', dir: 'OUT', channel: 'Email', who: 'system · Karya Vaani', subject: 'Auto-reminder · ESIC contribution due', ref: 'PV-COMM-' + (base - 7) },
+      { ts: '24 Mar 2026 · 17:10 IST', dir: 'IN', channel: 'WhatsApp', who: lead, subject: 'Induction fitment appointment confirmed', ref: 'PV-COMM-' + (base - 8) },
+      { ts: '20 Mar 2026 · 10:30 IST', dir: 'OUT', channel: 'Email', who: 'HR · Priya M.', subject: 'Onboarding batch received · verification in progress', ref: 'PV-COMM-' + (base - 9) }
     ];
 
     let html = '';
     html += '<div class="card-h" style="padding:0;margin-bottom:10px">' +
-            '<div class="card-h-title" style="font-size:0.85rem">Recent communications · last 30 days</div>' +
-            '<div class="card-h-sub">Every email, portal action and WhatsApp message is logged · cross-references the vendor email feature</div></div>';
-    html += '<table class="t"><thead><tr><th>Time</th><th>Dir</th><th>Channel</th><th>Subject</th><th>Person</th><th>Ref</th></tr></thead><tbody>';
-    comms.forEach(m => {
-      html += '<tr><td class="mono tiny">' + m.ts + '</td>' +
-              '<td><span class="pill ' + (m.dir === 'OUT' ? 'blue' : 'outline') + ' tiny">' + m.dir + '</span></td>' +
-              '<td>' + m.channel + '</td>' +
-              '<td class="t-strong">' + m.subject + '</td>' +
-              '<td>' + m.who + '</td>' +
-              '<td class="mono tiny">' + m.ref + '</td></tr>';
-    });
-    html += '</tbody></table>';
+            '<div class="card-h-title" style="font-size:0.85rem">Recent communications</div>' +
+            '<div class="card-h-sub">Every email, portal action and WhatsApp message is logged · search + paginate below</div></div>';
+    html += '<div class="wk-search" style="margin-bottom:10px"><span class="wk-search-ico">⌕</span>' +
+            '<input type="text" id="ctcomm-search" class="wk-search-in" autocomplete="off" placeholder="Search communications — subject, channel, direction or person…"></div>';
+    html += '<table class="t"><thead><tr><th>Time</th><th>Dir</th><th>Channel</th><th>Subject</th><th>Person</th><th>Ref</th></tr></thead><tbody id="ctcomm-body"></tbody></table>';
+    html += '<div id="ctcomm-pagination" class="kv-pager"></div>';
     html += '<div style="margin-top:14px;display:flex;gap:8px">';
     html += '  <button class="btn primary" onclick="openVendorEmailFromContractor(\'' + c.id + '\')">+ New notification</button>';
     html += '  <button class="btn">Export to PDF</button>';
     html += '</div>';
     document.getElementById('ct-pane-comms').innerHTML = html;
+
+    if (typeof KVTABLE !== 'undefined') {
+      KVTABLE.set({
+        key: 'ctcomm', tbody: 'ctcomm-body', pageSize: 6, cols: 6, rows: comms,
+        text: function (m) { return m.ts + ' ' + m.dir + ' ' + m.channel + ' ' + m.subject + ' ' + m.who + ' ' + m.ref; },
+        row: function (m) {
+          return '<tr><td class="mono tiny">' + m.ts + '</td>' +
+            '<td><span class="pill ' + (m.dir === 'OUT' ? 'blue' : 'outline') + ' tiny">' + m.dir + '</span></td>' +
+            '<td>' + m.channel + '</td>' +
+            '<td class="t-strong">' + m.subject + '</td>' +
+            '<td>' + m.who + '</td>' +
+            '<td class="mono tiny">' + m.ref + '</td></tr>';
+        }
+      });
+    }
   }
 
   /* ── all-contractor task aggregation (bottom of page) ── */
@@ -4204,7 +4210,97 @@ function __kvOnReady(fn) {
         joinDate: ind ? ind.joinDate : '—',
       });
     });
+    /* onboarded employees who have entered induction (from the onboarding flow) */
+    obSyncInductionJoinees().forEach(function (j) { list.push(j); });
     return list;
+  }
+
+  /* Bridge onboarded captures that are in (or through) induction into the
+     induction module: synthesize the name-keyed IND_STATE / PPE_STATE /
+     language records the induction grid + drilldown read, and return joinee
+     rows. Idempotent — safe to call on every grid render. */
+  function obSyncInductionJoinees() {
+    var out = [];
+    if (typeof CAP_STATE === 'undefined') return out;
+    (CAP_STATE.recent || []).forEach(function (r, i) {
+      var stage = (typeof obJourneyStage === 'function') ? obJourneyStage(r) : 'imported';
+      if (stage !== 'induction' && stage !== 'complete') return;
+      var name = r.name;
+      var mods = (typeof obIndModules === 'function') ? obIndModules(r) : [];
+      var comp = r.inductionModules || {};
+      IND_STATE[name] = {
+        joinDate: r.inductionStart || 'onboarded',
+        track: r.type === 'contract' ? 'contract' : 'direct',
+        startedOn: r.inductionStart || null,
+        _cap: r, _ci: i,
+        inductionStart: r.inductionStart || null, inductionEnd: r.inductionEnd || null,
+        modules: mods.map(function (m) {
+          return { id: 'obm-' + m, label: m, mandatory: true, status: (comp[m] || stage === 'complete') ? 'done' : 'scheduled', completedOn: (comp[m] || stage === 'complete') ? 'done' : null };
+        })
+      };
+      var hasSizes = r.ppe && r.ppe.uniform && r.ppe.uniform !== '—' && r.ppe.shoe && r.ppe.shoe !== '—';
+      PPE_STATE[name] = { shoe: (r.ppe && r.ppe.shoe) || '—', uniform: (r.ppe && r.ppe.uniform) || '—', gloves: '—',
+        status: hasSizes ? 'confirmed' : 'missing', orderedOn: null, deliverBy: r.fitmentAppt || '—',
+        vendor: (r.employment && r.employment.contractor) || '—', receipt: null };
+      if (typeof WORKER_LANGUAGE !== 'undefined' && r.lang) WORKER_LANGUAGE[name] = r.lang;
+      out.push({
+        name: name,
+        type: r.type === 'contract' ? 'Contract' : 'Direct',
+        anchor: r.type === 'contract' ? ((r.category || '') + ' · ' + ((r.employment && r.employment.contractor) || '—')) : (r.designation || r.category || 'Worker'),
+        joinDate: r.inductionStart || 'onboarded'
+      });
+    });
+    return out;
+  }
+  /* helpers used by the induction drilldown for capture-backed joinees */
+  function obCaptureByName(name) {
+    return (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).find(function (r) { return r.name === name; }) || null;
+  }
+  function obToggleIndModuleByName(name, label) {
+    if (!obRequireHR()) return;
+    var rec = obCaptureByName(name); if (!rec) return;
+    var comp = Object.assign({}, rec.inductionModules || {}); comp[label] = true;
+    obPersistRec(rec, { inductionModules: comp });
+    if (typeof obRefreshOnboardViews === 'function') obRefreshOnboardViews();
+    if (typeof renderIndGrid === 'function') renderIndGrid();
+    openIndDrill(name);
+    toast('Module completed · ' + label, 'green');
+  }
+  /* schedule a PPE fitment appointment — reflected on the worker record */
+  function obScheduleFitment(name) {
+    if (!obRequireHR()) return;
+    var rec = obCaptureByName(name); if (!rec) return;
+    var base = rec.inductionStart ? new Date(rec.inductionStart + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + 2);
+    var when = base.toISOString().slice(0, 10);
+    obPersistRec(rec, { fitmentAppt: when });
+    if (typeof obRefreshOnboardViews === 'function') obRefreshOnboardViews();
+    if (typeof renderIndGrid === 'function') renderIndGrid();
+    openIndDrill(name);
+    toast('PPE fitment appointment scheduled for ' + name + ' on ' + when, 'green');
+  }
+  /* Notify HR ops — sends a real email via the mailing service, which also logs
+     it to the communication log (Recent communications), plus a live toast. */
+  function obNotifyHrOps(name) {
+    if (!obRequireHR()) return;
+    var rec = obCaptureByName(name);
+    var hrOps = (window.__KVUSER && window.__KVUSER.email) || 'support@pionedata.com';
+    var subject = 'Induction ops action · ' + name + (rec ? ' (' + rec.id + ')' : '');
+    var body = 'HR ops notification.\n\nWorker: ' + name + (rec ? ' · ' + rec.id : '') +
+      '\nCategory: ' + (rec && rec.category || '—') +
+      '\nInduction window: ' + (rec && rec.inductionStart || '—') + ' → ' + (rec && rec.inductionEnd || '—') +
+      '\nPPE fitment: ' + (rec && rec.fitmentAppt ? 'scheduled ' + rec.fitmentAppt : 'pending') +
+      '\n\nPlease action the induction / PPE fitment for this worker. — Karya Vaani';
+    toast('Notifying HR ops for ' + name + '…', 'blue');
+    fetch((window.__KV_API_BASE || '') + '/api/send-email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: [hrOps], subject: subject, message: body })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) toast('✓ HR ops notified by email · logged in Recent communications', 'green');
+        else toast('HR ops email failed: ' + ((j && j.error) || 'mailer'), 'red');
+      })
+      .catch(function (e) { toast('HR ops email failed: ' + e.message, 'red'); });
   }
 
   let IND_SORT = { col: 'riskRank', dir: -1 };
@@ -4405,21 +4501,53 @@ function __kvOnReady(fn) {
     const drill = document.getElementById('ind-drill');
     drill.classList.add('on');
 
+    const cap = ind._cap || null;   /* onboarding capture backing this joinee, if any */
     const isDirect = !!WORKERS.find(w => w.name === name);
     const anchorRec = isDirect
       ? WORKERS.find(w => w.name === name)
       : CONTRACT_WORKERS.find(w => w.name === name);
 
-    document.getElementById('ind-drill-eye').textContent =
-      (isDirect ? 'Direct employee · ' : 'Contract worker · ') + (isDirect ? anchorRec.posId : anchorRec.contractor);
+    document.getElementById('ind-drill-eye').textContent = cap
+      ? ((cap.type === 'direct' ? 'Direct employee · ' : 'Contract worker · ') + ((cap.employment && cap.employment.contractor) || cap.id))
+      : ((isDirect ? 'Direct employee · ' : 'Contract worker · ') + (anchorRec ? (isDirect ? anchorRec.posId : anchorRec.contractor) : name));
     document.getElementById('ind-drill-title').textContent = name;
     const p = indProgressOf(name);
+    const indWin = cap ? (' · Induction ' + (cap.inductionStart || '—') + ' → ' + (cap.inductionEnd || '—')) : '';
     document.getElementById('ind-drill-meta').textContent =
-      'Join date: ' + ind.joinDate + ' · ' + p.done + '/' + p.total + ' modules complete · ' +
+      'Join date: ' + ind.joinDate + indWin + ' · ' + p.done + '/' + p.total + ' modules complete · ' +
       (p.gated > 0 ? (p.gated + ' modules gated · resolve PPE/ESIC first') : 'on track');
 
     /* render module list */
     const list = document.getElementById('ind-drill-modules');
+    /* capture-backed joinees get a vertical step-by-step timeline with the join
+       date, per-module completion (HR can mark complete) and the induction
+       window as the closing step */
+    if (cap) {
+      const comp = cap.inductionModules || {};
+      const isHR2 = obIsHR();
+      const stepDone = (cap.journeyStage === 'complete');
+      let th = '<div class="drill-list-h"><span>Induction timeline</span><span class="tiny muted">' + ind.modules.length + ' modules · ' + (cap.category || '') + '</span></div>';
+      const steps = [{ label: 'Joined / onboarded', sub: cap.inductionStart ? ('Induction starts ' + cap.inductionStart) : 'Awaiting schedule', done: true }];
+      ind.modules.forEach(function (m) { steps.push({ label: m.label, sub: comp[m.label] || stepDone ? 'Completed' : 'Scheduled', done: !!comp[m.label] || stepDone, module: m.label }); });
+      steps.push({ label: 'Induction complete', sub: cap.inductionEnd ? ('Target end ' + cap.inductionEnd) : '', done: stepDone });
+      let sh2 = '<div style="padding:8px 4px">';
+      steps.forEach(function (st, si) {
+        const d = st.done, last = si === steps.length - 1;
+        sh2 += '<div style="display:flex;gap:12px;align-items:stretch">' +
+          '<div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto">' +
+            '<div style="width:22px;height:22px;border-radius:50%;background:' + (d ? 'var(--green)' : 'var(--line)') + ';color:' + (d ? '#fff' : 'var(--ink-2)') + ';display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700">' + (d ? '✓' : si) + '</div>' +
+            (last ? '' : '<div style="width:2px;flex:1;min-height:16px;background:' + (d ? 'var(--green)' : 'var(--line)') + '"></div>') +
+          '</div>' +
+          '<div style="flex:1;padding-bottom:12px">' +
+            '<div style="font-size:0.84rem;font-weight:600">' + st.label + '</div>' +
+            '<div class="tiny muted">' + (st.sub || '') + '</div>' +
+            (st.module && !d && isHR2 ? '<button class="btn" style="margin-top:5px;padding:2px 9px;font-size:0.68rem" onclick="obToggleIndModuleByName(\'' + name.replace(/'/g, "\\'") + '\',\'' + st.module.replace(/'/g, "\\'") + '\')">Mark complete</button>' : '') +
+          '</div>' +
+        '</div>';
+      });
+      sh2 += '</div>';
+      list.innerHTML = th + sh2;
+    } else {
     list.innerHTML = '<div class="drill-list-h"><span>Induction modules</span><span class="tiny muted">' + ind.modules.length + ' modules · ' + (ind.track === 'direct' ? 'Common + Direct + Role' : 'Common + Contract + Role') + '</span></div>';
     ind.modules.forEach(m => {
       const cls = m.status; /* gated/done/inprog/scheduled */
@@ -4444,6 +4572,7 @@ function __kvOnReady(fn) {
         '</div>'
       );
     });
+    }
 
     /* render side panel: PPE, attestation timeline, statutory notes */
     const side = document.getElementById('ind-drill-side');
@@ -4471,7 +4600,15 @@ function __kvOnReady(fn) {
     sh += '</div>';
 
     sh += '<div class="drill-acts">';
-    if (!ppe || ppe.status === 'missing') {
+    if (cap) {
+      /* capture-backed joinee — functional actions wired to the onboarding record */
+      var safeNm = name.replace(/'/g, "\\'");
+      sh += (ppe && ppe.status === 'confirmed')
+        ? '<button class="btn" disabled title="Captured from the import">✓ Sizes captured</button>'
+        : '<button class="btn primary" onclick="obNotifyHrOps(\'' + safeNm + '\')">Capture sizes now</button>';
+      sh += '<button class="btn" onclick="obScheduleFitment(\'' + safeNm + '\')">' + (cap.fitmentAppt ? 'Fitment ' + cap.fitmentAppt + ' · reschedule' : 'Schedule fitment appointment') + '</button>';
+      sh += '<button class="btn" onclick="obNotifyHrOps(\'' + safeNm + '\')">Notify HR ops</button>';
+    } else if (!ppe || ppe.status === 'missing') {
       sh += '<button class="btn primary">Capture sizes now</button>';
       sh += '<button class="btn">Schedule fitment appointment</button>';
       sh += '<button class="btn">Notify HR ops</button>';
@@ -16835,9 +16972,13 @@ function __kvOnReady(fn) {
     if (!verhoeffValid(clean)) { toast('Enter a valid Aadhaar first', 'red'); return; }
     const t = _KV_AAD_TARGET && document.getElementById(_KV_AAD_TARGET);
     if (t) t.value = clean;
-    if (_KV_AAD_DONE) _KV_AAD_DONE(clean);
+    const done = _KV_AAD_DONE;
+    _KV_AAD_DONE = null;
     toast('Aadhaar verified · ' + maskAadhaar(clean), 'green');
+    /* close the Aadhaar modal FIRST, then run the callback — the callback may
+       reopen the worker modal, and closing after would dismiss it again. */
     omCloseModal();
+    if (done) done(clean);
   }
   /* capture-form button: verify Aadhaar into #cap-aadhaar and flag the profile */
   function capVerifyAadhaar() {
@@ -17126,7 +17267,8 @@ function __kvOnReady(fn) {
       kvKV('Preferred language', '<span class="pill outline">' + (rec.lang || '—') + '</span>') +
       kvKV('Inter-state migrant', rec.migrant ? 'Yes (ISMW / OSHC)' : 'No') +
       kvKV('Address', [a.addr1, a.addr2, a.city, a.district, a.pin, a.state].filter(Boolean).join(', ')) +
-      kvKV('PPE issued', [ppe.uniform && ('Uniform ' + ppe.uniform), ppe.shoe && ('Shoe ' + ppe.shoe), ppe.helmet, ppe.glove].filter(Boolean).join(' · '))
+      kvKV('PPE issued', [ppe.uniform && ('Uniform ' + ppe.uniform), ppe.shoe && ('Shoe ' + ppe.shoe), ppe.helmet, ppe.glove].filter(Boolean).join(' · ')) +
+      kvKV('PPE fitment appointment', rec.fitmentAppt ? '<span class="pill blue tiny">' + rec.fitmentAppt + '</span>' : '<span class="pill outline tiny">Not scheduled</span>')
     );
     const aadhaarRow = rec.aadhaarVerified
       ? '<span class="pill green tiny">Verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
@@ -17474,7 +17616,12 @@ function __kvOnReady(fn) {
   function obDeleteCapture(i) {
     const r = CAP_STATE.recent[i]; if (!r) return;
     if (!window.confirm('Remove ' + r.name + ' (' + r.id + ') from onboarded employees?')) return;
-    const finish = function () { CAP_STATE.recent.splice(i, 1); capRenderRecent(); obRenderDirectory(); toast('Removed ' + r.name, 'green'); };
+    const finish = function () {
+      CAP_STATE.recent.splice(i, 1);
+      if (typeof omCloseModal === 'function') omCloseModal();   /* close the open detail modal */
+      obRefreshOnboardViews();                                   /* refresh every list without a page reload */
+      toast('Removed ' + r.name, 'green');
+    };
     if (r.backendId) {
       fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures/' + r.backendId, { method: 'DELETE' })
         .then(function (x) { return x.json().catch(function () { return {}; }); })
