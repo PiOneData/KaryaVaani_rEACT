@@ -12743,12 +12743,20 @@ function __kvOnReady(fn) {
       var sh = String(rec.shift || '').toLowerCase();
       var shift = sh.indexOf('night') >= 0 ? 'night' : (sh.indexOf('gen') >= 0 ? 'general' : 'morning');
       var firstStop = (ro.stops && ro.stops[0]) || { name: '—' };
+      var contractor = (rec.employment && rec.employment.contractor) || '';
       return {
         code: rec.id, name: rec.name,
         dept: (rec.employment && rec.employment.dept) || rec.designation || rec.category || 'Contract',
-        locality: firstStop.name, pickup: firstStop.name, mobile: rec.mobile || '—',
+        desig: rec.designation || rec.category || '',
+        locality: firstStop.name, pickup: firstStop.name, pickupIdx: 0, mobile: rec.mobile || '—',
         route: ro.code, routeName: ro.route, shift: shift,
-        gender: rec.gender === 'Female' ? 'F' : 'M', pickupIdx: 0,
+        board: (ro[shift] && ro[shift].board) || '',
+        type: rec.type === 'direct' ? 'emp' : 'ctr',
+        gender: rec.gender === 'Female' ? 'F' : 'M',
+        plate: 'Bus ' + ro.code,
+        agency: rec.type === 'direct' ? 'Daikin (direct)' : (contractor || '—'),
+        operator: (typeof trRouteOperator === 'function' ? trRouteOperator(ro.code) : ''),
+        nightConsent: rec.gender === 'Female' ? (rec.nightShiftConsent ? 'yes' : 'pending') : 'na',
         _onboarded: true, _ci: i
       };
     }).filter(Boolean);
@@ -13056,7 +13064,8 @@ function __kvOnReady(fn) {
         : trConsentPill(cons) + (cons === 'pending' ? ' <button class="rd-mini" onclick="event.stopPropagation();trCollectConsent(\'' + a.code + '\')">Collect</button>' : '');
       const pu = trPickupAt(r, s, a.pickupIdx || 0);
       const dp = trDropAt(r, s, a.pickupIdx || 0);
-      return '<tr class="' + trCls + '" style="cursor:pointer" onclick="omOpenWorker(\'' + a.code + '\')" title="Open employee details · travel history · attendance">' +
+      const openCall = a._onboarded ? ('obOpenCapture(' + a._ci + ')') : ('omOpenWorker(\'' + a.code + '\')');
+      return '<tr class="' + trCls + '" style="cursor:pointer" onclick="' + openCall + '" title="Open employee details · travel history · attendance">' +
         '<td style="font-weight:600;color:var(--txt)">' + a.name + g + '</td>' +
         '<td><span class="wid">' + a.code + '</span></td>' +
         '<td>' + typeBadge + '</td>' +
