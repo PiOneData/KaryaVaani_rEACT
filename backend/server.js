@@ -340,7 +340,10 @@ app.post('/api/onboarding-captures', (req, res) => {
   let capture;
   const idx = p.id ? list.findIndex(c => c.id === p.id) : -1;
   if (idx !== -1) {
-    capture = { ...list[idx], ...p, aadhaarLast4: aadhaarLast4, updatedAt: nowIso };
+    // Partial updates (verify/induction patches) may omit aadhaar — keep the
+    // stored last-4 rather than nulling it when this request didn't carry one.
+    const nextLast4 = aadhaarLast4 != null ? aadhaarLast4 : (list[idx].aadhaarLast4 || null);
+    capture = { ...list[idx], ...p, aadhaarLast4: nextLast4, updatedAt: nowIso };
     list[idx] = capture;
   } else {
     capture = {

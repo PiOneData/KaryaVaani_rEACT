@@ -30,9 +30,9 @@ export default function SecOnboarding() {
         <div className="page-h-right">
           <button className="btn" id="ob-back-ct" onClick={(event) => { window.nav('ct-home', null) }} data-onclick="nav('ct-home', null)">← Contractor home</button>
           {' '}
-          <button className="btn" disabled title="Coming soon">Bulk import</button>
+          <button className="btn" onClick={(event) => { window.obGotoCapture('bulk') }} data-onclick="obGotoCapture('bulk')">Bulk import</button>
           {' '}
-          <button className="btn primary" disabled title="Coming soon">+ Start onboarding</button>
+          <button className="btn primary" onClick={(event) => { window.obGotoCapture('single') }} data-onclick="obGotoCapture('single')">+ Start onboarding</button>
         </div>
       </div>
       {' '}
@@ -166,16 +166,56 @@ export default function SecOnboarding() {
           Capture / Upload personal details
         </div>
         {' '}
-        <div className="tab" onClick={(event) => { window.subTab(event,'ob','direct') }} data-onclick="subTab(event,'ob','direct')">
-          Direct employee track
-        </div>
-        {' '}
-        <div className="tab" onClick={(event) => { window.subTab(event,'ob','contract') }} data-onclick="subTab(event,'ob','contract')">
-          Contract worker track
+        <div className="tab" onClick={(event) => { window.subTab(event,'ob','track') }} data-onclick="subTab(event,'ob','track')">
+          All Employee Track
         </div>
         {' '}
         <div className="tab" onClick={(event) => { window.subTab(event,'ob','docs') }} data-onclick="subTab(event,'ob','docs')">
           Shared document store
+        </div>
+      </div>
+      {' '}
+      {/*  ─── ALL EMPLOYEE TRACK — every onboarded employee, contractor-scoped ───  */}
+      {' '}
+      <div id="ob-track" className="subpane" style={{ display: "none" }}>
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="card-h-title">All Employee Track</div>
+              {' '}
+              <div className="card-h-sub" id="obt-scope">All onboarded employees</div>
+            </div>
+            {' '}
+            <span className="pill outline" id="obt-count">0 employees</span>
+          </div>
+          {' '}
+          <div className="wk-search">
+            <span className="wk-search-ico">⌕</span>
+            {' '}
+            <input type="text" id="obt-search" className="wk-search-in" autoComplete="off" placeholder="Search by name, ID, route, gender or stage…" />
+          </div>
+          {' '}
+          <table className="t" id="obt-grid">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Route</th>
+                <th>Gender / shift</th>
+                <th>Aadhaar</th>
+                <th>Onboarding stage</th>
+                <th style={{ textAlign: "right" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody id="obt-body" />
+          </table>
+          {' '}
+          <div id="obt-noresults" className="wk-noresults" style={{ display: "none" }}>
+            No employees onboarded yet. Use Capture / Upload to add them.
+          </div>
+          {' '}
+          <div id="obt-pagination" className="kv-pager" />
         </div>
       </div>
       {' '}
@@ -1026,16 +1066,24 @@ export default function SecOnboarding() {
                   </button>
                 </div>
                 {' '}
+                <div className="field" style={{ marginBottom: "12px" }}>
+                  <label className="field-l">Contractor / employer for this batch</label>
+                  {' '}
+                  <select className="sel" id="cap-bulk-contractor" />
+                  {' '}
+                  <div className="cap-hint">Contractor login is locked to your own firm; HR can pick any firm or import direct employees.</div>
+                </div>
+                {' '}
                 <div className="cap-drop" id="cap-drop" onClick={(event) => { document.getElementById('cap-bulk-input').click() }} data-onclick="document.getElementById('cap-bulk-input').click()">
                   <div className="cap-drop-ico">⬆</div>
                   {' '}
-                  <div className="cap-drop-t">Drop your CSV here, or click to browse</div>
+                  <div className="cap-drop-t">Drop your Excel (.xlsx) or CSV here, or click to browse</div>
                   {' '}
                   <div className="cap-drop-s">
-                    Columns: name, type, mobile, aadhaar, language, category, uniform, shoe — one worker per row
+                    Columns: name, type, mobile, aadhaar, pan, gender, route, shift, language, category, contractor, uniform, shoe — one worker per row. Aadhaar stays a 12-digit whole number.
                   </div>
                   {' '}
-                  <input type="file" id="cap-bulk-input" accept=".csv" style={{ display: "none" }} onChange={(event) => { window.capBulkFile(event) }} />
+                  <input type="file" id="cap-bulk-input" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={(event) => { window.capBulkFile(event) }} />
                 </div>
                 {' '}
                 <div className="cap-drop-or">
@@ -1058,28 +1106,40 @@ export default function SecOnboarding() {
                   <span className="pill blue" id="cap-bulk-count">—</span>
                 </div>
                 {' '}
-                <table className="t">
-                  <thead>
-                    <tr>
-                      <th>Worker</th>
-                      <th>Type</th>
-                      <th>Mobile</th>
-                      <th>Language</th>
-                      <th>Category</th>
-                      <th>PPE size</th>
-                      <th>Row check</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cap-bulk-body" />
-                </table>
+                <div className="row-between" style={{ margin: "4px 0 10px", flexWrap: "wrap", gap: "8px" }}>
+                  <span className="pill outline" style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    📄 <span id="cap-bulk-file">—</span>
+                  </span>
+                  {' '}
+                  <button className="btn" onClick={(event) => { window.capBulkReset() }} data-onclick="capBulkReset()">Reset</button>
+                </div>
+                {' '}
+                <div id="cap-bulk-consent" className="note amber" style={{ display: "none", marginBottom: "10px" }} />
+                {' '}
+                <div style={{ overflowX: "auto" }}>
+                  <table className="t">
+                    <thead>
+                      <tr>
+                        <th>Worker</th>
+                        <th>Mobile</th>
+                        <th>Aadhaar</th>
+                        <th>Gender</th>
+                        <th>Route</th>
+                        <th>Shift</th>
+                        <th>Row check</th>
+                      </tr>
+                    </thead>
+                    <tbody id="cap-bulk-body" />
+                  </table>
+                </div>
                 {' '}
                 <div className="cap-action" style={{ marginTop: "14px", borderTop: "1px solid var(--line)", paddingTop: "14px" }}>
                   <div className="tiny" style={{ color: "var(--ink-2)" }}>
-                    Confirmation links are sent to every valid row in one batch.
+                    Ready rows are imported into onboarding and appear in All Employee Track.
                   </div>
                   {' '}
                   <button className="btn primary" id="cap-bulk-send" onClick={(event) => { window.capBulkSend() }} data-onclick="capBulkSend()">
-                    Send confirmation links to all
+                    Start onboarding
                   </button>
                 </div>
               </div>
@@ -1093,22 +1153,22 @@ export default function SecOnboarding() {
                 {' '}
                 <div className="cap-flow">
                   <span className="cap-flow-i">1</span>
-                  <span>Download the template, or load the sample batch to see the format.</span>
+                  <span>Download the .xlsx template (or load the sample) — Aadhaar stays a 12-digit whole number.</span>
                 </div>
                 {' '}
                 <div className="cap-flow">
                   <span className="cap-flow-i">2</span>
-                  <span>Each row is validated — name, 10-digit mobile, 12-digit Aadhaar, worker type.</span>
+                  <span>Upload the file. Each row is validated; correct Gender, Route and Shift with the dropdowns.</span>
                 </div>
                 {' '}
                 <div className="cap-flow">
                   <span className="cap-flow-i">3</span>
-                  <span>One confirmation link per valid row goes out on WhatsApp in the worker's language.</span>
+                  <span>Female night-shift workers need OSHC Rule 83 transport consent before onboarding.</span>
                 </div>
                 {' '}
                 <div className="cap-flow">
                   <span className="cap-flow-i">4</span>
-                  <span>Workers confirm their own profile; records become push-ready as each confirms.</span>
+                  <span>Start onboarding — workers appear in All Employee Track. Verify PAN + Aadhaar → induction.</span>
                 </div>
               </div>
               {' '}

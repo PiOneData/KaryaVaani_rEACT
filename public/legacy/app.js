@@ -259,13 +259,30 @@ function __kvOnReady(fn) {
 
   /* ── inline tabs (used in onboarding) ── */
   function subTab(evt, group, name) {
-    const tabs = evt.target.parentElement.querySelectorAll('.tab');
-    tabs.forEach(t => t.classList.remove('on'));
-    evt.target.classList.add('on');
-    document.querySelectorAll('#' + group + '-direct, #' + group + '-contract, #' + group + '-capture, #' + group + '-docs')
+    /* highlight the matching tab. evt may be null (called programmatically),
+       in which case we find the tab whose handler targets this pane name. */
+    let tabsParent = evt && evt.target ? evt.target.parentElement : null;
+    if (!tabsParent) {
+      const sec = document.getElementById('sec-onboarding') || document;
+      tabsParent = sec.querySelector('.tabs');
+    }
+    if (tabsParent) {
+      const tabs = tabsParent.querySelectorAll('.tab');
+      tabs.forEach(t => t.classList.remove('on'));
+      if (evt && evt.target) evt.target.classList.add('on');
+      else tabs.forEach(t => { if ((t.getAttribute('data-onclick') || '').indexOf("'" + name + "'") >= 0) t.classList.add('on'); });
+    }
+    document.querySelectorAll('#' + group + '-direct, #' + group + '-contract, #' + group + '-capture, #' + group + '-docs, #' + group + '-track')
       .forEach(p => p.style.display = 'none');
     const pane = document.getElementById(group + '-' + name);
     if (pane) pane.style.display = 'block';
+    if (group === 'ob' && name === 'track' && typeof obTrackRender === 'function') obTrackRender();
+  }
+  /* header shortcut: jump to the capture pane in a given mode (single/bulk) */
+  function obGotoCapture(mode) {
+    subTab(null, 'ob', 'capture');
+    if (typeof capSetMode === 'function') capSetMode(mode || 'single');
+    if (mode === 'bulk' && typeof capPopulateBulkContractor === 'function') capPopulateBulkContractor();
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -3492,13 +3509,13 @@ function __kvOnReady(fn) {
     if (!onboarded.length) { host.innerHTML = ''; return; }
     var html = '<div class="card-h" style="padding:0;margin:16px 0 8px"><div class="card-h-title" style="font-size:0.85rem">Newly onboarded · this contractor</div>' +
       '<div class="card-h-sub">' + onboarded.length + ' captured in Onboarding · click a row to open the worker</div></div>';
-    html += '<table class="t"><thead><tr><th>Worker</th><th>Category</th><th>Aadhaar</th><th>Status</th></tr></thead><tbody>';
+    html += '<table class="t"><thead><tr><th>Worker</th><th>Category</th><th>Aadhaar</th><th>Induction stage</th></tr></thead><tbody>';
     onboarded.forEach(function (x) {
       html += '<tr style="cursor:pointer" onclick="obOpenCapture(' + x.i + ')">' +
         '<td class="t-strong">' + vwEsc(x.r.name) + ' <span class="tiny muted">(' + vwEsc(x.r.id) + ')</span></td>' +
         '<td>' + vwEsc(x.r.category || '—') + '</td>' +
         '<td>' + (x.r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
-        '<td>' + (x.r.status === 'confirmed' ? 'Confirmed' : 'Awaiting') + '</td></tr>';
+        '<td>' + (typeof obStagePill === 'function' ? obStagePill(x.r) : (x.r.status === 'confirmed' ? 'Confirmed' : 'Awaiting')) + '</td></tr>';
     });
     html += '</tbody></table>';
     host.innerHTML = html;
@@ -13977,138 +13994,319 @@ function __kvOnReady(fn) {
   }
 
   /* ════ BULK UPLOAD ════ */
+
+  /* allowed transport routes (from the system route list) for the route dropdown */
+  function capRouteOptions() {
+    return (typeof TR_ROUTES !== 'undefined' ? TR_ROUTES : []).map(function (r) {
+      return { code: r.code || r.bus, label: r.route || (r.code || r.bus) };
+    });
+  }
+  /* match a free-text route cell to an allowed route; '' if unknown */
+  function capRouteMatch(v) {
+    var s = String(v || '').trim().toLowerCase();
+    if (!s) return '';
+    var opts = capRouteOptions();
+    var hit = opts.find(function (o) {
+      return o.code.toLowerCase() === s || o.label.toLowerCase() === s ||
+        o.label.toLowerCase().indexOf(s) >= 0 || (s.length > 1 && s.indexOf(o.code.toLowerCase()) >= 0);
+    });
+    return hit ? hit.label : '';
+  }
+  /* controlled choice sets */
+  var CAP_GENDERS = ['Male', 'Female', 'Other'];
+  function capGenderNorm(v) {
+    var s = String(v || '').trim().toLowerCase();
+    if (s === 'm' || s === 'male' || s === 'man') return 'Male';
+    if (s === 'f' || s === 'female' || s === 'w' || s === 'woman' || s === 'women') return 'Female';
+    if (!s) return '';
+    return 'Other';
+  }
+  var CAP_SHIFTS = ['Morning', 'General', 'Night'];
+  function capShiftNorm(v) {
+    var s = String(v || '').trim().toLowerCase();
+    if (s.indexOf('night') >= 0 || s === 'c') return 'Night';
+    if (s.indexOf('gen') >= 0 || s === 'b') return 'General';
+    if (s.indexOf('morn') >= 0 || s === 'a') return 'Morning';
+    return '';
+  }
+  /* recover full Aadhaar digits from an Excel numeric / scientific-notation
+     cell (e.g. 7.85E+14 or 123456789012.0) so it is a whole 12-digit number */
+  function capAadhaarNorm(v) {
+    if (v == null) return '';
+    var s = String(v).trim();
+    if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
+      var n = Number(s);
+      if (isFinite(n)) s = n.toFixed(0);
+    }
+    return s.replace(/\D/g, '');
+  }
+
   function capDownloadTemplate() {
-    const csv = 'name,type,mobile,aadhaar,pan,language,category,contractor,uniform,shoe\n' +
-      'Ramesh Naidu,direct,9876543210,123456789012,ABCDE1234F,Telugu,Skilled,,L,9\n' +
-      'Lalita Devi,contract,9811122233,234567890123,PQRSX6789K,Hindi,Semi-skilled,United Human Resource,M,6\n';
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'karya-vaani-worker-upload-template.csv';
+    var routes = capRouteOptions();
+    var headers = ['name', 'type', 'mobile', 'aadhaar', 'pan', 'gender', 'route', 'shift', 'language', 'category', 'contractor', 'uniform', 'shoe'];
+    var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    var sample = [
+      ['Ramesh Naidu', 'direct', '9876543210', '123456789012', 'ABCDE1234F', 'Male', (routes[0] ? routes[0].label : 'Route 1 · Tada'), 'Morning', 'Telugu', 'Skilled', (scope || ''), 'L', '9'],
+      ['Lalita Devi', 'contract', '9811122233', '234567890123', 'PQRSX6789K', 'Female', (routes[1] ? routes[1].label : 'Route 2 · Sullurpet'), 'Night', 'Hindi', 'Semi-skilled', (scope || 'Ark HR'), 'M', '6']
+    ];
+    if (typeof XLSX !== 'undefined') {
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet([headers].concat(sample));
+      /* force the aadhaar column to TEXT so Excel never renders it as 7.85E+14 */
+      sample.forEach(function (_, r) {
+        var addr = XLSX.utils.encode_cell({ c: 3, r: r + 1 });
+        if (ws[addr]) { ws[addr].t = 's'; ws[addr].z = '@'; }
+      });
+      ws['!cols'] = headers.map(function () { return { wch: 16 }; });
+      XLSX.utils.book_append_sheet(wb, ws, 'Workers');
+      /* reference sheet listing the only allowed routes / genders / shifts */
+      var ref = [['ALLOWED ROUTES (use exactly)'], ['code', 'route']]
+        .concat(routes.map(function (o) { return [o.code, o.label]; }))
+        .concat([[''], ['ALLOWED GENDER'], ['Male'], ['Female'], ['Other'], [''], ['ALLOWED SHIFT'], ['Morning'], ['General'], ['Night'],
+                 [''], ['Aadhaar must be a 12-digit whole number (kept as text).']]);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'Allowed values');
+      XLSX.writeFile(wb, 'karya-vaani-worker-upload-template.xlsx');
+      toast('Upload template downloaded (.xlsx)', 'green');
+      return;
+    }
+    var csv = headers.join(',') + '\n' + sample.map(function (r) { return r.join(','); }).join('\n') + '\n';
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'karya-vaani-worker-upload-template.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     toast('Upload template downloaded', 'green');
   }
 
-  function capBulkFile(ev) {
-    const file = ev.target.files && ev.target.files[0];
+  /* read a dropped/selected file — .xlsx/.xls via SheetJS (reads the real cell
+     value, so a numeric Aadhaar stays a whole 12-digit number), .csv as text.
+     Both feed a single matrix parser. */
+  function capReadFile(file) {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (e) { capBulkParse(e.target.result, file.name); };
-    reader.readAsText(file);
+    var name = file.name || 'uploaded file';
+    var isXlsx = /\.(xlsx|xls)$/i.test(name);
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        if (isXlsx) {
+          if (typeof XLSX === 'undefined') { toast('Excel library not loaded — save as CSV and retry', 'red'); return; }
+          var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          capParseMatrix(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }), name);
+        } else {
+          var lines = String(e.target.result).split(/\r?\n/).filter(function (l) { return l.trim(); });
+          capParseMatrix(lines.map(function (l) { return l.split(','); }), name);
+        }
+      } catch (err) { toast('Could not read file: ' + (err && err.message || err), 'red'); }
+    };
+    if (isXlsx) reader.readAsArrayBuffer(file); else reader.readAsText(file);
   }
+  function capBulkFile(ev) { capReadFile(ev.target.files && ev.target.files[0]); }
 
-  /* parse a simple CSV into worker rows */
-  function capBulkParse(text, fname) {
-    const lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
-    if (lines.length < 2) { toast('That file has no worker rows', 'red'); return; }
-    const head = lines[0].split(',').map(function (h) { return h.trim().toLowerCase(); });
-    const idx = function (k) { return head.indexOf(k); };
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const c = lines[i].split(',');
-      rows.push({
-        name: (c[idx('name')] || '').trim(),
-        type: ((c[idx('type')] || 'direct').trim().toLowerCase() === 'contract') ? 'contract' : 'direct',
-        mobile: (c[idx('mobile')] || '').trim(),
-        aadhaar: (c[idx('aadhaar')] || '').trim(),
-        pan: (c[idx('pan')] || '').trim(),
-        language: (c[idx('language')] || 'Telugu').trim(),
-        category: (c[idx('category')] || 'Unskilled').trim(),
-        contractor: (c[idx('contractor')] || '').trim(),
-        uniform: (c[idx('uniform')] || '—').trim(),
-        shoe: (c[idx('shoe')] || '—').trim()
-      });
+  function capParseMatrix(matrix, fname) {
+    if (!matrix || matrix.length < 2) { toast('That file has no worker rows', 'red'); return; }
+    var head = (matrix[0] || []).map(function (h) { return String(h == null ? '' : h).trim().toLowerCase(); });
+    var idx = function (k) { return head.indexOf(k); };
+    var rows = [];
+    for (var i = 1; i < matrix.length; i++) {
+      var c = matrix[i] || [];
+      if (!c.join('').trim()) continue;
+      rows.push(capBuildRow(function (k) { var j = idx(k); return j >= 0 ? String(c[j] == null ? '' : c[j]).trim() : ''; }));
     }
     capBulkShow(rows, fname || 'uploaded file');
   }
 
-  function capBulkSample() {
-    const sample = [
-      { name: 'Ramesh Naidu',   type: 'direct',   mobile: '9876543210', aadhaar: '123456789012', language: 'Telugu',  category: 'Skilled',       uniform: 'L', shoe: '9' },
-      { name: 'Lalita Devi',    type: 'contract', mobile: '9811122233', aadhaar: '234567890123', language: 'Hindi',   category: 'Semi-skilled',  uniform: 'M', shoe: '6' },
-      { name: 'Suresh Kumar',   type: 'direct',   mobile: '9700045566', aadhaar: '345678901234', language: 'Telugu',  category: 'Skilled',       uniform: 'XL', shoe: '10' },
-      { name: 'Bharath Singh',  type: 'contract', mobile: '9090909090', aadhaar: '456789012345', language: 'Hindi',   category: 'Unskilled',     uniform: 'L', shoe: '8' },
-      { name: 'Anand Mohan',    type: 'direct',   mobile: '9123412345', aadhaar: '567890123456', language: 'Telugu',  category: 'Highly skilled',uniform: 'M', shoe: '7' },
-      { name: 'Pooja Reddy',    type: 'contract', mobile: '98',         aadhaar: '678',          language: 'Telugu',  category: 'Semi-skilled',  uniform: 'S', shoe: '5' }
-    ];
-    capBulkShow(sample, 'sample batch');
+  /* build one normalised worker row from a get(column) accessor */
+  function capBuildRow(get) {
+    var type = (String(get('type') || 'direct').toLowerCase() === 'contract') ? 'contract' : 'direct';
+    return {
+      name: get('name'),
+      type: type,
+      mobile: get('mobile'),
+      aadhaar: capAadhaarNorm(get('aadhaar')),
+      pan: (get('pan') || '').toUpperCase(),
+      gender: capGenderNorm(get('gender')),
+      route: capRouteMatch(get('route')),
+      shift: capShiftNorm(get('shift')),
+      language: get('language') || 'Telugu',
+      category: get('category') || 'Unskilled',
+      contractor: get('contractor'),
+      uniform: get('uniform') || '—',
+      shoe: get('shoe') || '—',
+      nightConsent: false
+    };
   }
 
+  function capBulkSample() {
+    var routes = capRouteOptions();
+    var rl = function (i) { return routes[i] ? routes[i].label : ''; };
+    var firm = (typeof kvOnboardScope === 'function' && kvOnboardScope()) || 'Ark HR';
+    var mk = function (o) { return capBuildRow(function (k) { return o[k] == null ? '' : String(o[k]); }); };
+    capBulkShow([
+      mk({ name: 'Ramesh Naidu', type: 'contract', mobile: '9876543210', aadhaar: '123456789012', pan: 'ABCDE1234F', gender: 'Male', route: rl(0), shift: 'Morning', language: 'Telugu', category: 'Skilled', contractor: firm, uniform: 'L', shoe: '9' }),
+      mk({ name: 'Lalita Devi', type: 'contract', mobile: '9811122233', aadhaar: '234567890123', pan: 'PQRSX6789K', gender: 'Female', route: rl(1), shift: 'Night', language: 'Hindi', category: 'Semi-skilled', contractor: firm, uniform: 'M', shoe: '6' }),
+      mk({ name: 'Suresh Kumar', type: 'contract', mobile: '9700045566', aadhaar: '345678901234', pan: 'LMNOP2345Q', gender: 'Male', route: rl(2), shift: 'General', language: 'Telugu', category: 'Skilled', contractor: firm, uniform: 'XL', shoe: '10' })
+    ], 'sample batch');
+  }
+
+  /* a row is importable when the mandatory + controlled fields are all valid;
+     a female worker on night shift additionally needs OSHC transport consent */
   function capBulkRowValid(r) {
-    return r.name && r.mobile.replace(/\D/g, '').length >= 10 &&
-      r.aadhaar.replace(/\D/g, '').length === 12;
+    if (!r.name) return false;
+    if (r.mobile.replace(/\D/g, '').length < 10) return false;
+    if (r.aadhaar.replace(/\D/g, '').length !== 12) return false;
+    if (!r.gender) return false;
+    if (!r.route) return false;
+    if (r.gender === 'Female' && r.shift === 'Night' && !r.nightConsent) return false;
+    return true;
+  }
+  function capRowIssue(r) {
+    if (!r.name) return 'Name missing';
+    if (r.mobile.replace(/\D/g, '').length < 10) return 'Mobile < 10 digits';
+    if (r.aadhaar.replace(/\D/g, '').length !== 12) return 'Aadhaar not 12 digits';
+    if (!r.gender) return 'Gender not set';
+    if (!r.route) return 'Route not set';
+    if (r.gender === 'Female' && r.shift === 'Night' && !r.nightConsent) return 'Night consent needed';
+    return '';
+  }
+
+  /* update a single preview cell (controlled dropdowns) and re-validate */
+  function capBulkEdit(i, field, val) {
+    if (!CAP_STATE.bulk || !CAP_STATE.bulk[i]) return;
+    CAP_STATE.bulk[i][field] = val;
+    capBulkShow(CAP_STATE.bulk, CAP_STATE.bulkSource || 'uploaded file');
+  }
+  /* capture OSHC night-shift consent for every female night-shift row at once */
+  function capBulkConsentAll(on) {
+    (CAP_STATE.bulk || []).forEach(function (r) { if (r.gender === 'Female' && r.shift === 'Night') r.nightConsent = !!on; });
+    capBulkShow(CAP_STATE.bulk, CAP_STATE.bulkSource || 'uploaded file');
   }
 
   function capBulkShow(rows, source) {
     CAP_STATE.bulk = rows;
-    document.getElementById('cap-bulk-preview-card').style.display = 'block';
-    const valid = rows.filter(capBulkRowValid).length;
-    document.getElementById('cap-bulk-sub').textContent = 'From ' + source + ' · review before sending links';
-    document.getElementById('cap-bulk-count').textContent = valid + ' of ' + rows.length + ' valid';
-    document.getElementById('cap-bulk-body').innerHTML = rows.map(function (r) {
-      const ok = capBulkRowValid(r);
-      const initials = r.name ? r.name.split(' ').map(function (p) { return p[0]; }).join('').slice(0, 2).toUpperCase() : '?';
+    CAP_STATE.bulkSource = source;
+    var card = document.getElementById('cap-bulk-preview-card');
+    if (card) card.style.display = 'block';
+    var valid = rows.filter(capBulkRowValid).length;
+    var fileEl = document.getElementById('cap-bulk-file');
+    if (fileEl) fileEl.textContent = source;
+    var subEl = document.getElementById('cap-bulk-sub');
+    if (subEl) subEl.textContent = valid + ' of ' + rows.length + ' rows ready · review the dropdowns, then start onboarding';
+    var cntEl = document.getElementById('cap-bulk-count');
+    if (cntEl) cntEl.textContent = valid + ' of ' + rows.length + ' valid';
+    var routeOpts = capRouteOptions();
+    var sel = function (i, field, cur, list) {
+      return '<select class="sel" style="padding:3px 6px;font-size:0.72rem;min-width:120px" onchange="capBulkEdit(' + i + ',\'' + field + '\',this.value)">' +
+        '<option value=""' + (cur ? '' : ' selected') + '>— select —</option>' +
+        list.map(function (o) { var v = o.value != null ? o.value : o; var t = o.label != null ? o.label : o;
+          return '<option value="' + String(v).replace(/"/g, '&quot;') + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + t + '</option>'; }).join('') +
+      '</select>';
+    };
+    document.getElementById('cap-bulk-body').innerHTML = rows.map(function (r, i) {
+      var ok = capBulkRowValid(r);
+      var issue = capRowIssue(r);
+      var initials = r.name ? r.name.split(' ').map(function (p) { return p[0]; }).join('').slice(0, 2).toUpperCase() : '?';
       return '<tr>' +
         '<td><span class="cap-recent-ava" style="width:24px;height:24px;font-size:0.62rem;display:inline-flex;vertical-align:middle;margin-right:7px">' + initials + '</span>' +
           '<span class="t-strong">' + (r.name || '—') + '</span></td>' +
-        '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' +
-          (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
         '<td class="mono tiny">' + (r.mobile || '—') + '</td>' +
-        '<td>' + r.language + '</td>' +
-        '<td>' + r.category + '</td>' +
-        '<td class="tiny">U:' + r.uniform + ' · S:' + r.shoe + '</td>' +
+        '<td class="mono tiny">' + (r.aadhaar ? r.aadhaar.replace(/\D/g, '') : '<span style="color:var(--red-dk)">—</span>') + '</td>' +
+        '<td>' + sel(i, 'gender', r.gender, CAP_GENDERS) + '</td>' +
+        '<td>' + sel(i, 'route', r.route, routeOpts.map(function (o) { return { value: o.label, label: o.label }; })) + '</td>' +
+        '<td>' + sel(i, 'shift', r.shift, CAP_SHIFTS) + '</td>' +
         '<td>' + (ok
-          ? '<span class="pill green tiny">Valid</span>'
-          : '<span class="pill red tiny">Check mobile / Aadhaar</span>') + '</td>' +
+          ? '<span class="pill green tiny">Ready</span>'
+          : '<span class="pill red tiny" title="' + issue + '">' + issue + '</span>') + '</td>' +
       '</tr>';
     }).join('');
-    const btn = document.getElementById('cap-bulk-send');
-    if (btn) btn.disabled = valid === 0;
-    document.getElementById('cap-bulk-status').innerHTML =
+    /* female night-shift consent (OSHC Rule 83) */
+    var femNight = rows.filter(function (r) { return r.gender === 'Female' && r.shift === 'Night'; });
+    var consentEl = document.getElementById('cap-bulk-consent');
+    if (consentEl) {
+      if (femNight.length) {
+        var allConsented = femNight.every(function (r) { return r.nightConsent; });
+        consentEl.style.display = 'flex';
+        consentEl.innerHTML =
+          '<label class="cap-check" style="display:inline-flex;align-items:center;gap:8px;font-size:0.8rem">' +
+            '<input type="checkbox"' + (allConsented ? ' checked' : '') + ' onchange="capBulkConsentAll(this.checked)"> ' +
+            '<span>⚠ <strong>' + femNight.length + '</strong> female worker' + (femNight.length === 1 ? '' : 's') +
+            ' on night shift — capture OSHC Rule 83 transport consent + base login before onboarding.</span>' +
+          '</label>';
+      } else { consentEl.style.display = 'none'; consentEl.innerHTML = ''; }
+    }
+    var btn = document.getElementById('cap-bulk-send');
+    if (btn) { btn.disabled = valid === 0; btn.textContent = valid ? ('Start onboarding · ' + valid + ' worker' + (valid === 1 ? '' : 's')) : 'Start onboarding'; }
+    var statusEl = document.getElementById('cap-bulk-status');
+    if (statusEl) statusEl.innerHTML =
       '<div class="tiny" style="color:var(--ink-2);line-height:1.6">' + rows.length +
-      ' rows parsed · <strong>' + valid + ' valid</strong>' +
-      (rows.length - valid ? ' · ' + (rows.length - valid) + ' need correction' : '') +
-      '. Ready to send confirmation links.</div>';
+      ' rows parsed · <strong>' + valid + ' ready</strong>' +
+      (rows.length - valid ? ' · ' + (rows.length - valid) + ' need correction (use the dropdowns)' : '') +
+      '. Click <strong>Start onboarding</strong> to import them.</div>';
   }
 
+  /* clear the parsed batch */
+  function capBulkReset() {
+    CAP_STATE.bulk = [];
+    CAP_STATE.bulkSource = '';
+    var card = document.getElementById('cap-bulk-preview-card');
+    if (card) card.style.display = 'none';
+    var input = document.getElementById('cap-bulk-input');
+    if (input) input.value = '';
+    var statusEl = document.getElementById('cap-bulk-status');
+    if (statusEl) statusEl.innerHTML = '<div class="tiny muted">No batch processed yet.</div>';
+    toast('Batch cleared', 'green');
+  }
+
+  /* Start onboarding — persist every valid row as an onboarding capture so it
+     is stored, survives reload, and shows in the directory + All Employee Track
+     + vendor onboarding pane. Records begin at the "imported" journey stage. */
   function capBulkSend() {
-    const valid = CAP_STATE.bulk.filter(capBulkRowValid);
-    if (!valid.length) { toast('No valid rows to send', 'red'); return; }
-    const scope = kvOnboardScope();
+    var valid = (CAP_STATE.bulk || []).filter(capBulkRowValid);
+    if (!valid.length) { toast('No rows ready — fix the highlighted rows first', 'red'); return; }
+    var scope = kvOnboardScope();
+    var firmEl = document.getElementById('cap-bulk-contractor');
+    var chosen = firmEl ? firmEl.value : '';
     valid.forEach(function (r) {
-      const contractor = r.contractor || scope || '';
-      const type = contractor ? 'contract' : r.type;
-      const wid = (type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
-      const rec = {
+      var contractor = r.contractor || chosen || scope || '';
+      var type = contractor ? 'contract' : r.type;
+      var wid = (type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
+      var femaleNight = r.gender === 'Female' && r.shift === 'Night';
+      var rec = {
         id: wid, name: r.name, type: type, lang: r.language,
-        category: r.category, photo: null, mobile: r.mobile, status: 'sent',
+        category: r.category, designation: r.category, photo: null, mobile: r.mobile, status: 'sent',
+        gender: r.gender, route: r.route, shift: r.shift,
         pan: (r.pan || '').toUpperCase(), panVerified: false,
         aadhaarLast4: String(r.aadhaar || '').replace(/\D/g, '').slice(-4), aadhaarVerified: false,
-        employment: { contractor: contractor }
+        nightShiftConsent: femaleNight ? !!r.nightConsent : false,
+        nightConsentAt: (femaleNight && r.nightConsent) ? new Date().toISOString() : null,
+        journeyStage: 'imported', inductionStatus: null, inductionStart: null, inductionEnd: null,
+        ppe: { uniform: r.uniform, shoe: r.shoe },
+        employment: { contractor: contractor, shift: r.shift }
       };
       CAP_STATE.recent.unshift(rec);
-      /* persist to the backend so bulk imports reflect in HR + survive reload */
       fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(Object.assign({ aadhaar: r.aadhaar }, rec, { photo: undefined }))
       }).then(function (resp) { return resp.json().catch(function () { return {}; }); })
-        .then(function (j) { if (j && j.ok && j.capture) rec.backendId = j.capture.id; })
+        .then(function (j) {
+          if (j && j.ok && j.capture) { rec.backendId = j.capture.id; }
+          else if (j && j.error) { toast('Import: ' + r.name + ' — ' + j.error, 'amber'); }
+          if (typeof obRenderDirectory === 'function') obRenderDirectory();
+          if (typeof obTrackRender === 'function') obTrackRender();
+        })
         .catch(function () { /* offline — kept in session */ });
-      /* real WhatsApp confirmation link via the communication gateway */
-      if (window.KVWhatsApp && r.mobile) {
-        window.KVWhatsApp.send(r.mobile,
-          'Namaste ' + r.name + ', please confirm your Karya Vaani worker profile: ' +
-          'https://karyavaani.app/confirm/' + wid);
-      }
     });
     capRenderRecent();
     if (typeof obRenderDirectory === 'function') obRenderDirectory();
-    document.getElementById('cap-bulk-status').innerHTML =
+    if (typeof obTrackRender === 'function') obTrackRender();
+    var statusEl = document.getElementById('cap-bulk-status');
+    if (statusEl) statusEl.innerHTML =
       '<div class="tiny" style="color:var(--green-dk);font-weight:600">✓ ' + valid.length +
-      ' confirmation links sent on WhatsApp</div>' +
-      '<div class="tiny muted" style="margin-top:4px">Each worker confirms their own profile in their language. ' +
-      'Records become push-ready as confirmations arrive.</div>';
-    toast(valid.length + ' confirmation links sent to workers on WhatsApp', 'green');
+      ' worker(s) imported into onboarding</div>' +
+      '<div class="tiny muted" style="margin-top:4px">Now visible in <strong>All Employee Track</strong> and the directory. ' +
+      'Verify PAN + Aadhaar to move each into induction training.</div>';
+    toast(valid.length + ' worker(s) imported — verify documents to begin induction', 'green');
+    capBulkReset();
+    if (typeof obShowTrack === 'function') obShowTrack();
   }
 
   /* drag-and-drop on the bulk drop zone */
@@ -14123,11 +14321,27 @@ function __kvOnReady(fn) {
     });
     drop.addEventListener('drop', function (ev) {
       const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = function (e) { capBulkParse(e.target.result, f.name); };
-      reader.readAsText(f);
+      capReadFile(f);
     });
+    /* populate the contractor lock dropdown for bulk imports */
+    capPopulateBulkContractor();
+  }
+
+  /* bulk-import contractor dropdown: a logged-in contractor is locked to their
+     own firm (only "Ark HR" etc.); HR sees every firm + a blank (direct) option */
+  function capPopulateBulkContractor() {
+    var el = document.getElementById('cap-bulk-contractor');
+    if (!el) return;
+    var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    if (scope) {
+      el.innerHTML = '<option value="' + String(scope).replace(/"/g, '&quot;') + '">' + scope + '</option>';
+      el.value = scope; el.disabled = true;
+    } else {
+      var firms = (window.__KVDATA && window.__KVDATA.contractors) || [];
+      el.innerHTML = '<option value="">Direct (no contractor)</option>' +
+        firms.map(function (c) { return '<option>' + c.name + '</option>'; }).join('');
+      el.disabled = false;
+    }
   }
 
   /* ── approved employment records the capture form tags onto ──
@@ -16650,7 +16864,9 @@ function __kvOnReady(fn) {
     if (typeof capSetType === 'function') capSetType('contract');
     var cf = document.getElementById('cap-contractor');
     if (cf && firm) cf.value = firm;
+    if (typeof capPopulateBulkContractor === 'function') capPopulateBulkContractor();
     if (typeof obRenderDirectory === 'function') obRenderDirectory();
+    if (typeof obTrackRender === 'function') obTrackRender();
   }
 
   /* compliance for a captured onboarding profile — links to the contractor
@@ -16675,6 +16891,137 @@ function __kvOnReady(fn) {
     const score = items.reduce(function (s, it) { return s + (it.ok ? it.weight : 0); }, 0);
     const criticalsOk = items.filter(function (it) { return it.severity === 'critical'; }).every(function (it) { return it.ok; });
     return { score: score, status: (criticalsOk && score >= 80) ? 'compliant' : 'non-compliant', items: items, contractor: ct, aadhaarVerified: !!rec.aadhaarVerified };
+  }
+
+  /* ── onboarding journey stage + timeline ─────────────────────────────────
+     A newly onboarded worker moves through: imported → docs verified
+     (PAN + Aadhaar) → induction (scheduled) → completed. The stage is derived
+     from the persisted capture record so every view stays consistent. */
+  var OB_STAGES = [
+    { key: 'imported', label: 'Imported' },
+    { key: 'verified', label: 'Docs verified' },
+    { key: 'induction', label: 'Induction' },
+    { key: 'complete', label: 'Completed' }
+  ];
+  function obJourneyStage(rec) {
+    if (!rec) return 'imported';
+    if (rec.inductionStatus === 'complete') return 'complete';
+    if (rec.inductionStart || rec.inductionStatus === 'scheduled') return 'induction';
+    var verified = !!rec.aadhaarVerified && (rec.pan ? !!rec.panVerified : true);
+    return verified ? 'verified' : 'imported';
+  }
+  function obStageLabel(rec) {
+    var s = obJourneyStage(rec);
+    var f = OB_STAGES.find(function (x) { return x.key === s; });
+    return f ? f.label : s;
+  }
+  function obStagePill(rec) {
+    var s = obJourneyStage(rec);
+    var cls = s === 'complete' ? 'green' : s === 'induction' ? 'blue' : s === 'verified' ? 'amber' : 'outline';
+    return '<span class="pill ' + cls + ' tiny">' + obStageLabel(rec) + '</span>';
+  }
+  /* horizontal step indicator for a worker's onboarding journey */
+  function obTimelineHtml(rec) {
+    var cur = obJourneyStage(rec);
+    var curIdx = OB_STAGES.map(function (x) { return x.key; }).indexOf(cur);
+    return '<div style="display:flex;align-items:flex-start;margin:2px 0 16px;width:100%">' +
+      OB_STAGES.map(function (st, i) {
+        var done = i < curIdx, active = i === curIdx;
+        var bg = done ? 'var(--green)' : active ? 'var(--blue)' : 'var(--line)';
+        var fg = (done || active) ? '#fff' : 'var(--ink-2)';
+        var node = '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto;width:88px">' +
+          '<div style="width:26px;height:26px;border-radius:50%;background:' + bg + ';color:' + fg + ';display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700">' + (done ? '✓' : (i + 1)) + '</div>' +
+          '<div class="tiny" style="text-align:center;color:' + (active ? 'var(--blue)' : done ? 'var(--green-dk)' : 'var(--ink-2)') + ';font-weight:' + (active ? '700' : '500') + '">' + st.label + '</div>' +
+        '</div>';
+        var bar = (i < OB_STAGES.length - 1) ? '<div style="flex:1;height:3px;background:' + (i < curIdx ? 'var(--green)' : 'var(--line)') + ';margin:13px 2px 0"></div>' : '';
+        return node + bar;
+      }).join('') +
+    '</div>';
+  }
+
+  /* persist a patch onto a capture record (session + backend) */
+  function obPersistRec(rec, patch) {
+    Object.assign(rec, patch);
+    if (rec.backendId) {
+      fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ id: rec.backendId, name: rec.name }, patch))
+      }).catch(function () {});
+    }
+  }
+  function obRefreshOnboardViews() {
+    if (typeof capRenderRecent === 'function') capRenderRecent();
+    if (typeof obRenderDirectory === 'function') obRenderDirectory();
+    if (typeof obTrackRender === 'function') obTrackRender();
+    /* if a vendor drilldown onboarding pane is open, refresh it too */
+    if (typeof VW_STATE !== 'undefined' && VW_STATE && VW_STATE.contractor && typeof vwRenderOnboarding === 'function') {
+      try { vwRenderOnboarding(VW_STATE.contractor); } catch (e) {}
+    }
+  }
+  /* HR/contractor confirms PAN + Aadhaar are verified, then promotes to induction */
+  function obMoveToInduction(i) {
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    if (!rec.aadhaarVerified || (rec.pan && !rec.panVerified)) {
+      toast('Verify both Aadhaar and PAN before moving to induction', 'red'); return;
+    }
+    obPersistRec(rec, { journeyStage: 'induction', inductionStatus: 'scheduled' });
+    obRefreshOnboardViews(); obOpenCapture(i);
+    toast(rec.name + ' moved to induction training', 'green');
+  }
+  function obSaveInduction(i) {
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var s = document.getElementById('ob-ind-start'); var e = document.getElementById('ob-ind-end');
+    var start = s ? s.value : ''; var end = e ? e.value : '';
+    if (!start || !end) { toast('Select both a start and end date', 'red'); return; }
+    if (end < start) { toast('End date must be on or after the start date', 'red'); return; }
+    obPersistRec(rec, { inductionStart: start, inductionEnd: end, inductionStatus: 'scheduled', journeyStage: 'induction' });
+    obRefreshOnboardViews(); obOpenCapture(i);
+    toast('Induction schedule saved for ' + rec.name, 'green');
+  }
+  function obCompleteInduction(i) {
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    obPersistRec(rec, { inductionStatus: 'complete', journeyStage: 'complete', inductionCompletedAt: new Date().toISOString(), status: 'confirmed' });
+    obRefreshOnboardViews(); obOpenCapture(i);
+    toast('✓ Induction training completed for ' + rec.name, 'green');
+  }
+
+  /* ── All Employee Track: one scoped list of every onboarded employee ─────
+     Contractor login sees only their own firm's employees; HR sees all. */
+  function obTrackRender() {
+    var body = document.getElementById('obt-body');
+    if (!body) return;
+    var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    var list = (CAP_STATE.recent || []).filter(function (r) {
+      if (!scope) return true;
+      return String((r.employment && r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
+    });
+    var titleEl = document.getElementById('obt-scope');
+    if (titleEl) titleEl.textContent = scope ? ('Employees onboarded under ' + scope) : 'All onboarded employees · every contractor';
+    var nr = document.getElementById('obt-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
+    if (typeof KVTABLE === 'undefined') return;
+    KVTABLE.set({
+      key: 'obt', tbody: 'obt-body', count: 'obt-count', noun: 'employee',
+      pageSize: 12, cols: 8, rows: list.map(function (r, i) { return { r: r, i: i }; }),
+      text: function (x) { return (x.r.id || '') + ' ' + (x.r.name || '') + ' ' + (x.r.route || '') + ' ' + (x.r.gender || '') + ' ' + obStageLabel(x.r) + ' ' + ((x.r.employment && x.r.employment.contractor) || ''); },
+      row: function (x) {
+        var r = x.r, i = x.i;
+        return '<tr style="cursor:pointer" onclick="obOpenCapture(' + i + ')">' +
+          '<td class="t-strong">' + r.id + '</td><td>' + r.name + '</td>' +
+          '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
+          '<td class="tiny">' + (r.route || '—') + '</td>' +
+          '<td class="tiny">' + (r.gender || '—') + (r.shift ? ' · ' + r.shift : '') + '</td>' +
+          '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓ Aadhaar</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+          '<td>' + obStagePill(r) + '</td>' +
+          '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
+            '<button class="btn" onclick="obOpenCapture(' + i + ')">Open</button></td>' +
+        '</tr>';
+      }
+    });
+  }
+  /* jump to the All Employee Track tab */
+  function obShowTrack() {
+    var tabs = document.querySelectorAll('#sec-onboarding .tabs .tab');
+    [].forEach.call(tabs, function (t) { if (/All Employee Track/i.test(t.textContent || '')) t.click(); });
   }
 
   /* tabbed onboarding-detail modal (General / Identification / Compliance) */
@@ -16746,11 +17093,58 @@ function __kvOnReady(fn) {
         '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
       '</div>' +
       '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) + ctLink;
+    /* ── verification & induction (journey timeline + HR actions) ── */
+    var stage = obJourneyStage(rec);
+    var verified = !!rec.aadhaarVerified && (rec.pan ? !!rec.panVerified : true);
+    var aStep = rec.aadhaarVerified
+      ? '<span class="pill green tiny">Aadhaar verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
+      : '<span class="pill red tiny">Aadhaar pending</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
+    var pStep = !rec.pan
+      ? '<span class="pill outline tiny">No PAN on record</span>'
+      : (rec.panVerified ? '<span class="pill green tiny">PAN verified · ' + rec.pan + '</span>'
+         : '<span class="mono">' + rec.pan + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify PAN</button>');
+    var indBlock;
+    if (stage === 'imported' || stage === 'verified') {
+      indBlock =
+        '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 1 · Document verification (HR)</div>' +
+        '<div class="cap-hint" style="margin:4px 0 8px">HR verifies PAN and Aadhaar manually. Both must be verified before the worker enters induction training.</div>' +
+        '<div style="display:flex;flex-direction:column;gap:9px">' +
+          '<div class="row-between"><span>Aadhaar eKYC</span><span>' + aStep + '</span></div>' +
+          '<div class="row-between"><span>PAN card</span><span>' + pStep + '</span></div>' +
+        '</div>' +
+        '<div style="margin-top:16px">' +
+          (verified
+            ? '<button class="btn primary" onclick="obMoveToInduction(' + i + ')">Move to induction training →</button>'
+            : '<button class="btn" disabled title="Verify PAN + Aadhaar first">Move to induction training →</button>' +
+              '<div class="tiny muted" style="margin-top:6px">Verify both documents above to enable induction.</div>') +
+        '</div>';
+    } else {
+      var done = stage === 'complete';
+      indBlock =
+        '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 2 · Induction training' + (done ? '' : ' (HR schedules)') + '</div>' +
+        '<div class="cap-hint" style="margin:4px 0 10px">Set the training window with the date pickers and Save. When training is finished, mark it completed — completion reflects in vendor compliance, the HR employee list and the contractor view.</div>' +
+        '<div class="g2" style="gap:10px 14px">' +
+          '<div class="field"><label class="field-l">Start date</label><input class="input" type="date" id="ob-ind-start" value="' + (rec.inductionStart || '') + '"' + (done ? ' disabled' : '') + '></div>' +
+          '<div class="field"><label class="field-l">End date</label><input class="input" type="date" id="ob-ind-end" value="' + (rec.inductionEnd || '') + '"' + (done ? ' disabled' : '') + '></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
+          (done
+            ? '<span class="pill green">✓ Induction completed' + (rec.inductionCompletedAt ? ' · ' + new Date(rec.inductionCompletedAt).toLocaleDateString('en-IN') : '') + '</span>'
+            : '<button class="btn" onclick="obSaveInduction(' + i + ')">Save schedule</button>' +
+              '<button class="btn primary" onclick="obCompleteInduction(' + i + ')">Mark completed ✓</button>') +
+        '</div>';
+    }
+    var journey = obTimelineHtml(rec) +
+      (rec.gender === 'Female' && rec.shift === 'Night'
+        ? '<div class="note ' + (rec.nightShiftConsent ? 'green' : 'amber') + '" style="margin-bottom:12px;font-size:0.74rem">Female worker on night shift · OSHC Rule 83 transport consent ' + (rec.nightShiftConsent ? 'captured' + (rec.nightConsentAt ? ' · ' + new Date(rec.nightConsentAt).toLocaleDateString('en-IN') : '') : 'PENDING') + '.</div>'
+        : '') +
+      indBlock;
     kvTabModal({
-      eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract'),
+      eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract') + ' · ' + obStageLabel(rec),
       title: rec.name + ' · ' + rec.category,
       tabs: [
         { id: 'general', label: 'General information', html: general },
+        { id: 'journey', label: 'Verification & induction', html: journey },
         { id: 'ident', label: 'Identification documents', html: identification },
         { id: 'compliance', label: 'Compliance', html: compliance }
       ],
@@ -16873,6 +17267,7 @@ function __kvOnReady(fn) {
           .map(function (c) { return Object.assign({}, c, { backendId: c.id, status: c.status || 'sent' }); });
         if (loaded.length) { CAP_STATE.recent = CAP_STATE.recent.concat(loaded); capRenderRecent(); }
         obRenderDirectory();
+        if (typeof obTrackRender === 'function') obTrackRender();
       })
       .catch(function () {});
   }
@@ -16920,7 +17315,7 @@ function __kvOnReady(fn) {
           '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
           '<td>' + (r.category || '—') + '</td><td>' + link + '</td>' +
           '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
-          '<td>' + (r.status === 'confirmed' ? '<span class="pill green tiny">Confirmed</span>' : '<span class="pill amber tiny">Awaiting</span>') + '</td>' +
+          '<td>' + obStagePill(r) + '</td>' +
           '<td><span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
           '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
             '<button class="btn" onclick="obEditCapture(' + i + ')">Edit</button> ' +
