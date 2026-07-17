@@ -12724,10 +12724,34 @@ function __kvOnReady(fn) {
     return n < 82 ? 'ok' : (n < 92 ? 'pend' : 'miss');
   }
   function trRoster() {
-    if (TR_ROSTER) return TR_ROSTER;
-    const workers = (window.__KVDATA && window.__KVDATA.omMapping) || (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
-    TR_ROSTER = workers.map(trAssign).filter(Boolean);
-    return TR_ROSTER;
+    if (!TR_ROSTER) {
+      const workers = (window.__KVDATA && window.__KVDATA.omMapping) || (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
+      TR_ROSTER = workers.map(trAssign).filter(Boolean);
+    }
+    /* append onboarded workers fresh each call so their route/shift edits show
+       immediately (the seed roster stays cached) */
+    return TR_ROSTER.concat(obTransportAssignments());
+  }
+  /* onboarded workers assigned a route in the import become transport
+     assignments, placed in their route + shift batch beside the seed roster */
+  function obTransportAssignments() {
+    if (typeof CAP_STATE === 'undefined' || typeof TR_ROUTES === 'undefined' || !TR_ROUTES.length) return [];
+    return (CAP_STATE.recent || []).map(function (rec, i) {
+      if (!rec.route) return null;
+      var ro = TR_ROUTES.find(function (x) { return x.route === rec.route || x.code === rec.route; });
+      if (!ro) return null;
+      var sh = String(rec.shift || '').toLowerCase();
+      var shift = sh.indexOf('night') >= 0 ? 'night' : (sh.indexOf('gen') >= 0 ? 'general' : 'morning');
+      var firstStop = (ro.stops && ro.stops[0]) || { name: '—' };
+      return {
+        code: rec.id, name: rec.name,
+        dept: (rec.employment && rec.employment.dept) || rec.designation || rec.category || 'Contract',
+        locality: firstStop.name, pickup: firstStop.name, mobile: rec.mobile || '—',
+        route: ro.code, routeName: ro.route, shift: shift,
+        gender: rec.gender === 'Female' ? 'F' : 'M', pickupIdx: 0,
+        _onboarded: true, _ci: i
+      };
+    }).filter(Boolean);
   }
   function trBatch(routeCode, shift) { return trRoster().filter(function (a) { return a.route === routeCode && a.shift === shift; }); }
 
@@ -12832,8 +12856,9 @@ function __kvOnReady(fn) {
       const status = att
         ? (boardedSet[a.code] ? '<span class="pill green tiny">Boarded</span>' : '<span class="pill red tiny">Absent</span>')
         : '<span class="pill outline tiny">—</span>';
-      return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + a.code + '\')" title="Open employee details · travel history · attendance">' +
-        '<td class="mono">' + a.code + '</td><td class="t-strong">' + a.name + '</td><td>' + a.dept + '</td>' +
+      var openCall = a._onboarded ? ('obOpenCapture(' + a._ci + ')') : ('omOpenWorker(\'' + a.code + '\')');
+      return '<tr style="cursor:pointer" onclick="' + openCall + '" title="Open employee details · travel history · attendance">' +
+        '<td class="mono">' + a.code + (a._onboarded ? ' <span class="pill blue tiny">onboarded</span>' : '') + '</td><td class="t-strong">' + a.name + '</td><td>' + a.dept + '</td>' +
         '<td>' + a.locality + '</td><td>' + a.pickup + '</td><td class="mono">' + a.mobile + '</td><td style="text-align:center">' + status + '</td></tr>';
     }).join('');
     omModal(
@@ -17273,6 +17298,29 @@ function __kvOnReady(fn) {
     obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast('Module completed · ' + label, 'green');
   }
+  /* re-render the transport route batches / gatekeeping views if they are on
+     screen, so a route/shift change reflects immediately */
+  function obRefreshTransport() {
+    try { if (typeof trRenderBatches === 'function') trRenderBatches(); } catch (e) {}
+    try { if (typeof trGkRenderRoutes === 'function') trGkRenderRoutes(); } catch (e) {}
+    try { if (typeof trGkRenderSummary === 'function') trGkRenderSummary(); } catch (e) {}
+  }
+  /* edit a worker's transport route / shift separately from the full profile */
+  function obSetWorkerRoute(i, val) {
+    if (!obRequireHR()) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    obPersistRec(rec, { route: val || null });
+    obRefreshOnboardViews(); obRefreshTransport();
+    toast('Route updated for ' + rec.name + (val ? ' · ' + val : ''), 'green');
+  }
+  function obSetWorkerShift(i, val) {
+    if (!obRequireHR()) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var emp = Object.assign({}, rec.employment || {}); emp.shift = val || null;
+    obPersistRec(rec, { shift: val || null, employment: emp });
+    obRefreshOnboardViews(); obRefreshTransport();
+    toast('Shift updated for ' + rec.name + (val ? ' · ' + val : ''), 'green');
+  }
   /* persist an induction date the moment it is picked, so it survives the modal
      re-renders that happen when a training module is marked complete */
   function obSetInductionDate(i, field, value) {
@@ -17577,12 +17625,32 @@ function __kvOnReady(fn) {
         ? '<div class="note ' + (rec.nightShiftConsent ? 'green' : 'amber') + '" style="margin-bottom:12px;font-size:0.74rem">Female worker on night shift · OSHC Rule 83 transport consent ' + (rec.nightShiftConsent ? 'captured' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') : 'PENDING') + '.</div>'
         : '') +
       indBlock + femLogin;
+    /* transport / shift roster — editable separately (HR), read-only for contractor */
+    var trRouteOpts = (typeof capRouteOptions === 'function') ? capRouteOptions() : [];
+    var trEd =
+      '<div class="card-h-title" style="font-size:0.85rem;margin-top:14px">Transport · shift roster</div>' +
+      '<div class="cap-hint" style="margin:4px 0 8px">Route and shift place this worker in the transport route batch. Edit them here to move the worker between routes / shifts.</div>' +
+      '<div class="g2" style="gap:10px 14px">' +
+        '<div class="field"><label class="field-l">Route</label>' +
+          (obIsHR()
+            ? '<select class="sel" onchange="obSetWorkerRoute(' + i + ',this.value)"><option value="">— none —</option>' +
+                trRouteOpts.map(function (o) { return '<option value="' + o.label.replace(/"/g, '&quot;') + '"' + (o.label === rec.route ? ' selected' : '') + '>' + o.label + '</option>'; }).join('') + '</select>'
+            : '<div class="input" style="background:#f8fafc">' + (rec.route || '—') + '</div>') +
+        '</div>' +
+        '<div class="field"><label class="field-l">Shift</label>' +
+          (obIsHR()
+            ? '<select class="sel" onchange="obSetWorkerShift(' + i + ',this.value)"><option value="">— none —</option>' +
+                ['Morning', 'General', 'Night'].map(function (s) { return '<option' + (s === rec.shift ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>'
+            : '<div class="input" style="background:#f8fafc">' + (rec.shift || '—') + '</div>') +
+        '</div>' +
+      '</div>' +
+      (rec.route ? '<div class="tiny muted" style="margin-top:6px">Shown in the transport ' + (rec.shift || '—') + ' batch for <strong>' + rec.route + '</strong>.</div>' : '');
     kvTabModal({
       eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract') + ' · ' + obStageLabel(rec),
       title: rec.name + ' · ' + rec.category,
       active: activeTab || undefined,
       tabs: [
-        { id: 'general', label: 'General information', html: general },
+        { id: 'general', label: 'General information', html: general + trEd },
         { id: 'journey', label: 'Verification & induction', html: journey },
         { id: 'ident', label: 'Identification documents', html: identification },
         { id: 'compliance', label: 'Compliance', html: compliance }
