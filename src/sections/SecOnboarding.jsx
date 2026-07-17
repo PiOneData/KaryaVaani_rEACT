@@ -189,10 +189,22 @@ export default function SecOnboarding() {
             <span className="pill outline" id="obt-count">0 employees</span>
           </div>
           {' '}
-          <div className="wk-search">
-            <span className="wk-search-ico">⌕</span>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "10px" }}>
+            <div className="wk-search" style={{ flex: "1 1 220px", marginBottom: 0 }}>
+              <span className="wk-search-ico">⌕</span>
+              {' '}
+              <input type="text" id="obt-search" className="wk-search-in" autoComplete="off" placeholder="Search by name, ID, route, gender or stage…" />
+            </div>
             {' '}
-            <input type="text" id="obt-search" className="wk-search-in" autoComplete="off" placeholder="Search by name, ID, route, gender or stage…" />
+            <select id="obt-filter-contractor" className="sel" style={{ maxWidth: "220px", display: "none" }} onChange={(event) => { window.obTrackRender() }}>
+              <option value="">All contractors</option>
+            </select>
+            {' '}
+            <select id="obt-filter-type" className="sel" style={{ maxWidth: "160px" }} onChange={(event) => { window.obTrackRender() }}>
+              <option value="">All types</option>
+              <option value="contract">Contract</option>
+              <option value="direct">Direct</option>
+            </select>
           </div>
           {' '}
           <table className="t" id="obt-grid">

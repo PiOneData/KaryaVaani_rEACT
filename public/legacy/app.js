@@ -2595,6 +2595,18 @@ function __kvOnReady(fn) {
   }
   window.kvNotify = kvNotify;
 
+  /* Clicking anywhere on a date/time field opens the native picker (browsers
+     otherwise only open it from the small calendar icon). Delegated so it also
+     covers inputs created later inside modals. */
+  __kvOnReady(function () {
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (t && t.tagName === 'INPUT' && /^(date|datetime-local|month|time|week)$/.test(t.type) && typeof t.showPicker === 'function') {
+        try { t.showPicker(); } catch (_) { /* already open / not allowed */ }
+      }
+    });
+  });
+
   function ensureSheetJS() {
     if (typeof XLSX === 'undefined') {
       toast('Excel library not loaded — check internet', 'red');
@@ -3450,6 +3462,7 @@ function __kvOnReady(fn) {
     if (!host) return;
     VW_STATE.contractor = c.name;
     VW_STATE.sortCol = 'name'; VW_STATE.sortDir = 1;
+    VW_STATE.filters = { category: '', esic: '', migrant: '' };
     var safeCt = String(c.name).replace(/'/g, "\\'");
     host.innerHTML =
       '<div class="card-h" style="padding:0;margin-bottom:10px;align-items:flex-start">' +
@@ -3460,6 +3473,7 @@ function __kvOnReady(fn) {
           '<button class="btn tiny" onclick="vwImportOpen(\'' + safeCt + '\')">⬆ Import vendor data</button>' +
         '</div>' +
       '</div>' +
+      '<div id="ctw-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>' +
       '<div style="overflow-x:auto"><table class="t"><thead><tr>' +
         vwHeader('name', 'Worker') + vwHeader('code', 'Code') + vwHeader('category', 'Category') +
         vwHeader('designation', 'Designation') + vwHeader('esicStatus', 'ESIC') + vwHeader('clraStatus', 'CLRA') +
@@ -3486,13 +3500,60 @@ function __kvOnReady(fn) {
     vwRenderOnboarding(c);
   }
 
+  /* skill / status filter for the deployed-workers pane */
+  function vwSetFilter(field, val) {
+    VW_STATE.filters = VW_STATE.filters || {};
+    VW_STATE.filters[field] = val;
+    var c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS.find(function (x) { return x.name === VW_STATE.contractor; }) : null;
+    vwRenderTable(c || { name: VW_STATE.contractor, deployed: VW_STATE.workers.length });
+  }
+  function vwRenderFilters() {
+    var host = document.getElementById('ctw-filters');
+    if (!host) return;
+    var f = VW_STATE.filters || {};
+    var cats = {}, esics = {};
+    (VW_STATE.workers || []).forEach(function (w) {
+      if (w.category) cats[w.category] = 1;
+      if (w.esicStatus) esics[w.esicStatus] = 1;
+    });
+    var sel = function (id, label, cur, opts) {
+      return '<select class="sel" style="max-width:180px;font-size:0.78rem" onchange="vwSetFilter(\'' + id + '\',this.value)">' +
+        '<option value="">' + label + '</option>' +
+        opts.map(function (o) { return '<option value="' + String(o).replace(/"/g, '&quot;') + '"' + (String(o) === String(cur) ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
+      '</select>';
+    };
+    host.innerHTML =
+      sel('category', 'All skill levels', f.category, Object.keys(cats).sort()) +
+      sel('esic', 'All ESIC status', f.esic, Object.keys(esics).sort()) +
+      '<select class="sel" style="max-width:150px;font-size:0.78rem" onchange="vwSetFilter(\'migrant\',this.value)">' +
+        '<option value="">All workers</option>' +
+        '<option value="yes"' + (f.migrant === 'yes' ? ' selected' : '') + '>Migrant only</option>' +
+        '<option value="no"' + (f.migrant === 'no' ? ' selected' : '') + '>Non-migrant</option>' +
+      '</select>';
+  }
+  function vwIsMigrant(w) {
+    var v = String(w.migrant == null ? '' : w.migrant).toLowerCase();
+    return !!(v && v !== 'no' && v !== 'false' && v !== '0');
+  }
+
   function vwRenderTable(c) {
     var deployed = (c && c.deployed) || VW_STATE.workers.length;
+    vwRenderFilters();
+    var f = VW_STATE.filters || {};
+    var all = VW_STATE.workers.slice();
+    var rows = all.filter(function (w) {
+      if (f.category && String(w.category || '') !== f.category) return false;
+      if (f.esic && String(w.esicStatus || '') !== f.esic) return false;
+      if (f.migrant === 'yes' && !vwIsMigrant(w)) return false;
+      if (f.migrant === 'no' && vwIsMigrant(w)) return false;
+      return true;
+    });
+    var filtered = (rows.length !== all.length);
     var sub = document.getElementById('ctw-sub');
     if (sub) sub.textContent = VW_STATE.workers.length
-      ? (VW_STATE.workers.length + ' of ' + deployed + ' deployed · ' + (VW_STATE.generated ? 'estimated roster — import vendor data to replace' : 'imported vendor data') + ' · click a worker for details')
+      ? (rows.length + (filtered ? ' of ' + all.length + ' match filters' : ' of ' + deployed + ' deployed') + ' · ' + (VW_STATE.generated ? 'estimated roster — import vendor data to replace' : 'imported vendor data') + ' · click a worker for details')
       : ('No workers to show · ' + deployed + ' reported deployed. Use “Import vendor data” to upload the roster.');
-    var rows = VW_STATE.workers.slice().sort(function (a, b) {
+    rows.sort(function (a, b) {
       var va = vwSortVal(a, VW_STATE.sortCol), vb = vwSortVal(b, VW_STATE.sortCol);
       if (va < vb) return -1 * VW_STATE.sortDir;
       if (va > vb) return 1 * VW_STATE.sortDir;
@@ -17280,6 +17341,26 @@ function __kvOnReady(fn) {
       if (!scope) return true;
       return String((r.employment && r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
     });
+    /* filter by contractor (HR only — a contractor is already scoped to one
+       firm) and by worker type */
+    var ctSel = document.getElementById('obt-filter-contractor');
+    var tySel = document.getElementById('obt-filter-type');
+    if (ctSel) {
+      if (scope) { ctSel.style.display = 'none'; }
+      else {
+        ctSel.style.display = '';
+        var firms = {};
+        list.forEach(function (r) { var n = (r.employment && r.employment.contractor) || ''; if (n) firms[n] = 1; });
+        var cur = ctSel.value;
+        var opts = Object.keys(firms).sort();
+        ctSel.innerHTML = '<option value="">All contractors</option>' +
+          opts.map(function (n) { return '<option value="' + n.replace(/"/g, '&quot;') + '"' + (n === cur ? ' selected' : '') + '>' + n + '</option>'; }).join('');
+      }
+    }
+    var ctVal = (ctSel && ctSel.style.display !== 'none') ? ctSel.value : '';
+    var tyVal = tySel ? tySel.value : '';
+    if (ctVal) list = list.filter(function (r) { return ((r.employment && r.employment.contractor) || '') === ctVal; });
+    if (tyVal) list = list.filter(function (r) { return (r.type || 'direct') === tyVal; });
     var titleEl = document.getElementById('obt-scope');
     if (titleEl) titleEl.textContent = scope ? ('Employees onboarded under ' + scope) : 'All onboarded employees · every contractor';
     var nr = document.getElementById('obt-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
