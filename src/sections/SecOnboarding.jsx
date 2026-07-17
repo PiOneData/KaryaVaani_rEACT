@@ -1083,6 +1083,8 @@ export default function SecOnboarding() {
                     Columns: name, type, mobile, aadhaar, pan, gender, route, shift, language, category, contractor, uniform, shoe — one worker per row. Aadhaar stays a 12-digit whole number.
                   </div>
                   {' '}
+                  <div className="pill green" id="cap-drop-file" style={{ display: "none", marginTop: "10px" }} />
+                  {' '}
                   <input type="file" id="cap-bulk-input" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={(event) => { window.capBulkFile(event) }} />
                 </div>
                 {' '}

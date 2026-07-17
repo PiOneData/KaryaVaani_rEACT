@@ -388,6 +388,39 @@ app.delete('/api/onboarding-captures/:id', (req, res) => {
   }
 });
 
+/* Provision (or fetch) a Karya Vaani worker login for an onboarded employee.
+   One login per capture: if one already exists it is returned rather than
+   duplicated. Returns the plaintext password once so HR can hand it over. */
+app.post('/api/worker-login', (req, res) => {
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'store not ready' });
+  const { captureId, name, mobile, lang } = req.body || {};
+  if (!name) return res.status(400).json({ ok: false, error: 'name is required' });
+  store.data.users = store.data.users || [];
+  const users = store.data.users;
+  const existing = captureId ? users.find(u => u.linkedType === 'worker' && u.linkedId === captureId) : null;
+  const slug = String(name).trim().toLowerCase().split(/\s+/)[0].replace(/[^a-z0-9]/g, '') || 'worker';
+  const tail = String(mobile || '').replace(/\D/g, '').slice(-4) || String(Math.floor(1000 + Math.random() * 9000));
+  let username = existing ? existing.username : (slug + tail);
+  if (!existing) { let n = 1; while (users.some(u => u.username === username)) { username = slug + tail + '-' + (n++); } }
+  const password = 'worker@' + tail;
+  const nowIso = new Date().toISOString();
+  const user = Object.assign({}, existing || {}, {
+    username, role: 'employee', title: 'Worker / Labourer', name: String(name),
+    linkedType: 'worker', linkedId: captureId || null, lang: lang || null,
+    passwordHash: hashPassword(password), createdAt: existing ? existing.createdAt : nowIso, updatedAt: nowIso
+  });
+  const idx = users.findIndex(u => u.username === username);
+  if (idx >= 0) users[idx] = user; else users.push(user);
+  try {
+    dbPut('users', username, user);
+    res.json({ ok: true, username, password });
+  } catch (err) {
+    console.error('worker-login error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 /* ── Onboarding documents ──────────────────────────────────────────────────
    Per-worker uploaded documents (PAN, bank proof, education, prior employment,
    …) stored as data-URLs keyed by worker id, so they can be retrieved and

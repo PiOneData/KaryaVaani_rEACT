@@ -14083,6 +14083,9 @@ function __kvOnReady(fn) {
   function capReadFile(file) {
     if (!file) return;
     var name = file.name || 'uploaded file';
+    /* show the chosen file name right in the drop zone */
+    var dropFile = document.getElementById('cap-drop-file');
+    if (dropFile) { dropFile.style.display = 'inline-flex'; dropFile.textContent = '📄 ' + name; }
     var isXlsx = /\.(xlsx|xls)$/i.test(name);
     var reader = new FileReader();
     reader.onload = function (e) {
@@ -14251,6 +14254,8 @@ function __kvOnReady(fn) {
     if (card) card.style.display = 'none';
     var input = document.getElementById('cap-bulk-input');
     if (input) input.value = '';
+    var dropFile = document.getElementById('cap-drop-file');
+    if (dropFile) { dropFile.style.display = 'none'; dropFile.textContent = ''; }
     var statusEl = document.getElementById('cap-bulk-status');
     if (statusEl) statusEl.innerHTML = '<div class="tiny muted">No batch processed yet.</div>';
     toast('Batch cleared', 'green');
@@ -16391,11 +16396,12 @@ function __kvOnReady(fn) {
   /* ── reusable tabbed modal ─────────────────────────────────────────────── */
   function kvTabModal(opts) {
     const tabs = opts.tabs || [];
+    const isOn = function (t, i) { return opts.active ? (t.id === opts.active) : (i === 0); };
     const btns = tabs.map(function (t, i) {
-      return '<div class="tab' + (i === 0 ? ' on' : '') + '" onclick="kvTabSwitch(this,\'' + t.id + '\')">' + t.label + '</div>';
+      return '<div class="tab' + (isOn(t, i) ? ' on' : '') + '" onclick="kvTabSwitch(this,\'' + t.id + '\')">' + t.label + '</div>';
     }).join('');
     const panes = tabs.map(function (t, i) {
-      return '<div class="kvtab-pane" data-pane="' + t.id + '" style="display:' + (i === 0 ? 'block' : 'none') + '">' + t.html + '</div>';
+      return '<div class="kvtab-pane" data-pane="' + t.id + '" style="display:' + (isOn(t, i) ? 'block' : 'none') + '">' + t.html + '</div>';
     }).join('');
     omModal(
       '<div class="modal-h"><div class="modal-h-left">' +
@@ -16958,31 +16964,107 @@ function __kvOnReady(fn) {
       try { vwRenderOnboarding(VW_STATE.contractor); } catch (e) {}
     }
   }
-  /* HR/contractor confirms PAN + Aadhaar are verified, then promotes to induction */
+  /* only HR (admin) may verify documents and run induction; a contractor sees
+     the same tab read-only */
+  function obIsHR() { return (window.__KVUSER || {}).role === 'admin'; }
+  function obRequireHR() {
+    if (obIsHR()) return true;
+    toast('Only HR can perform verification and induction', 'red');
+    return false;
+  }
+  /* induction training modules by skill level — common modules for everyone,
+     plus skill-specific modules. Every module must be completed before the
+     overall induction can be marked complete. */
+  var OB_IND_COMMON = ['Site safety rules & code of conduct', 'PPE use & Lockout-Tagout', 'Emergency response & evacuation'];
+  var OB_IND_BY_SKILL = {
+    'Unskilled': ['Basic manual handling & housekeeping'],
+    'Semi-skilled': ['Machine safety basics', 'Material handling'],
+    'Skilled': ['Machine operation & quality standards', 'Hazardous material handling'],
+    'Highly skilled': ['Advanced equipment operation', 'Supervisory safety & permit-to-work']
+  };
+  function obIndModules(rec) {
+    var cat = (rec && rec.category) || 'Unskilled';
+    var extra = OB_IND_BY_SKILL[cat] || OB_IND_BY_SKILL['Unskilled'];
+    return OB_IND_COMMON.concat(extra);
+  }
+
   function obMoveToInduction(i) {
+    if (!obRequireHR()) return;
     var rec = CAP_STATE.recent[i]; if (!rec) return;
     if (!rec.aadhaarVerified || (rec.pan && !rec.panVerified)) {
       toast('Verify both Aadhaar and PAN before moving to induction', 'red'); return;
     }
     obPersistRec(rec, { journeyStage: 'induction', inductionStatus: 'scheduled' });
-    obRefreshOnboardViews(); obOpenCapture(i);
+    obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast(rec.name + ' moved to induction training', 'green');
   }
+  /* mark one induction training module complete */
+  function obToggleIndModule(i, mi) {
+    if (!obRequireHR()) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var mods = obIndModules(rec);
+    var label = mods[mi]; if (!label) return;
+    var comp = Object.assign({}, rec.inductionModules || {});
+    comp[label] = true;
+    obPersistRec(rec, { inductionModules: comp });
+    obRefreshOnboardViews(); obOpenCapture(i, 'journey');
+    toast('Module completed · ' + label, 'green');
+  }
   function obSaveInduction(i) {
+    if (!obRequireHR()) return;
     var rec = CAP_STATE.recent[i]; if (!rec) return;
     var s = document.getElementById('ob-ind-start'); var e = document.getElementById('ob-ind-end');
     var start = s ? s.value : ''; var end = e ? e.value : '';
     if (!start || !end) { toast('Select both a start and end date', 'red'); return; }
     if (end < start) { toast('End date must be on or after the start date', 'red'); return; }
     obPersistRec(rec, { inductionStart: start, inductionEnd: end, inductionStatus: 'scheduled', journeyStage: 'induction' });
-    obRefreshOnboardViews(); obOpenCapture(i);
+    obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast('Induction schedule saved for ' + rec.name, 'green');
   }
   function obCompleteInduction(i) {
+    if (!obRequireHR()) return;
     var rec = CAP_STATE.recent[i]; if (!rec) return;
-    obPersistRec(rec, { inductionStatus: 'complete', journeyStage: 'complete', inductionCompletedAt: new Date().toISOString(), status: 'confirmed' });
-    obRefreshOnboardViews(); obOpenCapture(i);
+    /* every training module must be completed first */
+    var mods = obIndModules(rec);
+    var comp = rec.inductionModules || {};
+    var pending = mods.filter(function (m) { return !comp[m]; });
+    if (pending.length) {
+      toast('Cannot complete induction — ' + pending.length + ' of ' + mods.length + ' training module(s) still pending', 'red');
+      return;
+    }
+    /* capture whatever dates are on the pickers so the completed view shows them */
+    var s = document.getElementById('ob-ind-start'); var e = document.getElementById('ob-ind-end');
+    var start = (s && s.value) || rec.inductionStart || null;
+    var end = (e && e.value) || rec.inductionEnd || null;
+    obPersistRec(rec, { inductionStart: start, inductionEnd: end, inductionStatus: 'complete', journeyStage: 'complete', inductionCompletedAt: new Date().toISOString(), status: 'confirmed' });
+    obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast('✓ Induction training completed for ' + rec.name, 'green');
+  }
+
+  /* provision / view a worker login for a (female) employee */
+  function obCreateWorkerLogin(i) {
+    if (!obRequireHR()) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    fetch((window.__KV_API_BASE || '') + '/api/worker-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ captureId: rec.backendId || rec.id, name: rec.name, mobile: rec.mobile, lang: rec.lang })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          /* persist only the username — never the plaintext password, since
+             captures ship to every client via /api/bootstrap */
+          obPersistRec(rec, { loginUsername: j.username });
+          obRefreshOnboardViews(); obOpenCapture(i, 'journey');
+          toast('Worker login created · username: ' + j.username + ' · password: ' + j.password, 'green');
+        } else { toast('Could not create login: ' + ((j && j.error) || 'unknown'), 'red'); }
+      })
+      .catch(function (e) { toast('Could not create login: ' + e.message, 'red'); });
+  }
+  function obShowWorkerLogin(i) {
+    var rec = CAP_STATE.recent[i]; if (!rec || !rec.loginUsername) return;
+    /* the backend derives the password as worker@<last-4 of mobile> */
+    var pw = 'worker@' + (String(rec.mobile || '').replace(/\D/g, '').slice(-4) || '••••');
+    toast('Worker login · username: ' + rec.loginUsername + ' · password: ' + pw, 'green');
   }
 
   /* ── All Employee Track: one scoped list of every onboarded employee ─────
@@ -17025,7 +17107,7 @@ function __kvOnReady(fn) {
   }
 
   /* tabbed onboarding-detail modal (General / Identification / Compliance) */
-  function obOpenCapture(i) {
+  function obOpenCapture(i, activeTab) {
     const rec = CAP_STATE.recent[i];
     if (!rec) return;
     const docKey = rec.backendId || rec.id;
@@ -17093,55 +17175,116 @@ function __kvOnReady(fn) {
         '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
       '</div>' +
       '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) + ctLink;
-    /* ── verification & induction (journey timeline + HR actions) ── */
+    /* ── verification & induction (journey timeline + HR actions) ──
+       Verification, moving to induction and completing training are HR-only
+       actions. A contractor sees the same tab read-only with the current
+       stage. Induction training is a set of modules that vary by the worker's
+       skill level — every module must be completed before the overall
+       induction can be marked complete. */
     var stage = obJourneyStage(rec);
+    var isHR = obIsHR();
     var verified = !!rec.aadhaarVerified && (rec.pan ? !!rec.panVerified : true);
+    var fmtD = function (v) { if (!v) return '—'; var d = new Date(v.length === 10 ? v + 'T00:00:00' : v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
     var aStep = rec.aadhaarVerified
       ? '<span class="pill green tiny">Aadhaar verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
-      : '<span class="pill red tiny">Aadhaar pending</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
+      : (isHR
+          ? '<span class="pill red tiny">Aadhaar pending</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>'
+          : '<span class="pill red tiny">Aadhaar pending · awaiting HR</span>');
     var pStep = !rec.pan
       ? '<span class="pill outline tiny">No PAN on record</span>'
       : (rec.panVerified ? '<span class="pill green tiny">PAN verified · ' + rec.pan + '</span>'
-         : '<span class="mono">' + rec.pan + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify PAN</button>');
+         : (isHR ? '<span class="mono">' + rec.pan + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify PAN</button>'
+                 : '<span class="mono">' + rec.pan + '</span> <span class="pill amber tiny">awaiting HR</span>'));
     var indBlock;
     if (stage === 'imported' || stage === 'verified') {
       indBlock =
-        '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 1 · Document verification (HR)</div>' +
+        '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 1 · Document verification' + (isHR ? ' (HR)' : '') + '</div>' +
         '<div class="cap-hint" style="margin:4px 0 8px">HR verifies PAN and Aadhaar manually. Both must be verified before the worker enters induction training.</div>' +
         '<div style="display:flex;flex-direction:column;gap:9px">' +
           '<div class="row-between"><span>Aadhaar eKYC</span><span>' + aStep + '</span></div>' +
           '<div class="row-between"><span>PAN card</span><span>' + pStep + '</span></div>' +
         '</div>' +
         '<div style="margin-top:16px">' +
-          (verified
-            ? '<button class="btn primary" onclick="obMoveToInduction(' + i + ')">Move to induction training →</button>'
-            : '<button class="btn" disabled title="Verify PAN + Aadhaar first">Move to induction training →</button>' +
-              '<div class="tiny muted" style="margin-top:6px">Verify both documents above to enable induction.</div>') +
+          (!isHR
+            ? '<div class="note indigo" style="font-size:0.74rem">Verification and induction are managed by HR. Current stage: <strong>' + obStageLabel(rec) + '</strong>.</div>'
+            : (verified
+                ? '<button class="btn primary" onclick="obMoveToInduction(' + i + ')">Move to induction training →</button>'
+                : '<button class="btn" disabled title="Verify PAN + Aadhaar first">Move to induction training →</button>' +
+                  '<div class="tiny muted" style="margin-top:6px">Verify both documents above to enable induction.</div>')) +
         '</div>';
     } else {
       var done = stage === 'complete';
-      indBlock =
-        '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 2 · Induction training' + (done ? '' : ' (HR schedules)') + '</div>' +
-        '<div class="cap-hint" style="margin:4px 0 10px">Set the training window with the date pickers and Save. When training is finished, mark it completed — completion reflects in vendor compliance, the HR employee list and the contractor view.</div>' +
-        '<div class="g2" style="gap:10px 14px">' +
-          '<div class="field"><label class="field-l">Start date</label><input class="input" type="date" id="ob-ind-start" value="' + (rec.inductionStart || '') + '"' + (done ? ' disabled' : '') + '></div>' +
-          '<div class="field"><label class="field-l">End date</label><input class="input" type="date" id="ob-ind-end" value="' + (rec.inductionEnd || '') + '"' + (done ? ' disabled' : '') + '></div>' +
-        '</div>' +
-        '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
-          (done
-            ? '<span class="pill green">✓ Induction completed' + (rec.inductionCompletedAt ? ' · ' + new Date(rec.inductionCompletedAt).toLocaleDateString('en-IN') : '') + '</span>'
-            : '<button class="btn" onclick="obSaveInduction(' + i + ')">Save schedule</button>' +
-              '<button class="btn primary" onclick="obCompleteInduction(' + i + ')">Mark completed ✓</button>') +
+      var mods = obIndModules(rec);
+      var comp = rec.inductionModules || {};
+      var doneCount = mods.filter(function (m) { return comp[m]; }).length;
+      var allDone = mods.length > 0 && doneCount === mods.length;
+      /* vertical, step-by-step module timeline — mark each training type done */
+      var modHtml = '<div style="margin:4px 0 6px">' + mods.map(function (m, mi) {
+        var d = !!comp[m];
+        var last = mi === mods.length - 1;
+        return '<div style="display:flex;gap:12px;align-items:stretch">' +
+          '<div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto">' +
+            '<div style="width:24px;height:24px;border-radius:50%;background:' + (d ? 'var(--green)' : 'var(--line)') + ';color:' + (d ? '#fff' : 'var(--ink-2)') + ';display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700">' + (d ? '✓' : (mi + 1)) + '</div>' +
+            (last ? '' : '<div style="width:2px;flex:1;min-height:16px;background:' + (d ? 'var(--green)' : 'var(--line)') + '"></div>') +
+          '</div>' +
+          '<div style="flex:1;padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px">' +
+            '<div style="font-size:0.84rem;font-weight:600">' + m + '</div>' +
+            '<div style="flex:0 0 auto">' +
+              (d ? '<span class="pill green tiny">Completed</span>'
+                 : (isHR && !done ? '<button class="btn" style="padding:3px 10px;font-size:0.72rem" onclick="obToggleIndModule(' + i + ',' + mi + ')">Mark complete</button>'
+                                  : '<span class="pill outline tiny">Pending</span>')) +
+            '</div>' +
+          '</div>' +
         '</div>';
+      }).join('') + '</div>';
+      var dateSection = done
+        ? '<div class="g2" style="gap:10px 14px">' +
+            '<div class="kpi"><div class="kpi-eye">Start date</div><div class="kpi-val" style="font-size:1rem">' + fmtD(rec.inductionStart) + '</div></div>' +
+            '<div class="kpi"><div class="kpi-eye">End date</div><div class="kpi-val" style="font-size:1rem">' + fmtD(rec.inductionEnd) + '</div></div>' +
+          '</div>'
+        : (isHR
+            ? '<div class="g2" style="gap:10px 14px">' +
+                '<div class="field"><label class="field-l">Start date</label><input class="input" type="date" id="ob-ind-start" value="' + (rec.inductionStart || '') + '"></div>' +
+                '<div class="field"><label class="field-l">End date</label><input class="input" type="date" id="ob-ind-end" value="' + (rec.inductionEnd || '') + '"></div>' +
+              '</div>'
+            : '<div class="g2" style="gap:10px 14px">' +
+                '<div class="kpi"><div class="kpi-eye">Start date</div><div class="kpi-val" style="font-size:1rem">' + fmtD(rec.inductionStart) + '</div></div>' +
+                '<div class="kpi"><div class="kpi-eye">End date</div><div class="kpi-val" style="font-size:1rem">' + fmtD(rec.inductionEnd) + '</div></div>' +
+              '</div>');
+      indBlock =
+        '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 2 · Induction training · <span style="color:var(--blue)">' + (rec.category || 'Unskilled') + '</span></div>' +
+        '<div class="cap-hint" style="margin:4px 0 10px">Training modules are set by the worker\'s skill level. ' + (isHR ? 'Mark each module complete, set the training window, then mark the whole induction complete.' : 'HR marks each training module complete.') + ' <strong>' + doneCount + ' of ' + mods.length + '</strong> modules done.</div>' +
+        modHtml +
+        (done ? '<div class="note green" style="margin:10px 0 12px;font-size:0.78rem">✓ Induction completed' + (rec.inductionCompletedAt ? ' on ' + fmtD(rec.inductionCompletedAt) : '') + '. Training window ' + fmtD(rec.inductionStart) + ' → ' + fmtD(rec.inductionEnd) + '.</div>' : '') +
+        dateSection +
+        (done ? '' :
+          '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
+            (isHR
+              ? '<button class="btn" onclick="obSaveInduction(' + i + ')">Save schedule</button>' +
+                '<button class="btn primary" onclick="obCompleteInduction(' + i + ')">Mark induction completed ✓</button>' +
+                (allDone ? '' : '<span class="tiny" style="color:var(--red-dk)">Complete all ' + mods.length + ' modules to finish induction.</span>')
+              : '<div class="note indigo" style="font-size:0.74rem">Induction is managed by HR. Current stage: <strong>' + obStageLabel(rec) + '</strong>.</div>') +
+          '</div>');
     }
+    /* worker login for a newly created female employee (HR only) */
+    var femLogin = (rec.gender === 'Female' && isHR)
+      ? '<div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">' +
+          '<div class="card-h-title" style="font-size:0.85rem">Worker login · female employee</div>' +
+          '<div class="cap-hint" style="margin:4px 0 8px">Provision a Karya Vaani worker login so this employee can sign in.</div>' +
+          (rec.loginUsername
+            ? '<span class="pill green tiny">Login active · ' + rec.loginUsername + '</span> <button class="btn" style="padding:3px 10px;font-size:0.72rem" onclick="obShowWorkerLogin(' + i + ')">View credentials</button>'
+            : '<button class="btn" onclick="obCreateWorkerLogin(' + i + ')">Create worker login</button>') +
+        '</div>'
+      : '';
     var journey = obTimelineHtml(rec) +
       (rec.gender === 'Female' && rec.shift === 'Night'
-        ? '<div class="note ' + (rec.nightShiftConsent ? 'green' : 'amber') + '" style="margin-bottom:12px;font-size:0.74rem">Female worker on night shift · OSHC Rule 83 transport consent ' + (rec.nightShiftConsent ? 'captured' + (rec.nightConsentAt ? ' · ' + new Date(rec.nightConsentAt).toLocaleDateString('en-IN') : '') : 'PENDING') + '.</div>'
+        ? '<div class="note ' + (rec.nightShiftConsent ? 'green' : 'amber') + '" style="margin-bottom:12px;font-size:0.74rem">Female worker on night shift · OSHC Rule 83 transport consent ' + (rec.nightShiftConsent ? 'captured' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') : 'PENDING') + '.</div>'
         : '') +
-      indBlock;
+      indBlock + femLogin;
     kvTabModal({
       eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract') + ' · ' + obStageLabel(rec),
       title: rec.name + ' · ' + rec.category,
+      active: activeTab || undefined,
       tabs: [
         { id: 'general', label: 'General information', html: general },
         { id: 'journey', label: 'Verification & induction', html: journey },
@@ -17218,6 +17361,7 @@ function __kvOnReady(fn) {
       .catch(function (e) { toast('Delete failed: ' + e.message, 'red'); });
   }
   function obVerifyCaptureAadhaar(i) {
+    if (!obRequireHR()) return;
     const rec = CAP_STATE.recent[i]; if (!rec) return;
     kvAadhaarVerify('kv-aad-num', function (num) {
       rec.aadhaarVerified = true; rec.aadhaarLast4 = num.slice(-4);
@@ -17227,10 +17371,11 @@ function __kvOnReady(fn) {
           body: JSON.stringify({ id: rec.backendId, name: rec.name, aadhaarLast4: num.slice(-4), aadhaarVerified: true })
         }).catch(function () {});
       }
-      capRenderRecent(); obOpenCapture(i);
+      obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     });
   }
   function obVerifyCapturePan(i) {
+    if (!obRequireHR()) return;
     const rec = CAP_STATE.recent[i]; if (!rec) return;
     if (!kvPanValid(rec.pan)) { toast('This worker has no valid PAN on record (format ABCDE1234F)', 'red'); return; }
     rec.panVerified = true;
@@ -17241,7 +17386,7 @@ function __kvOnReady(fn) {
       }).catch(function () {});
     }
     toast('PAN verified for ' + rec.name, 'green');
-    capRenderRecent(); obOpenCapture(i);
+    obRefreshOnboardViews(); obOpenCapture(i, 'journey');
   }
   function obNotifyCapture(i) {
     const rec = CAP_STATE.recent[i]; if (!rec || !rec.mobile) return;
@@ -17328,7 +17473,7 @@ function __kvOnReady(fn) {
   /* delete a captured worker (DB + session) */
   function obDeleteCapture(i) {
     const r = CAP_STATE.recent[i]; if (!r) return;
-    if (!window.confirm('Remove ' + r.name + ' (' + r.id + ') from onboarding records?')) return;
+    if (!window.confirm('Remove ' + r.name + ' (' + r.id + ') from onboarded employees?')) return;
     const finish = function () { CAP_STATE.recent.splice(i, 1); capRenderRecent(); obRenderDirectory(); toast('Removed ' + r.name, 'green'); };
     if (r.backendId) {
       fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures/' + r.backendId, { method: 'DELETE' })
