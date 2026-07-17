@@ -17273,6 +17273,17 @@ function __kvOnReady(fn) {
     obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast('Module completed · ' + label, 'green');
   }
+  /* persist an induction date the moment it is picked, so it survives the modal
+     re-renders that happen when a training module is marked complete */
+  function obSetInductionDate(i, field, value) {
+    if (!obRequireHR()) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var patch = {};
+    if (field === 'start') patch.inductionStart = value || null; else patch.inductionEnd = value || null;
+    obPersistRec(rec, patch);
+    /* refresh the lists (stage/dates) without disrupting the open modal */
+    if (typeof obRefreshOnboardViews === 'function') obRefreshOnboardViews();
+  }
   function obSaveInduction(i) {
     if (!obRequireHR()) return;
     var rec = CAP_STATE.recent[i]; if (!rec) return;
@@ -17529,8 +17540,8 @@ function __kvOnReady(fn) {
           '</div>'
         : (isHR
             ? '<div class="g2" style="gap:10px 14px">' +
-                '<div class="field"><label class="field-l">Start date</label><input class="input" type="date" id="ob-ind-start" value="' + (rec.inductionStart || '') + '"></div>' +
-                '<div class="field"><label class="field-l">End date</label><input class="input" type="date" id="ob-ind-end" value="' + (rec.inductionEnd || '') + '"></div>' +
+                '<div class="field"><label class="field-l">Start date</label><input class="input" type="date" id="ob-ind-start" value="' + (rec.inductionStart || '') + '" onchange="obSetInductionDate(' + i + ',\'start\',this.value)"></div>' +
+                '<div class="field"><label class="field-l">End date</label><input class="input" type="date" id="ob-ind-end" value="' + (rec.inductionEnd || '') + '" onchange="obSetInductionDate(' + i + ',\'end\',this.value)"></div>' +
               '</div>'
             : '<div class="g2" style="gap:10px 14px">' +
                 '<div class="kpi"><div class="kpi-eye">Start date</div><div class="kpi-val" style="font-size:1rem">' + fmtD(rec.inductionStart) + '</div></div>' +
