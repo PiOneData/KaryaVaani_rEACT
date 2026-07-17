@@ -2579,6 +2579,22 @@ function __kvOnReady(fn) {
     window._toastTimer = setTimeout(() => { t.className = 'toast'; }, 2400);
   }
 
+  /* ── notification centre ────────────────────────────────────────────────
+     Push a notification onto the shared feed the top-bar bell renders. The
+     React bell listens for the 'kv-notify' event and re-reads window.__KVNOTIFY. */
+  function kvNotify(title, body, kind) {
+    if (typeof window === 'undefined') return;
+    window.__KVNOTIFY = window.__KVNOTIFY || [];
+    window.__KVNOTIFY.unshift({
+      id: 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      title: String(title || ''), body: String(body || ''), kind: kind || 'info',
+      at: new Date().toISOString(), read: false
+    });
+    if (window.__KVNOTIFY.length > 50) window.__KVNOTIFY.length = 50;
+    try { window.dispatchEvent(new CustomEvent('kv-notify')); } catch (e) {}
+  }
+  window.kvNotify = kvNotify;
+
   function ensureSheetJS() {
     if (typeof XLSX === 'undefined') {
       toast('Excel library not loaded — check internet', 'red');
@@ -4297,8 +4313,10 @@ function __kvOnReady(fn) {
       body: JSON.stringify({ to: [hrOps], subject: subject, message: body })
     }).then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (j) {
-        if (j && j.ok) toast('✓ HR ops notified by email · logged in Recent communications', 'green');
-        else toast('HR ops email failed: ' + ((j && j.error) || 'mailer'), 'red');
+        if (j && j.ok) {
+          toast('✓ HR ops notified by email · logged in Recent communications', 'green');
+          kvNotify('HR ops notified · ' + name, 'Induction / PPE fitment action requested. Email sent to ' + hrOps + '.', 'info');
+        } else toast('HR ops email failed: ' + ((j && j.error) || 'mailer'), 'red');
       })
       .catch(function (e) { toast('HR ops email failed: ' + e.message, 'red'); });
   }
@@ -11333,6 +11351,9 @@ function __kvOnReady(fn) {
     /* schedule */
     empRenderSchedule(c);
 
+    /* onboarding / induction status (only for workers with an onboarding record) */
+    empRenderOnboarding(c);
+
     /* personal analytics */
     empRenderPersonalAnalytics(c, agg);
 
@@ -11344,6 +11365,46 @@ function __kvOnReady(fn) {
 
     /* keep the floating chat FAB badge in sync with pending count */
     empChatBadge();
+  }
+
+  /* Onboarding & induction card on the worker's own home — shows their journey
+     stage, induction window and PPE fitment appointment. Matched to the logged-in
+     employee's linked capture (created worker login), else by name. Hidden when
+     the selected worker has no onboarding record. */
+  function empRenderOnboarding(c) {
+    const anchor = document.getElementById('emp-schedule-card');
+    let card = document.getElementById('emp-onboarding-card');
+    const caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    const u = window.__KVUSER || {};
+    let cap = null;
+    if (u.role === 'employee' && u.linkedType === 'worker' && u.linkedId) {
+      cap = caps.find(function (r) { return r.backendId === u.linkedId || r.id === u.linkedId; });
+    }
+    if (!cap && c) cap = caps.find(function (r) { return r.name && String(r.name).toLowerCase() === String(c.name).toLowerCase(); });
+    if (!cap) { if (card) card.remove(); return; }
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'emp-onboarding-card';
+      card.className = 'card';
+      card.style.marginBottom = '16px';
+      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(card, anchor);
+      else { const host = document.getElementById('sec-emp-home'); if (host) host.appendChild(card); }
+    }
+    const stageLabel = (typeof obStageLabel === 'function') ? obStageLabel(cap) : (cap.journeyStage || 'imported');
+    const timeline = (typeof obTimelineHtml === 'function') ? obTimelineHtml(cap) : '';
+    const mods = (typeof obIndModules === 'function') ? obIndModules(cap) : [];
+    const comp = cap.inductionModules || {};
+    const doneN = mods.filter(function (m) { return comp[m]; }).length;
+    card.innerHTML =
+      '<div class="card-h"><div><div class="card-h-title">My onboarding &amp; induction</div>' +
+        '<div class="card-h-sub">Your verification, PPE fitment and induction training status</div></div>' +
+        '<span class="pill blue">' + stageLabel + '</span></div>' +
+      timeline +
+      '<div class="g2" style="gap:10px 14px">' +
+        '<div class="kpi"><div class="kpi-eye">Induction window</div><div class="kpi-val" style="font-size:0.95rem">' + (cap.inductionStart || '—') + ' → ' + (cap.inductionEnd || '—') + '</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">PPE fitment appointment</div><div class="kpi-val" style="font-size:0.95rem">' + (cap.fitmentAppt ? cap.fitmentAppt : 'Not scheduled') + '</div></div>' +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:8px">Training modules: <strong>' + doneN + ' of ' + mods.length + '</strong> complete.</div>';
   }
 
   function empRenderMessageCard(it, c) {
@@ -17180,6 +17241,7 @@ function __kvOnReady(fn) {
     obPersistRec(rec, { inductionStart: start, inductionEnd: end, inductionStatus: 'complete', journeyStage: 'complete', inductionCompletedAt: new Date().toISOString(), status: 'confirmed' });
     obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast('✓ Induction training completed for ' + rec.name, 'green');
+    if (typeof kvNotify === 'function') kvNotify('Induction completed · ' + rec.name, rec.category + ' · all training modules done. Ready to push to HRIS.', 'success');
   }
 
   /* provision / view a worker login for a (female) employee */
