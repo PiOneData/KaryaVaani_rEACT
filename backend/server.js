@@ -647,6 +647,47 @@ app.post('/api/translate', async (req, res) => {
 const TTS_API_URL = (process.env.TTS_API_URL || 'http://4.247.160.91:64574').replace(/\/$/, '');
 const VOICE_CACHE_MAX = parseInt(process.env.VOICE_CACHE_MAX || '600', 10);
 
+/* ── Local Vakyansh TTS contract ───────────────────────────────────────────
+   POST {TTS_API_URL}/tts  { language, text, speaker? } -> audio/wav
+   `language` is REQUIRED (ISO 639-1 short code); `speaker` is 'male'|'female'.
+   The host currently serves Indic languages only (hi/ta/te/bn/mr/or/gu/pa);
+   kn/ml return "Unsupported language". Speaker defaults to female. */
+const TTS_SPEAKER = process.env.TTS_SPEAKER || 'female';
+const TTS_LANG_MAP = { EN: 'en', HI: 'hi', TA: 'ta', TE: 'te', BN: 'bn', MR: 'mr', OR: 'or', OD: 'or', GU: 'gu', PA: 'pa', KN: 'kn', ML: 'ml' };
+function toLocalTtsLang(code) {
+  if (!code) return '';
+  const up = String(code).trim().toUpperCase();
+  return TTS_LANG_MAP[up] || String(code).trim().slice(0, 2).toLowerCase();
+}
+/* fall back to the Unicode script when no language code was supplied, so the
+   Vakyansh model always receives the right `language` */
+function detectTtsLang(text) {
+  const s = String(text || '');
+  if (/[ఀ-౿]/.test(s)) return 'te';   // Telugu
+  if (/[஀-௿]/.test(s)) return 'ta';   // Tamil
+  if (/[ঀ-৿]/.test(s)) return 'bn';   // Bengali
+  if (/[଀-୿]/.test(s)) return 'or';   // Odia
+  if (/[઀-૿]/.test(s)) return 'gu';   // Gujarati
+  if (/[਀-੿]/.test(s)) return 'pa';   // Punjabi
+  if (/[ऀ-ॿ]/.test(s)) return 'hi';   // Devanagari → Hindi/Marathi
+  return 'en';
+}
+/* Call the local Vakyansh model with the current contract. Throws on non-2xx so
+   callers can fall back to Sarvam. */
+async function synthLocalTts(text, lang, signal) {
+  const language = toLocalTtsLang(lang) || detectTtsLang(text);
+  const resp = await fetch(TTS_API_URL + '/tts', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language, text: String(text), speaker: TTS_SPEAKER }),
+    signal
+  });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '');
+    throw new Error('local tts ' + resp.status + (detail ? ': ' + detail.slice(0, 160) : ''));
+  }
+  return Buffer.from(await resp.arrayBuffer());
+}
+
 function ttsHash(text) { return crypto.createHash('sha256').update(String(text)).digest('hex'); }
 function voiceCacheGet(hash) {
   const s = readStore();
@@ -764,18 +805,18 @@ app.post('/api/tts', async (req, res) => {
     if (useSarvam) {
       buf = await sarvamTts(text, lang);
     } else {
-      const resp = await fetch(TTS_API_URL + '/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-        signal: controller.signal
-      });
-      if (!resp.ok) {
-        const detail = await resp.text().catch(() => '');
-        return res.status(resp.status).json({ ok: false, error: 'tts service ' + resp.status + (detail ? ': ' + detail.slice(0, 200) : '') });
+      /* Local Vakyansh model is primary; if it errors (host down / a language
+         model failed to load), fall back to Sarvam so voice never breaks. */
+      try {
+        buf = await synthLocalTts(text, lang, controller.signal);
+      } catch (localErr) {
+        if (SARVAM_API_KEY) {
+          console.warn('local tts failed, falling back to Sarvam:', localErr.message);
+          buf = await sarvamTts(text, lang);
+        } else {
+          return res.status(502).json({ ok: false, error: 'tts service ' + localErr.message });
+        }
       }
-      buf = Buffer.from(await resp.arrayBuffer());
-      contentType = resp.headers.get('content-type') || 'audio/wav';
     }
     try { voiceCachePut(hash, buf, contentType); } catch (e) { console.error('voice cache store failed:', e.message); }
     res.set('Content-Type', contentType);
@@ -820,7 +861,7 @@ const VOICE_PREWARM_TOTAL = VOICE_TEMPLATES.length * VOICE_LANGS.length + VOICE_
 /* Bump when the translate/TTS pipeline changes (e.g. number expansion, sentence
    chunking) — on boot this invalidates every cached voice + warm marker so the
    next prewarm regenerates them with the new pipeline. */
-const VOICE_PIPELINE_VERSION = '2-numwords-chunked';
+const VOICE_PIPELINE_VERSION = '3-vakyansh-lang';
 function srcKey(text, lang) { return lang + '|' + crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 12); }
 
 async function prewarmTranslate(text, code) {
@@ -829,15 +870,17 @@ async function prewarmTranslate(text, code) {
   const out = await translateFull(text, toNllb('eng_Latn'), toNllb(code));
   return (out && out.trim()) || null;
 }
-async function prewarmTts(text) {
+async function prewarmTts(text, lang) {
   const hash = ttsHash(text);
   if (voiceCacheGet(hash)) return { hash, generated: false };   // already cached — never re-generate
-  const resp = await fetch(TTS_API_URL + '/tts', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text })
-  });
-  if (!resp.ok) throw new Error('tts ' + resp.status);
-  const buf = Buffer.from(await resp.arrayBuffer());
-  voiceCachePut(hash, buf, resp.headers.get('content-type') || 'audio/wav');
+  let buf;
+  try {
+    buf = await synthLocalTts(text, lang);
+  } catch (localErr) {
+    if (SARVAM_API_KEY) buf = await sarvamTts(text, lang);
+    else throw localErr;
+  }
+  voiceCachePut(hash, buf, 'audio/wav');
   return { hash, generated: true };
 }
 
@@ -866,7 +909,7 @@ async function prewarmVoices() {
       try {
         const text = await prewarmTranslate(VOICE_TEMPLATES[i], lang);
         if (!text) throw new Error('no translation');
-        const r = await prewarmTts(text);
+        const r = await prewarmTts(text, lang);
         store.data.voiceWarm[key] = { hash: r.hash, lang, at: new Date().toISOString() };
         dbPut('voiceWarm', key, store.data.voiceWarm[key]);
         if (r.generated) generated++; else cached++;
@@ -879,7 +922,7 @@ async function prewarmVoices() {
     const warm = store.data.voiceWarm[key];
     if (warm && warm.hash && voiceCacheGet(warm.hash)) { cached++; continue; }
     try {
-      const r = await prewarmTts(text);
+      const r = await prewarmTts(text, 'te');   // the transport comms are Telugu
       store.data.voiceWarm[key] = { hash: r.hash, at: new Date().toISOString() };
       dbPut('voiceWarm', key, store.data.voiceWarm[key]);
       if (r.generated) generated++; else cached++;
@@ -1049,11 +1092,13 @@ async function synthVoiceWav(text, lang, provider) {
     if (cached && cached.audio && String(cached.contentType || '').includes('wav')) {
       wav = Buffer.from(cached.audio, 'base64');
     } else {
-      const resp = await fetch(TTS_API_URL + '/tts', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: finalText })
-      });
-      if (!resp.ok) throw new Error('tts service ' + resp.status);
-      wav = Buffer.from(await resp.arrayBuffer());
+      /* local Vakyansh model primary, Sarvam fallback if the host errors */
+      try {
+        wav = await synthLocalTts(finalText, code);
+      } catch (localErr) {
+        if (SARVAM_API_KEY) wav = await sarvamTts(finalText, code);
+        else throw localErr;
+      }
     }
   }
   return { wav, finalText };

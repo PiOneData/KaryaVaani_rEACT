@@ -41,6 +41,11 @@ services:
       # Public origin the backend uses to build fetchable media URLs (voice
       # notes) that WhatsApp/AOC download when sending audio messages.
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://karyavaani.pionedata.com}
+      # Self-hosted Vakyansh TTS (primary voice engine). Contract:
+      # POST {TTS_API_URL}/tts { language, text, speaker } -> audio/wav.
+      # speaker is 'male' | 'female'. Falls back to Sarvam when this host errors.
+      - TTS_API_URL=${TTS_API_URL:-http://4.247.160.91:64574}
+      - TTS_SPEAKER=${TTS_SPEAKER:-female}
       # Sarvam AI translation engine (optional alternative to the self-hosted
       # IndicTrans2 model). Blank key = the Sarvam option falls back to our model.
       - SARVAM_API_URL=${SARVAM_API_URL:-https://api.sarvam.ai}
