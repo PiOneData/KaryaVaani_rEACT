@@ -144,9 +144,9 @@ export default function SecEmpHome() {
           <div className="card emp-schedule-card" id="emp-schedule-card">
             <div className="card-h">
               <div>
-                <div className="card-h-title">Today & tomorrow · your schedule</div>
+                <div className="card-h-title" id="emp-schedule-title">Weekly roster · your shift & transport</div>
                 {' '}
-                <div className="card-h-sub">Shift, pickup, and induction reminders pulled from your roster</div>
+                <div className="card-h-sub" id="emp-schedule-sub">Your shift, route and pickup/drop times pulled from the transport roster</div>
               </div>
             </div>
             {' '}
@@ -242,7 +242,7 @@ export default function SecEmpHome() {
                 </span>
               </button>
               {' '}
-              <button className="emp-qa-btn" onClick={(event) => { window.empToast('Language preference saved in your profile') }} data-onclick="empToast('Language preference saved in your profile')">
+              <button className="emp-qa-btn" onClick={(event) => { window.empChangeLanguage() }} data-onclick="empChangeLanguage()">
                 <span className="emp-qa-ico" style={{ background: "var(--ink-3)" }}>⌘</span>
                 {' '}
                 <span className="emp-qa-l">

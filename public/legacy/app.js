@@ -11501,17 +11501,74 @@ function __kvOnReady(fn) {
     '</div>';
   }
 
+  /* resolve the current worker's transport assignment (route + shift + times):
+     prefers an onboarded capture with a route, else a seed-roster match. */
+  function empTransportAssign(c) {
+    var caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    var u = window.__KVUSER || {};
+    var rec = null;
+    if (u.linkedType === 'worker' && u.linkedId) rec = caps.find(function (r) { return r.backendId === u.linkedId || r.id === u.linkedId; });
+    if (!rec && c) rec = caps.find(function (r) { return r.name && String(r.name).toLowerCase() === String(c.name).toLowerCase(); });
+    if (rec && rec.route && typeof TR_ROUTES !== 'undefined') {
+      var ro = TR_ROUTES.find(function (x) { return x.route === rec.route || x.code === rec.route; });
+      if (ro) {
+        var sh = String(rec.shift || '').toLowerCase();
+        var shift = sh.indexOf('night') >= 0 ? 'night' : (sh.indexOf('gen') >= 0 ? 'general' : 'morning');
+        return { route: ro.code, routeName: ro.route, shift: shift, pickupIdx: 0, pickup: (ro.stops && ro.stops[0] && ro.stops[0].name) || '—', ro: ro };
+      }
+    }
+    var roster = (window.__KVDATA && window.__KVDATA.omMapping) || (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
+    var w = roster.find(function (x) { return (c && c.code && x.code === c.code) || (c && x.name && x.name.toLowerCase() === String(c.name).toLowerCase()); });
+    if (w && typeof trAssign === 'function') {
+      var a = trAssign(w);
+      if (a) { a.ro = (typeof TR_ROUTES !== 'undefined') ? TR_ROUTES.find(function (x) { return x.code === a.route; }) : null; return a; }
+    }
+    return null;
+  }
+
   function empRenderSchedule(c) {
     const host = document.getElementById('emp-schedule-list');
     if (!host) return;
-    /* synthesize a small day-of schedule from chat presets + zone */
+    const titleEl = document.getElementById('emp-schedule-title');
+    const subEl = document.getElementById('emp-schedule-sub');
+    const a = empTransportAssign(c);
+    if (a && a.ro && typeof trPickupAt === 'function') {
+      const sLetter = a.shift === 'night' ? 'C' : a.shift === 'general' ? 'B' : 'A';
+      const shiftLabel = a.shift === 'night' ? 'Night · Shift C' : a.shift === 'general' ? 'General · Shift B' : 'Morning · Shift A';
+      const pickupT = trPickupAt(a.ro, sLetter, a.pickupIdx || 0);
+      const dropT = trDropAt(a.ro, sLetter, a.pickupIdx || 0);
+      const plantIn = trM2T((TR_SHIFT_PLANT[sLetter] || TR_SHIFT_PLANT.A).in);
+      const plantOut = trM2T((TR_SHIFT_PLANT[sLetter] || TR_SHIFT_PLANT.A).out);
+      if (titleEl) titleEl.textContent = 'Weekly roster · ' + (a.routeName || a.route);
+      if (subEl) subEl.textContent = shiftLabel + ' · board at ' + a.pickup + ' · reach plant ' + plantIn;
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      let html = '<div class="note indigo" style="margin-bottom:10px;font-size:0.78rem">' +
+        '<strong>' + (a.routeName || a.route) + '</strong> · ' + shiftLabel + ' · pickup at <strong>' + a.pickup + '</strong> ' + pickupT +
+        ' → plant ' + plantIn + ' · drop ' + plantOut + ' → ' + a.pickup + ' ' + dropT + '</div>';
+      html += days.map(function (d) {
+        const standDown = (d === 'Sat' && (a.route === 'B3' || a.route === 'B5'));
+        return '<div class="emp-sched">' +
+          '<div class="emp-sched-when">' + d + '</div>' +
+          '<div class="emp-sched-main">' +
+            (standDown
+              ? '<div class="emp-sched-t">Route stood down</div><div class="emp-sched-s">No transport on Saturday for this route</div>'
+              : '<div class="emp-sched-t">↑ Pickup ' + pickupT + ' · reach plant ' + plantIn + '</div>' +
+                '<div class="emp-sched-s">↓ Drop leaves plant ' + plantOut + ' · reaches ' + a.pickup + ' by ' + dropT + '</div>') +
+          '</div>' +
+        '</div>';
+      }).join('');
+      host.innerHTML = html;
+      return;
+    }
+    /* fallback: worker not matched to a transport route — generic day schedule */
+    if (titleEl) titleEl.textContent = 'Today & tomorrow · your schedule';
+    if (subEl) subEl.textContent = 'Shift, pickup, and induction reminders pulled from your roster';
     const items = [
       { when: 'Today · 06:55', t: 'Bus pickup', s: 'Route via ' + (c.zone || 'Zone') + ' · scheduled by Transport Schedule' },
       { when: 'Today · 08:00', t: 'Shift start', s: c.role + ' · ' + c.zone },
       { when: 'Today · 12:30', t: 'Lunch break', s: '30 min · canteen on the production floor' },
       { when: 'Today · 16:30', t: 'Shift end', s: 'Return bus departs at 16:45' }
     ];
-    /* if the worker is in compressor / paint shop, add a safety induction */
     if (/Compressor|Paint/i.test(c.zone || '')) {
       items.splice(2, 0, { when: 'Today · 11:00', t: 'PPE check', s: 'Class-B helmet + steel-toe shoes mandatory on the line' });
     }
@@ -11524,6 +11581,44 @@ function __kvOnReady(fn) {
         '</div>' +
       '</div>';
     }).join('');
+  }
+
+  /* change the current worker's preferred language — updates the chat contact,
+     the induction language map and (if onboarded) the persisted capture record */
+  function empChangeLanguage() {
+    var c = (typeof CHAT_CONTACTS !== 'undefined') ? CHAT_CONTACTS.find(function (x) { return x.id === EMP_ACTIVE; }) : null;
+    if (!c) { toast('No worker selected', 'red'); return; }
+    var langs = (typeof VB_LANGS !== 'undefined') ? VB_LANGS : [{ code: 'TE', name: 'Telugu', glyph: 'తె' }, { code: 'HI', name: 'Hindi', glyph: 'हि' }, { code: 'TA', name: 'Tamil', glyph: 'த' }];
+    var opts = langs.map(function (l) {
+      return '<button class="btn ' + (l.code === c.lang ? 'primary' : '') + '" style="justify-content:flex-start;min-width:150px" onclick="empSetLanguage(\'' + l.code + '\')">' +
+        '<span style="font-size:1.05rem;margin-right:8px">' + (l.glyph || '') + '</span>' + l.name + (l.code === c.lang ? ' · current' : '') + '</button>';
+    }).join('');
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Preferred language</span>' +
+        '<span class="modal-h-title">Change my language</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body"><div class="cap-hint" style="margin-bottom:12px">Karya Vaani will deliver every message, briefing and reminder in your chosen language.</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:10px">' + opts + '</div></div>',
+      560
+    );
+  }
+  function empSetLanguage(code) {
+    var c = (typeof CHAT_CONTACTS !== 'undefined') ? CHAT_CONTACTS.find(function (x) { return x.id === EMP_ACTIVE; }) : null;
+    if (!c) return;
+    var langs = (typeof VB_LANGS !== 'undefined') ? VB_LANGS : [];
+    var l = langs.find(function (x) { return x.code === code; }) || { code: code, name: code };
+    c.lang = code;
+    if (typeof WORKER_LANGUAGE !== 'undefined') WORKER_LANGUAGE[c.name] = code;
+    /* persist onto the onboarding record if this worker is onboarded */
+    var caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    var u = window.__KVUSER || {};
+    var rec = null;
+    if (u.linkedType === 'worker' && u.linkedId) rec = caps.find(function (r) { return r.backendId === u.linkedId || r.id === u.linkedId; });
+    if (!rec) rec = caps.find(function (r) { return r.name && String(r.name).toLowerCase() === String(c.name).toLowerCase(); });
+    if (rec && typeof obPersistRec === 'function') obPersistRec(rec, { lang: l.name });
+    omCloseModal();
+    if (typeof empRender === 'function') empRender();
+    toast('Language changed to ' + l.name, 'green');
   }
 
   function empRenderPersonalAnalytics(c, agg) {
