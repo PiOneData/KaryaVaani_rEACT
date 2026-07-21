@@ -94,11 +94,15 @@ async function post(payload) {
   /* AOC signals failure with a non-2xx status and/or a non-null `error`. */
   if (!resp.ok || (json && json.error)) {
     const e = json && json.error;
-    const msg =
-      (e && (e.message || (typeof e === 'string' ? e : JSON.stringify(e)))) ||
-      (json && json.message) ||
-      `HTTP ${resp.status}`;
-    const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    /* Surface the fullest error we can: a message string if present, otherwise
+       the whole response body (AOC sometimes returns a bare {error:true} with
+       the real reason elsewhere in the payload). */
+    let msg;
+    if (e && typeof e === 'object' && e.message) msg = e.message;
+    else if (typeof e === 'string' && e) msg = e;
+    else if (json && json.message) msg = json.message;
+    else msg = 'HTTP ' + resp.status + ' · ' + JSON.stringify(json).slice(0, 300);
+    const err = new Error(msg);
     err.raw = json;
     throw err;
   }
