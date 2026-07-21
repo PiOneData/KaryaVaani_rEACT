@@ -3967,17 +3967,17 @@ function __kvOnReady(fn) {
   function renderCtPaneDocs(c) {
     /* mock — generates a docs table for the contractor */
     const baseDocs = [
-      { type: 'CLRA licence',            file: 'clra_licence_' + c.id.toLowerCase() + '.pdf', expiry: c.clra.expiresOn, status: c.clra.cls, statusLabel: c.clra.label, hash: 'a3f7…' + c.id.slice(-3) },
-      { type: 'ESIC employer code',      file: 'esic_code_certificate.pdf', expiry: '—', status: 'green', statusLabel: 'Valid', hash: '5b88…' + c.id.slice(-3) },
-      { type: 'PF establishment code',   file: 'pf_estab_code.pdf', expiry: '—', status: 'green', statusLabel: 'Valid', hash: '7c12…' + c.id.slice(-3) },
-      { type: 'GST certificate',         file: 'gst_cert_' + c.gst.slice(-5) + '.pdf', expiry: '—', status: 'green', statusLabel: 'Active', hash: 'aa90…' + c.id.slice(-3) },
-      { type: 'Service agreement',       file: 'service_agreement_v3.pdf', expiry: '15 Mar 2027', status: 'green', statusLabel: 'Active', hash: 'b821…' + c.id.slice(-3) },
-      { type: 'Insurance · WC policy',   file: 'wc_policy_2026.pdf', expiry: '01 Apr 2027', status: 'green', statusLabel: 'Active', hash: '882c…' + c.id.slice(-3) },
+      { slug: 'clra', type: 'CLRA licence',            file: 'clra_licence_' + c.id.toLowerCase() + '.pdf', expiry: c.clra.expiresOn, status: c.clra.cls, statusLabel: c.clra.label, hash: 'a3f7…' + c.id.slice(-3) },
+      { slug: 'esic-code', type: 'ESIC employer code',      file: 'esic_code_certificate.pdf', expiry: '—', status: 'green', statusLabel: 'Valid', hash: '5b88…' + c.id.slice(-3) },
+      { slug: 'pf', type: 'PF establishment code',   file: 'pf_estab_code.pdf', expiry: '—', status: 'green', statusLabel: 'Valid', hash: '7c12…' + c.id.slice(-3) },
+      { slug: 'gst', type: 'GST certificate',         file: 'gst_cert_' + c.gst.slice(-5) + '.pdf', expiry: '—', status: 'green', statusLabel: 'Active', hash: 'aa90…' + c.id.slice(-3) },
+      { slug: 'service', type: 'Service agreement',       file: 'service_agreement_v3.pdf', expiry: '15 Mar 2027', status: 'green', statusLabel: 'Active', hash: 'b821…' + c.id.slice(-3) },
+      { slug: 'wc', type: 'Insurance · WC policy',   file: 'wc_policy_2026.pdf', expiry: '01 Apr 2027', status: 'green', statusLabel: 'Active', hash: '882c…' + c.id.slice(-3) },
     ];
     if (c.esic.state === 'breach') {
-      baseDocs.push({ type: 'ESIC May 2026 challan', file: 'esic_challan_may2026.pdf', expiry: '—', status: 'red', statusLabel: 'Shortfall · 4 workers', hash: 'red…' + c.id.slice(-3) });
+      baseDocs.push({ slug: 'esic-challan', type: 'ESIC May 2026 challan', file: 'esic_challan_may2026.pdf', expiry: '—', status: 'red', statusLabel: 'Shortfall · 4 workers', hash: 'red…' + c.id.slice(-3) });
     } else {
-      baseDocs.push({ type: 'ESIC May 2026 challan', file: 'esic_challan_may2026.pdf', expiry: '—', status: c.esic.cls, statusLabel: c.esic.label, hash: 'aa90…' + c.id.slice(-3) });
+      baseDocs.push({ slug: 'esic-challan', type: 'ESIC May 2026 challan', file: 'esic_challan_may2026.pdf', expiry: '—', status: c.esic.cls, statusLabel: c.esic.label, hash: 'aa90…' + c.id.slice(-3) });
     }
 
     let html = '';
@@ -3989,20 +3989,172 @@ function __kvOnReady(fn) {
       'ESIC employer code': { type: 'ESIC employer code', value: c.esicCode },
       'GST certificate':    { type: 'GST', value: c.gst }
     };
-    html += '<table class="t"><thead><tr><th>Document type</th><th>File</th><th>Expiry</th><th>Status</th><th>Audit hash</th></tr></thead><tbody>';
+    html += '<table class="t"><thead><tr><th>Document type</th><th>File</th><th>Expiry</th><th>Status</th><th>Audit hash</th><th></th></tr></thead><tbody>';
     baseDocs.forEach(d => {
       const idDoc = docIdMap[d.type];
       const typeCell = idDoc
         ? kvIdSpan(idDoc.type, idDoc.value, c.id, 'contractor')
         : d.type;
       html += '<tr><td class="t-strong">' + typeCell + '</td>' +
-              '<td class="mono tiny">' + d.file + '</td>' +
+              '<td class="mono tiny"><span class="cap-recent-link" onclick="ctViewDoc(\'' + c.id + '\',\'' + d.slug + '\')" title="Open document">📄 ' + d.file + '</span></td>' +
               '<td>' + d.expiry + '</td>' +
               '<td><span class="pill ' + d.status + '">' + d.statusLabel + '</span></td>' +
-              '<td class="mono tiny">' + d.hash + '</td></tr>';
+              '<td class="mono tiny">' + d.hash + '</td>' +
+              '<td style="text-align:right"><button class="btn tiny" onclick="ctViewDoc(\'' + c.id + '\',\'' + d.slug + '\')">View</button></td></tr>';
     });
     html += '</tbody></table>';
     document.getElementById('ct-pane-docs').innerHTML = html;
+  }
+
+  /* ── generate + open a realistic compliance document for the demo ──────────
+     Builds a formatted, printable (Save-as-PDF) document from the contractor's
+     real record fields, opened in a new tab. Covers every row in the Documents
+     tab so each is openable and presentable. */
+  function ctViewDoc(cid, slug) {
+    var c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS.find(function (x) { return x.id === cid; }) : null;
+    if (!c) { toast('Contractor not found', 'red'); return; }
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    var row = function (k, v) { return '<div class="row"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>'; };
+    var addr = esc(c.area || 'Sricity SEZ') + ', Andhra Pradesh – 517646';
+    var refNo = (c.id || 'CT').toUpperCase().replace(/[^A-Z0-9]/g, '') + '-' + (2026);
+    var todayLong = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    /* per-document authority header + title + body */
+    var DOCS = {
+      'clra': {
+        auth: 'GOVERNMENT OF ANDHRA PRADESH', dept: 'Office of the Licensing Officer · Labour Department',
+        title: 'LICENCE UNDER THE CONTRACT LABOUR (R&amp;A) ACT, 1970',
+        wm: 'CLRA',
+        body: row('Licence No.', 'ALC/CLRA/' + refNo + '/438') +
+          row('Issued to (Contractor)', c.name) +
+          row('Registered address', addr) +
+          row('PAN / CIN', c.panCin || 'AAQFS8338K1Z3') +
+          row('Principal Employer', 'Daikin Airconditioning India Pvt. Ltd., Sricity') +
+          row('Nature of work', 'Manpower supply · assembly, material handling, housekeeping') +
+          row('Maximum workers permitted', (c.deployed || 0) + ' workmen') +
+          row('Date of issue', '18 Jul 2025') +
+          row('Valid up to', c.clra && c.clra.expiresOn ? c.clra.expiresOn : '18 Jul 2026') +
+          row('Status', (c.clra && c.clra.label) || 'Active')
+      },
+      'esic-code': {
+        auth: 'EMPLOYEES’ STATE INSURANCE CORPORATION', dept: 'Ministry of Labour &amp; Employment, Govt. of India',
+        title: 'CERTIFICATE OF REGISTRATION (EMPLOYER CODE)',
+        wm: 'ESIC',
+        body: row('Employer Code No.', c.esicCode || '52-AP-2023-' + c.id.slice(-3)) +
+          row('Name of employer', c.name) +
+          row('Address of establishment', addr) +
+          row('Date of coverage', '01 Apr 2023') +
+          row('Sub-code (Sricity unit)', (c.esicCode || '52000000000').slice(0, 2) + '-SRC-' + c.id.slice(-3)) +
+          row('Nature of business', 'Contract manpower services') +
+          row('Regional Office', 'ESIC Regional Office, Guntur, A.P.') +
+          row('Status', (c.esic && c.esic.label) || 'Active &amp; contributing')
+      },
+      'pf': {
+        auth: 'EMPLOYEES’ PROVIDENT FUND ORGANISATION', dept: 'Ministry of Labour &amp; Employment, Govt. of India',
+        title: 'ESTABLISHMENT REGISTRATION CERTIFICATE (EPFO)',
+        wm: 'EPFO',
+        body: row('Establishment Code', 'APGNT' + (1500000 + parseInt(c.id.slice(-3) || '1')) + '000') +
+          row('Name of establishment', c.name) +
+          row('Address', addr) +
+          row('Date of coverage', '01 Apr 2023') +
+          row('Applicable scheme', 'EPF & MP Act, 1952 · EPF, EPS & EDLI') +
+          row('Contribution rate', '12% employee + 12% employer') +
+          row('EPFO Office', 'Regional PF Office, Guntur, A.P.') +
+          row('Status', 'Active · ECR filed to date')
+      },
+      'gst': {
+        auth: 'GOVERNMENT OF INDIA · FORM GST REG-06', dept: 'Goods and Services Tax · Central Board of Indirect Taxes',
+        title: 'CERTIFICATE OF REGISTRATION (GST)',
+        wm: 'GST',
+        body: row('GSTIN', c.gst || '37AAQFS8338K1Z3') +
+          row('Legal name', c.name) +
+          row('Trade name', c.name) +
+          row('Constitution of business', 'Private Limited Company') +
+          row('Address of principal place', addr) +
+          row('Date of liability', '01 Jul 2017') +
+          row('Type of registration', 'Regular') +
+          row('Status', 'Active')
+      },
+      'service': {
+        auth: 'DAIKIN AIRCONDITIONING INDIA PVT. LTD.', dept: 'Contract Labour &amp; Facilities · Sricity Plant',
+        title: 'MANPOWER SERVICE AGREEMENT',
+        wm: 'AGREEMENT',
+        body: row('Agreement No.', 'DAI/MSA/' + refNo + '/V3') +
+          row('Between (Principal Employer)', 'Daikin Airconditioning India Pvt. Ltd.') +
+          row('And (Service Provider)', c.name) +
+          row('Scope of services', 'Supply of ' + (c.deployed || 0) + ' contract workmen for plant operations') +
+          row('Commencement date', '01 Apr 2024') +
+          row('Term / valid up to', '15 Mar 2027') +
+          row('Statutory obligations', 'CLRA, ESIC, EPF, minimum wages & WC — service provider’s liability') +
+          row('Status', 'Active')
+      },
+      'wc': {
+        auth: 'THE ORIENTAL INSURANCE CO. LTD.', dept: 'Workmen’s Compensation Policy · Commercial Lines',
+        title: 'WORKMEN’S COMPENSATION INSURANCE POLICY',
+        wm: 'INSURED',
+        body: row('Policy No.', 'OIC/WC/2026/' + refNo) +
+          row('Insured (Contractor)', c.name) +
+          row('Location of risk', 'Daikin Plant, Sricity SEZ, A.P.') +
+          row('Number of workmen covered', (c.deployed || 0)) +
+          row('Sum insured (per capita)', '₹ 15,00,000 statutory + medical') +
+          row('Policy period', '01 Apr 2026 to 31 Mar 2027') +
+          row('Coverage', 'Workmen’s Compensation Act 1923 · death, disability, medical') +
+          row('Status', 'Active · premium paid')
+      },
+      'esic-challan': {
+        auth: 'EMPLOYEES’ STATE INSURANCE CORPORATION', dept: 'Monthly Contribution Challan',
+        title: 'ESIC CONTRIBUTION CHALLAN · MAY 2026',
+        wm: (c.esic && c.esic.state === 'breach') ? 'SHORTFALL' : 'PAID',
+        body: row('Challan No.', 'ESIC/' + refNo + '/052026') +
+          row('Employer Code', c.esicCode || '52-AP-2023-' + c.id.slice(-3)) +
+          row('Contribution period', 'May 2026') +
+          row('Number of employees', (c.deployed || 0)) +
+          row('Total wages', '₹ ' + ((c.deployed || 0) * 15600).toLocaleString('en-IN')) +
+          row('Employee contribution (0.75%)', '₹ ' + Math.round((c.deployed || 0) * 15600 * 0.0075).toLocaleString('en-IN')) +
+          row('Employer contribution (3.25%)', '₹ ' + Math.round((c.deployed || 0) * 15600 * 0.0325).toLocaleString('en-IN')) +
+          row('Payment status', (c.esic && c.esic.state === 'breach') ? 'SHORTFALL · 4 workers not enrolled' : 'Paid in full')
+      }
+    };
+    var d = DOCS[slug];
+    if (!d) { toast('Document unavailable', 'red'); return; }
+
+    var seal = '<div class="stamp">' + esc(d.wm) + '<br>VERIFIED<br>' + esc(refNo) + '</div>';
+    var html =
+      '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(c.name) + ' · ' + esc(d.title.replace(/<[^>]+>/g, '')) + '</title>' +
+      '<style>' +
+      'body{font-family:Georgia,"Times New Roman",serif;background:#e9edf2;margin:0;padding:24px;color:#1a2332}' +
+      '.doc{max-width:820px;margin:0 auto;background:#fff;padding:46px 56px;box-shadow:0 6px 30px rgba(0,0,0,.15);position:relative;border-top:6px solid #1e3a5f;overflow:hidden}' +
+      '.wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:110px;color:rgba(30,58,95,.06);font-weight:800;transform:rotate(-28deg);pointer-events:none;letter-spacing:6px}' +
+      '.gov{text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:14px;margin-bottom:6px;position:relative}' +
+      '.gov .em{font-size:34px}' +
+      '.gov h1{font-size:19px;margin:6px 0 0;color:#1e3a5f;letter-spacing:1px}' +
+      '.gov .sub{font-size:12px;color:#5a6b82;margin-top:4px}' +
+      '.doctitle{text-align:center;font-size:17px;font-weight:700;margin:20px 0 18px;text-decoration:underline;position:relative}' +
+      '.row{display:flex;padding:8px 0;border-bottom:1px dotted #cbd5e1;font-size:14px;position:relative}' +
+      '.row .k{width:250px;color:#5a6b82}.row .v{flex:1;font-weight:600}' +
+      '.seal{margin-top:34px;display:flex;justify-content:space-between;align-items:flex-end;position:relative}' +
+      '.stamp{width:118px;height:118px;border:3px double #1e6f3a;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#1e6f3a;transform:rotate(-12deg);font-weight:700;line-height:1.5}' +
+      '.sign{text-align:center;font-size:13px}.sign .line{border-top:1px solid #1a2332;width:210px;margin-bottom:4px}' +
+      '.foot{margin-top:26px;font-size:10px;color:#8a97a8;text-align:center;border-top:1px solid #e2e8f0;padding-top:10px;position:relative}' +
+      '.bar{font-family:monospace;font-size:22px;letter-spacing:-3px;color:#222;margin-top:4px}' +
+      '.actions{text-align:center;margin-top:16px}.actions button{font-family:system-ui;font-size:14px;padding:9px 18px;border:0;border-radius:8px;background:#1e3a5f;color:#fff;cursor:pointer}' +
+      '@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0}.actions{display:none}}' +
+      '</style></head><body>' +
+      '<div class="doc"><div class="wm">' + esc(d.wm) + '</div>' +
+        '<div class="gov"><div class="em">🇮🇳</div><h1>' + d.auth + '</h1><div class="sub">' + d.dept + '</div></div>' +
+        '<div class="doctitle">' + d.title + '</div>' +
+        d.body +
+        '<div class="seal">' + seal +
+          '<div class="sign"><div class="line"></div>Authorised Signatory<br><span style="font-size:11px;color:#5a6b82">' + esc(c.complianceLead ? c.complianceLead.split(' ·')[0] : 'Compliance Lead') + '</span></div>' +
+        '</div>' +
+        '<div class="foot">This is a system-generated demo document · encrypted at rest · chained to the Karya Vaani audit trail.<br>Ref ' + esc(refNo) + ' · issued ' + todayLong + '<div class="bar">|| ||| | |||| || | ||| |||| | || |||</div></div>' +
+      '</div>' +
+      '<div class="actions"><button onclick="window.print()">⎙ Print / Save as PDF</button></div>' +
+      '</body></html>';
+
+    var w = window.open('', '_blank');
+    if (!w) { toast('Popup blocked — allow popups to view the document', 'red'); return; }
+    w.document.write(html); w.document.close();
   }
 
   function renderCtPaneComms(c) {
