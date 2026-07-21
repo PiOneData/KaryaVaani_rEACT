@@ -8402,6 +8402,63 @@ function __kvOnReady(fn) {
 
   /* "Send next broadcast" — pushes the next template into the active thread,
      after a brief typing indicator, in the worker's language */
+  /* ── dynamic, personalized WhatsApp template data ─────────────────────────
+     Keeps the approved templates from reading flat: future-dated effective
+     dates, real pay periods and named contacts, plus per-worker language
+     routing to the right approved template. */
+  function kvTplFmtDate(d) { return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }); }
+  function kvTplFutureDate(days) { var d = new Date(); d.setDate(d.getDate() + (days || 14)); return kvTplFmtDate(d); }
+  function kvTplNextMonth() { var d = new Date(); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' }); }
+  function kvTplFirstName(name) { return (String(name || '').trim().split(/\s+/)[0]) || 'there'; }
+  function kvTplLang(lang) {
+    var s = String(lang || '').trim().toLowerCase();
+    if (s.indexOf('tam') >= 0 || s === 'ta') return 'ta';
+    if (s.indexOf('tel') >= 0 || s === 'te') return 'te';
+    return 'en';
+  }
+  /* Telugu minimum-wage template ('trial') — dynamic + named body variables:
+     [ revision label, effective date (future), where details are, pay period,
+       named contact person ] */
+  function kvWageParams() {
+    return ['2026', kvTplFutureDate(14), 'కార్య వాణి యాప్ మరియు నోటీసు బోర్డు', kvTplNextMonth(), 'ప్రియా మీనన్ · ప్లాంట్ HR'];
+  }
+  function kvBodyComp(params) { return [{ type: 'body', parameters: params.map(function (v) { return { type: 'text', text: String(v) }; }) }]; }
+
+  /* Send the right approved template(s) to a newly onboarded worker, chosen by
+     their selected language: a personalized account-creation welcome for
+     everyone (verify → Karya Vaani login), plus the Tamil transport notice or
+     the Telugu wage notice with dynamic, future-dated content. HR only. */
+  function kvSendOnboardingWhatsApp(i) {
+    if (typeof obRequireHR === 'function' && !obRequireHR()) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var to = rec.mobile || '';
+    if (!to) { toast('No mobile / WhatsApp number on record', 'red'); return; }
+    if (!window.KVWhatsApp) { toast('WhatsApp gateway unavailable', 'red'); return; }
+    var lang = kvTplLang(rec.lang);
+    var firstName = kvTplFirstName(rec.name);
+    var sends = [], labels = [];
+    /* 1 · personalized account-creation welcome (its Verify button links to the
+       Karya Vaani worker login, configured on the approved template) */
+    sends.push(window.KVWhatsApp.sendTemplate(to, 'account_creation', 'en_US', kvBodyComp([firstName])));
+    labels.push('welcome · ' + firstName);
+    /* 2 · language notice with dynamic future dates */
+    if (lang === 'ta') {
+      sends.push(window.KVWhatsApp.sendTemplate(to, 'tamil_transport_schedule_weekly_plan', 'ta', kvBodyComp([kvTplFutureDate(21)])));
+      labels.push('Tamil transport');
+    } else if (lang === 'te') {
+      sends.push(window.KVWhatsApp.sendTemplate(to, 'trial', 'te', kvBodyComp(kvWageParams())));
+      labels.push('Telugu wage revision');
+    }
+    toast('Sending onboarding WhatsApp to ' + rec.name + '…', 'blue');
+    Promise.all(sends).then(function (results) {
+      var ok = results.filter(function (r) { return r && r.ok; }).length;
+      if (ok) {
+        toast('✓ Sent ' + ok + ' approved template(s) to ' + rec.name + ' · ' + labels.join(' + '), 'green');
+        if (typeof kvNotify === 'function') kvNotify('WhatsApp sent · ' + rec.name, labels.join(' + ') + ' → ' + to, 'success');
+      } else { toast('WhatsApp send failed for ' + rec.name, 'red'); }
+    }).catch(function (e) { toast('WhatsApp send failed: ' + e.message, 'red'); });
+  }
+
   function chatSendNextBroadcast() {
     /* DEMO: always send the one approved WhatsApp template ('trial') to the
        fixed demo number 919500200300 — regardless of which worker is selected
@@ -8412,7 +8469,7 @@ function __kvOnReady(fn) {
     var now = new Date();
     var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
     var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
-    var params = ['TE2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
+    var params = (typeof kvWageParams === 'function') ? kvWageParams() : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
 
     /* focus (or create) the demo contact's conversation so the send is visible */
     var cid = (typeof chatEnsureLiveContact === 'function')
@@ -8626,7 +8683,7 @@ function __kvOnReady(fn) {
     var now = new Date();
     var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
     var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
-    var params = ['TE2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
+    var params = (typeof kvWageParams === 'function') ? kvWageParams() : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
     if (window.KVWhatsApp && typeof window.KVWhatsApp.sendApprovedTemplate === 'function') {
       window.KVWhatsApp.sendApprovedTemplate(demoNumber, params).then(function (res) {
         if (typeof toast === 'function') {
@@ -17763,6 +17820,7 @@ function __kvOnReady(fn) {
         '<div class="modal-footer-right">' +
         '<button class="btn" onclick="obEditCapture(' + i + ')">Edit</button>' +
         '<button class="btn danger" onclick="obDeleteCapture(' + i + ')">Delete</button>' +
+        ((typeof obIsHR === 'function' && obIsHR() && rec.mobile) ? '<button class="btn primary" onclick="kvSendOnboardingWhatsApp(' + i + ')" title="Send the approved welcome + language template to this worker">Send onboarding WhatsApp</button>' : '') +
         (c.status !== 'compliant' && rec.mobile ? '<button class="btn amber" onclick="obNotifyCapture(' + i + ')">Notify (WhatsApp)</button>' : '') +
         '<button class="btn" onclick="omCloseModal()">Close</button></div>'
     });

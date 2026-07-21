@@ -57,7 +57,10 @@
       var list = Array.isArray(to) ? to : [to];
       var recipients = list.map(cleanNumber).filter(function (n) { return n; });
       return post('/api/whatsapp/send-template', {
-        to: recipients, template: template, language: language || 'en', components: components
+        to: recipients, template: template, language: language || 'en', components: components,
+        /* per-language test-recipient routing (e.g. a Tamil template reaches the
+           Tamil-opted test number) — derived from the template language */
+        lang: String(language || '').slice(0, 2).toLowerCase()
       }).catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
     },
 
