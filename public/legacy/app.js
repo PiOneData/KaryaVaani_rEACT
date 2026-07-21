@@ -8437,9 +8437,13 @@ function __kvOnReady(fn) {
     var lang = kvTplLang(rec.lang);
     var firstName = kvTplFirstName(rec.name);
     var sends = [], labels = [];
-    /* 1 · personalized account-creation welcome (its Verify button links to the
-       Karya Vaani worker login, configured on the approved template) */
-    sends.push(window.KVWhatsApp.sendTemplate(to, 'account_creation', 'en_US', kvBodyComp([firstName])));
+    /* 1 · personalized account-creation welcome. Its Verify button is a
+       personalize-URL button → pass the login suffix (the worker's login
+       username, else their first name) so it deep-links to the Karya Vaani
+       worker login. */
+    var acComp = kvBodyComp([firstName]);
+    acComp.push({ type: 'button', sub_type: 'url', index: 0, parameters: [{ type: 'text', text: String(rec.loginUsername || firstName.toLowerCase()) }] });
+    sends.push(window.KVWhatsApp.sendTemplate(to, 'account_creation', 'en_US', acComp));
     labels.push('welcome · ' + firstName);
     /* 2 · language notice with dynamic future dates */
     if (lang === 'ta') {

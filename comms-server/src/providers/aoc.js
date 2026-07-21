@@ -61,6 +61,26 @@ function extractBodyParams(components) {
   return [];
 }
 
+/* Pull button (personalize-URL) params out of the components: either the
+   Meta-style array ([{ type:'button', sub_type:'url', parameters:[{text}] }])
+   or the AOC object ({ buttons:{ params:[...] } }). Templates with a dynamic
+   URL button (e.g. a "Verify account" link) require this or the send fails. */
+function extractButtonParams(components) {
+  if (!components) return [];
+  if (Array.isArray(components)) {
+    const btn = components.find((c) => {
+      const t = String(c.type || '').toLowerCase();
+      return t === 'button' || t === 'buttons';
+    });
+    const params = (btn && (btn.parameters || btn.params)) || [];
+    return params.map((p) => String((p && (p.text != null ? p.text : p)) || ''));
+  }
+  if (components.buttons && Array.isArray(components.buttons.params)) {
+    return components.buttons.params.map((p) => String(p == null ? '' : p));
+  }
+  return [];
+}
+
 async function post(payload) {
   const resp = await fetch(`${baseUrl}/v1/whatsapp`, {
     method: 'POST',
@@ -121,13 +141,18 @@ async function sendAudio({ to, link }) {
    the AOC shape { components: { body: { params: [...] } } }. */
 async function sendTemplate({ to, template, components, campaignName }) {
   const params = extractBodyParams(components);
+  const buttonParams = extractButtonParams(components);
+  const comp = { body: { params } };
+  /* only include buttons when the caller supplied a param — templates without a
+     dynamic-URL button must NOT receive a buttons block */
+  if (buttonParams.length) comp.buttons = { params: buttonParams };
   return post({
     from: toMsisdn(fromId),
     to: toMsisdn(to),
     templateName: template,
     type: 'template',
     campaignName: campaignName || 'karyavaani',
-    components: { body: { params } }
+    components: comp
   });
 }
 
