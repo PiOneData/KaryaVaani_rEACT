@@ -3457,9 +3457,49 @@ function __kvOnReady(fn) {
     vwRenderTable(c || { name: VW_STATE.contractor, deployed: VW_STATE.workers.length });
   }
 
+  /* is this the OM Manpower firm? Its real deployed roster is the client's
+     181-row manager-mapping sheet (omMapping), not a synthesized roster. */
+  function ctIsOM(c) { return !!c && (/om\s*manpower/i.test(c.name || '') || c.id === 'CT-009'); }
+
+  /* OM Manpower's deployed workers = the client's manager-mapping list, kept
+     intact (code, name, designation, department, reporting manager, UAN, ESI,
+     language), searchable + paginated, under the contractor drilldown. */
+  function renderOmMappingPane(c, host) {
+    var rows = (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
+    VW_STATE.contractor = c.name;
+    host.innerHTML =
+      '<div class="card-h" style="padding:0;margin-bottom:10px"><div>' +
+        '<div class="card-h-title" style="font-size:0.85rem">OM Manpower · manager mapping</div>' +
+        '<div class="card-h-sub">' + rows.length + ' associates · the client-provided roster (attendance / mapping sheet) — kept intact · click a row for full details</div>' +
+      '</div></div>' +
+      '<div class="wk-search" style="margin-bottom:10px"><span class="wk-search-ico">⌕</span>' +
+        '<input type="text" id="omw-search" class="wk-search-in" autocomplete="off" placeholder="Search associate, code, designation, manager, UAN, ESI…"></div>' +
+      '<div style="overflow-x:auto"><table class="t"><thead><tr>' +
+        '<th>Associate code</th><th>Name</th><th>Designation</th><th>Department</th><th>Reporting manager</th><th>UAN no</th><th>ESI no</th><th>Language</th>' +
+      '</tr></thead><tbody id="omw-body"></tbody></table></div>' +
+      '<div id="omw-pagination" class="om-pg"></div>' +
+      '<div id="ctw-onboarding"></div>';
+    if (typeof KVTABLE !== 'undefined') {
+      KVTABLE.set({
+        key: 'omw', tbody: 'omw-body', pageSize: 12, cols: 8, rows: rows,
+        text: function (r) { return [r.code, r.name, r.desig, r.dept, r.mgr, r.mgrCode, r.uan, r.esi, r.lang].join(' '); },
+        row: function (r) {
+          return '<tr style="cursor:pointer" onclick="omOpenWorker(\'' + r.code + '\')" title="Open associate details">' +
+            '<td class="t-strong">' + r.code + '</td><td>' + r.name + '</td>' +
+            '<td>' + (r.desig || '—') + '</td><td>' + (r.dept || '—') + '</td>' +
+            '<td>' + (r.mgr || '—') + (r.mgrCode ? ' <span class="tiny muted">· ' + r.mgrCode + '</span>' : '') + '</td>' +
+            '<td class="mono tiny">' + (r.uan || '—') + '</td><td class="mono tiny">' + (r.esi || '—') + '</td>' +
+            '<td><span class="pill outline tiny">' + (r.lang || '—') + '</span></td></tr>';
+        }
+      });
+    }
+    if (typeof vwRenderOnboarding === 'function') vwRenderOnboarding(c);
+  }
+
   function renderCtPaneWorkers(c) {
     var host = document.getElementById('ct-pane-workers');
     if (!host) return;
+    if (ctIsOM(c)) { renderOmMappingPane(c, host); return; }
     VW_STATE.contractor = c.name;
     VW_STATE.sortCol = 'name'; VW_STATE.sortDir = 1;
     VW_STATE.filters = { category: '', esic: '', migrant: '' };
@@ -15351,6 +15391,7 @@ function __kvOnReady(fn) {
   const OM_COLS = {
     code:  function (r) { return r.code; },
     name:  function (r) { return (r.name  || '').toLowerCase(); },
+    contractor: function (r) { return (r.contractor || '').toLowerCase(); },
     desig: function (r) { return (r.desig || '').toLowerCase(); },
     dept:  function (r) { return (r.dept  || '').toLowerCase(); },
     mgr:   function (r) { return (r.mgr   || '').toLowerCase(); },
@@ -15363,11 +15404,11 @@ function __kvOnReady(fn) {
   /* filter (search + department) then sort the full roster */
   function omFiltered() {
     const q = OM_QUERY.trim().toLowerCase();
-    let rows = omRosterAll().filter(function (r) {
+    let rows = allWorkersRoster().filter(function (r) {
       if (OM_DEPT !== 'all' && r.dept !== OM_DEPT) return false;
       if (!q) return true;
       return (r.code + ' ' + r.name + ' ' + r.desig + ' ' + r.dept + ' ' +
-              r.mgr + ' ' + r.mgrCode + ' ' + r.uan + ' ' + r.esi + ' ' + r.lang)
+              r.mgr + ' ' + r.mgrCode + ' ' + r.uan + ' ' + r.esi + ' ' + r.lang + ' ' + (r.contractor || ''))
               .toLowerCase().indexOf(q) > -1;
     });
     const get = OM_COLS[OM_SORT.col];
@@ -15418,29 +15459,37 @@ function __kvOnReady(fn) {
       const compCell = '<span class="pill ' + band + ' tiny">' +
         c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span>' +
         (!c.aadhaarVerified ? ' <span class="tiny" style="color:var(--red-dk)" title="Aadhaar not verified">⚠</span>' : '');
-      const openFn = r._onboarded ? ('obOpenCapture(' + r._ci + ')') : ('omOpenWorker(\'' + r.code + '\')');
+      /* open the right detail per worker kind: onboarded → capture modal,
+         OM Manpower associate → associate modal, other firms → contractor drill */
+      const openFn = r._onboarded ? ('obOpenCapture(' + r._ci + ')')
+        : r._kind === 'gen' ? ('ctOpenContractorByName(\'' + String(r.contractor).replace(/'/g, "\\'") + '\')')
+        : ('omOpenWorker(\'' + r.code + '\')');
       const codeCell = r._onboarded
         ? r.code + ' <span class="pill amber tiny">onboarded</span>'
         : r.code;
+      const idCell = function (kind, v) {
+        return (r._kind === 'om' || r._onboarded) ? omIdCell(kind, v, r) : '<span style="color:var(--ink-3,#8a8f98)">' + (v || '—') + '</span>';
+      };
       // whole row opens the tabbed worker modal; the UAN/ESI cells stop propagation
       // so they still open the verifiable document viewer instead.
-      return '<tr style="cursor:pointer" onclick="' + openFn + '" title="Open worker details">' +
+      return '<tr style="cursor:pointer" onclick="' + openFn + '" title="Open details">' +
         '<td class="t-strong">' + codeCell + '</td>' +
         '<td>' + r.name + '</td>' +
-        '<td>' + r.desig + '</td>' +
-        '<td>' + r.dept + '</td>' +
-        '<td>' + r.mgr + (r.mgrCode ? ' <span style="color:var(--ink-3,#8a8f98)">· ' + r.mgrCode + '</span>' : '') + '</td>' +
-        '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + omIdCell('UAN', r.uan, r) + '</td>' +
-        '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + omIdCell('ESI', r.esi, r) + '</td>' +
-        '<td><span class="pill outline">' + r.lang + '</span></td>' +
+        '<td><span class="cap-recent-link" onclick="event.stopPropagation();ctOpenContractorByName(\'' + String(r.contractor || '').replace(/'/g, "\\'") + '\')">' + (r.contractor || '—') + '</span></td>' +
+        '<td>' + (r.desig || '—') + '</td>' +
+        '<td>' + (r.dept || '—') + '</td>' +
+        '<td>' + (r.mgr || '—') + (r.mgrCode ? ' <span style="color:var(--ink-3,#8a8f98)">· ' + r.mgrCode + '</span>' : '') + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + idCell('UAN', r.uan) + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + idCell('ESI', r.esi) + '</td>' +
+        '<td><span class="pill outline">' + (r.lang || '—') + '</span></td>' +
         '<td>' + compCell + '</td>' +
       '</tr>';
     }).join('');
 
     const cnt = document.getElementById('om-count');
     if (cnt) cnt.textContent = (OM_QUERY.trim() || OM_DEPT !== 'all')
-      ? total + ' of ' + omRosterAll().length
-      : omRosterAll().length + ' associates';
+      ? total + ' of ' + allWorkersRoster().length
+      : allWorkersRoster().length + ' workers · all contractors';
     const nr = document.getElementById('om-noresults');
     if (nr) nr.style.display = total ? 'none' : 'block';
 
@@ -15524,7 +15573,7 @@ function __kvOnReady(fn) {
   }
   function omComputeKpis() {
     const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
-    const roster = omRosterAll();
+    const roster = allWorkersRoster();
     const n = roster.length || 1;
     set('om-kpi-assoc', roster.length);
     const cs = roster.map(omRowComp);
@@ -15548,7 +15597,7 @@ function __kvOnReady(fn) {
       OM_MAPPING = [];
       const cnt = document.getElementById('om-count');
       if (cnt) cnt.textContent = 'backend offline';
-      body.innerHTML = '<tr><td colspan="9" style="padding:16px;color:var(--red-dk,#b42318)">' +
+      body.innerHTML = '<tr><td colspan="10" style="padding:16px;color:var(--red-dk,#b42318)">' +
         'Roster unavailable \u2014 start the backend: ' +
         '<code>cd backend &amp;&amp; npm install &amp;&amp; npm run seed &amp;&amp; npm start</code></td></tr>';
       return;
@@ -18141,7 +18190,44 @@ function __kvOnReady(fn) {
       });
   }
   function omRosterAll() { return (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []).concat(omOnboardedDirects()); }
-  function omRowComp(r) { return r._onboarded ? obWorkerCompliance(r._rec) : omWorkerCompliance(r); }
+  function omRowComp(r) { return r._comp ? r._comp : (r._onboarded ? obWorkerCompliance(r._rec) : omWorkerCompliance(r)); }
+
+  /* EVERY worker across ALL contractors, in the directory row shape, each tagged
+     with the contractor they're deployed under. OM Manpower contributes its real
+     181-row mapping; the other firms contribute their deployed roster; onboarded
+     direct captures are included too. Drives the all-workers Workforce Directory. */
+  function allWorkersRoster() {
+    var out = [];
+    var cons = (typeof CONTRACTORS !== 'undefined' && CONTRACTORS.length)
+      ? CONTRACTORS : ((window.__KVDATA && window.__KVDATA.contractors) || []);
+    cons.forEach(function (c) {
+      if (ctIsOM(c)) {
+        (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []).forEach(function (r) {
+          out.push(Object.assign({}, r, { contractor: c.name, _kind: 'om' }));
+        });
+      } else {
+        (typeof ctRoster === 'function' ? ctRoster(c) : []).forEach(function (w) {
+          out.push({
+            code: w.code, name: w.name, desig: w.designation || w.category || 'Worker',
+            dept: w.department || '—', mgr: '—', mgrCode: '', uan: '—', esi: '—',
+            lang: w.language || '—', contractor: c.name, _kind: 'gen', _cname: c.name,
+            _comp: { score: w.compliancePct, status: (w.compliancePct >= 60 ? 'compliant' : 'non-compliant'), aadhaarVerified: true }
+          });
+        });
+      }
+    });
+    /* onboarded (direct + contract) captures */
+    (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).forEach(function (r, i) {
+      var e = r.employment || {};
+      out.push({
+        code: r.id, name: r.name, desig: r.designation || r.category || 'Worker', dept: e.dept || '—',
+        mgr: r.manager || '—', mgrCode: r.managerCode || '', uan: r.uan || '—', esi: r.esi || '—',
+        lang: r.lang || '—', contractor: (r.type === 'direct') ? 'Daikin (direct)' : (e.contractor || 'Contract'),
+        _kind: 'onboarded', _onboarded: true, _ci: i, _rec: r
+      });
+    });
+    return out;
+  }
 
   /* ── onboarded-workers directory grid (trackable + CRUD) ───────────────── */
   function obRenderDirectory() {

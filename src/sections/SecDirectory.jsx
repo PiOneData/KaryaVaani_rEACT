@@ -41,9 +41,9 @@ export default function SecDirectory() {
       {' '}
       <div className="g4" style={{ margin: "4px 0 18px" }}>
         <div className="kpi">
-          <div className="kpi-eye">OM Manpower associates</div>
+          <div className="kpi-eye">Total workers</div>
           <div className="kpi-val" id="om-kpi-assoc">—</div>
-          <div className="kpi-sub">workforce · SRICITY-FG</div>
+          <div className="kpi-sub">across all contractors</div>
         </div>
         {' '}
         <div className="kpi">
@@ -68,9 +68,9 @@ export default function SecDirectory() {
       <div className="card">
         <div className="card-h">
           <div>
-            <div className="card-h-title">OM Manpower · manager mapping</div>
+            <div className="card-h-title">Workforce directory · all workers</div>
             {' '}
-            <div className="card-h-sub">Live roster from the attendance / mapping sheet — associate, designation, department, reporting manager and statutory IDs</div>
+            <div className="card-h-sub">Every worker across all contractors, with the firm they're deployed under · click a row for details, or the contractor to drill in</div>
           </div>
           {' '}
           <span className="pill outline" id="om-count">—</span>
@@ -106,8 +106,9 @@ export default function SecDirectory() {
           <table className="t" id="om-grid">
             <thead>
               <tr>
-                <th className="om-th-sort" data-omcol="code" onClick={(event) => { window.omSort('code') }}>Associate code <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="code" onClick={(event) => { window.omSort('code') }}>Worker code <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="name" onClick={(event) => { window.omSort('name') }}>Name <span className="om-caret">⇅</span></th>
+                <th className="om-th-sort" data-omcol="contractor" onClick={(event) => { window.omSort('contractor') }}>Contractor <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="desig" onClick={(event) => { window.omSort('desig') }}>Designation <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="dept" onClick={(event) => { window.omSort('dept') }}>Department <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="mgr" onClick={(event) => { window.omSort('mgr') }}>Reporting manager <span className="om-caret">⇅</span></th>
