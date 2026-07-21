@@ -99,7 +99,7 @@ services:
       - COMMS_VERIFY_SIGNATURE=${COMMS_VERIFY_SIGNATURE:-false}
       # TEST ONLY: redirect every outbound message to this one number.
       # Remove (set empty) to send to real recipients in production.
-      - WHATSAPP_TEST_RECIPIENT=${WHATSAPP_TEST_RECIPIENT:-919500200300,919840942405,919880947594:ta}
+      - WHATSAPP_TEST_RECIPIENT=${WHATSAPP_TEST_RECIPIENT:-919500200300,919840942405,919880947594:ta,918122222261}
     restart: unless-stopped
 
   frontend:
