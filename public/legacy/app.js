@@ -8435,12 +8435,18 @@ function __kvOnReady(fn) {
      their selected language: a personalized account-creation welcome for
      everyone (verify → Karya Vaani login), plus the Tamil transport notice or
      the Telugu wage notice with dynamic, future-dated content. HR only. */
-  function kvSendOnboardingWhatsApp(i) {
-    if (typeof obRequireHR === 'function' && !obRequireHR()) return;
+  /* whether onboarding auto-sends WhatsApp to the new worker (demo toggle) */
+  function kvAutoWaEnabled() { var el = document.getElementById('cap-autowa'); return el ? !!el.checked : true; }
+
+  function kvSendOnboardingWhatsApp(i, opts) {
+    opts = opts || {};
+    /* manual button is HR-only; the auto-send on onboarding runs for whoever
+       onboarded the worker (HR or contractor) */
+    if (!opts.auto && typeof obRequireHR === 'function' && !obRequireHR()) return;
     var rec = CAP_STATE.recent[i]; if (!rec) return;
     var to = rec.mobile || '';
-    if (!to) { toast('No mobile / WhatsApp number on record', 'red'); return; }
-    if (!window.KVWhatsApp) { toast('WhatsApp gateway unavailable', 'red'); return; }
+    if (!to) { if (!opts.auto) toast('No mobile / WhatsApp number on record', 'red'); return; }
+    if (!window.KVWhatsApp) { if (!opts.auto) toast('WhatsApp gateway unavailable', 'red'); return; }
     var lang = kvTplLang(rec.lang);
     var firstName = kvTplFirstName(rec.name);
     var sends = [], labels = [];
@@ -8458,6 +8464,16 @@ function __kvOnReady(fn) {
       sends.push(window.KVWhatsApp.sendTemplate(to, 'trial', 'te', kvBodyComp(kvWageParams(rec.name))));
       labels.push('Telugu wage revision');
     }
+    /* 3 · personalized welcome VOICE NOTE (delivers only inside the worker's
+       24h session window — a template opens no window, so the worker must have
+       messaged the business number in the last 24h to hear this). */
+    var vlang = (lang === 'ta') ? 'ta' : 'te';
+    var vtext = 'Namaste ' + firstName + ', welcome to Karya Vaani. Your onboarding is complete. Your transport route, weekly shift roster and induction schedule are available in the app. Be at your pickup point five minutes early and stay safe.';
+    sends.push(fetch((window.__KV_API_BASE || '') + '/api/whatsapp/send-voice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: to, text: vtext, lang: vlang, provider: 'local', caption: 'Welcome · ' + firstName })
+    }).then(function (r) { return r.json().catch(function () { return { ok: false }; }); }).catch(function () { return { ok: false }; }));
+    labels.push('voice note');
     toast('Sending onboarding WhatsApp to ' + rec.name + '…', 'blue');
     Promise.all(sends).then(function (results) {
       var ok = results.filter(function (r) { return r && r.ok; }).length;
@@ -14350,6 +14366,12 @@ function __kvOnReady(fn) {
       .then(function (j) {
         if (j && j.ok && j.capture) {
           rec.backendId = j.capture.id;
+          /* DEMO: auto-send the WhatsApp welcome + language template + voice note
+             to the worker as soon as they're onboarded (toggle: #cap-autowa). */
+          if (typeof kvAutoWaEnabled === 'function' && kvAutoWaEnabled() && rec.mobile && typeof kvSendOnboardingWhatsApp === 'function') {
+            var _ix = CAP_STATE.recent.indexOf(rec);
+            if (_ix >= 0) kvSendOnboardingWhatsApp(_ix, { auto: true });
+          }
           // upload any documents attached on the form, now that we have a worker id
           (CAP_STATE.docs || []).forEach(function (d) {
             fetch((window.__KV_API_BASE || '') + '/api/onboarding-documents', {

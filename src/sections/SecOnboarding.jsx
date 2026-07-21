@@ -1046,6 +1046,11 @@ export default function SecOnboarding() {
                   <div className="tiny" style={{ color: "var(--ink-2)", lineHeight: "1.55" }}>
                     A secure link is sent to the worker's WhatsApp number in their chosen language. They review their profile and confirm — the record is push-ready only once confirmed.
                   </div>
+                  {' '}
+                  <label className="cap-check" style={{ display: "inline-flex", marginTop: "8px" }}>
+                    <input type="checkbox" id="cap-autowa" defaultChecked />
+                    {" On save, send the WhatsApp welcome + language template + voice note to this worker"}
+                  </label>
                 </div>
                 {' '}
                 <div className="cap-action-r">
