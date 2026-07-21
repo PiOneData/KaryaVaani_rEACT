@@ -39,14 +39,20 @@
     setFallbackRecipient: function (n) { fallbackRecipient = n || ''; },
     cleanNumber: cleanNumber,
 
-    /* send(to, message)  — `to` may be a string, a number, or an array of either */
-    send: function (to, message, lang) {
+    /* send(to, message, lang, category) — `to` may be a string, number, or array.
+       `category` (emergency|safety|welfare|transport|hr|spp) prepends a colour-
+       coded emoji + *bold* header line to the free-form message. */
+    send: function (to, message, lang, category) {
       var list = Array.isArray(to) ? to : [to];
       var recipients = list.map(cleanNumber).filter(function (n) { return n; });
       if (!recipients.length || !message) {
         return Promise.resolve({ ok: false, error: 'missing recipient or message' });
       }
-      var payload = { to: recipients, message: message };
+      var body = message;
+      if (category && typeof window.kvCatHeader === 'function') {
+        var h = window.kvCatHeader(category); if (h) body = h + message;
+      }
+      var payload = { to: recipients, message: body };
       if (lang) payload.lang = lang;   /* per-language test-recipient routing */
       return post('/api/whatsapp/send', payload)
         .catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });

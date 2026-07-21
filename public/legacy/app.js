@@ -8623,6 +8623,26 @@ function __kvOnReady(fn) {
   }
   function kvBodyComp(params) { return [{ type: 'body', parameters: params.map(function (v) { return { type: 'text', text: String(v) }; }) }]; }
 
+  /* ── message categories (department / urgency) → WhatsApp header ────────────
+     WhatsApp renders plain text only (no coloured fonts), so a category is
+     conveyed by an emoji + a *bold* header line + a priority tier. Applied to
+     FREE-FORM sends (notifications). Approved templates have a fixed body, so
+     they can't be prefixed — for real colour on those, use an image-header
+     template (a coloured banner per category). */
+  var KV_MSG_CAT = {
+    emergency: { emoji: '🚨', label: 'EMERGENCY', tier: 'A', style: 'Band' },
+    safety:    { emoji: '⚠️', label: 'SAFETY',    tier: 'A', style: 'Band' },
+    welfare:   { emoji: '💚', label: 'WELFARE',   tier: 'C', style: 'Frame' },
+    transport: { emoji: '🚌', label: 'TRANSPORT', tier: 'C', style: 'Frame' },
+    hr:        { emoji: '📋', label: 'HR',         tier: 'B', style: 'Stripe' },
+    spp:       { emoji: '🤝', label: 'SPP',        tier: 'B', style: 'Stripe' }
+  };
+  function kvCatHeader(cat) {
+    var c = KV_MSG_CAT[String(cat || '').toLowerCase()];
+    return c ? (c.emoji + ' *' + c.label + '* · priority ' + c.tier + '\n\n') : '';
+  }
+  window.kvCatHeader = kvCatHeader;
+
   /* Send the right approved template(s) to a newly onboarded worker, chosen by
      their selected language: a personalized account-creation welcome for
      everyone (verify → Karya Vaani login), plus the Tamil transport notice or
@@ -13257,7 +13277,8 @@ function __kvOnReady(fn) {
     const shift = TR_STATE.shift;
     const batch = trBatch(code, shift);
     if (!batch.length) { toast('No workers in this batch', 'red'); return; }
-    const msg = 'Transport ' + r.route + ' (' + shift + ' shift, week ' + trWeekRangeLabel(TR_STATE.weekOffset) + '): your bus ' + code +
+    const msg = (typeof kvCatHeader === 'function' ? kvCatHeader('transport') : '') +
+      'Transport ' + r.route + ' (' + shift + ' shift, week ' + trWeekRangeLabel(TR_STATE.weekOffset) + '): your bus ' + code +
       ' boards at ' + r.stops[0].name + ' area at ' + ((r[shift] && r[shift].board) || '') + ' and reaches the plant by ' + ((r[shift] && r[shift].plant) || '') + '. Be 5 minutes early.';
     return fetch((window.__KV_API_BASE || '') + '/api/transport/notify', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -18152,7 +18173,7 @@ function __kvOnReady(fn) {
     const fails = c.items.filter(function (it) { return !it.ok; }).map(function (it) { return it.label; }).join(', ') || 'pending items';
     if (window.KVWhatsApp) {
       window.KVWhatsApp.notify(rec.mobile,
-        'Namaste ' + rec.name + ', please complete pending onboarding compliance: ' + fails + '. — Plant HR, Karya Vaani',
+        (typeof kvCatHeader === 'function' ? kvCatHeader('hr') : '') + 'Namaste ' + rec.name + ', please complete pending onboarding compliance: ' + fails + '. — Plant HR, Karya Vaani',
         { label: 'WhatsApp sent to ' + rec.name });
     } else { toast('WhatsApp gateway unavailable', 'red'); }
   }
