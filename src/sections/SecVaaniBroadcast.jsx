@@ -103,13 +103,13 @@ export default function SecVaaniBroadcast() {
             <span className="vbm-row-k">Engine</span>
             {' '}
             <div className="vbm-row-v">
-              <select className="sel" id="vb-provider" onChange={(event) => { window.vbSetProvider(event.target.value) }} data-onchange="vbSetProvider(this.value)">
-                <option value="local">Our model · IndicTrans2</option>
+              <select className="sel" id="vb-provider" defaultValue="sarvam" onChange={(event) => { window.vbSetProvider(event.target.value) }} data-onchange="vbSetProvider(this.value)">
                 <option value="sarvam">Sarvam AI</option>
+                <option value="local">Our model · IndicTrans2</option>
               </select>
               {' '}
               <div className="vbm-row-hint" id="vb-provider-hint">
-                Our model (IndicTrans2) · native-script translation
+                Sarvam AI · falls back to our model (IndicTrans2) if unavailable
               </div>
             </div>
           </div>

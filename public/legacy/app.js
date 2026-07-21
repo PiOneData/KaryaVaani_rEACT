@@ -6424,7 +6424,7 @@ function __kvOnReady(fn) {
     subject: VB_PRESETS.rain.subject,
     source: VB_PRESETS.rain.body,
     langs: ['TE', 'HI'],          /* exactly two */
-    provider: 'local',            /* 'local' (IndicTrans2) | 'sarvam' (Sarvam AI) */
+    provider: 'sarvam',           /* default Sarvam AI; backend falls back to local (IndicTrans2) if Sarvam is unavailable */
     audiences: ['production'],    /* selected audience group ids */
     translations: null,           /* { TE:'…', HI:'…' } once translated */
     sent: false,
@@ -8444,13 +8444,11 @@ function __kvOnReady(fn) {
     var lang = kvTplLang(rec.lang);
     var firstName = kvTplFirstName(rec.name);
     var sends = [], labels = [];
-    /* 1 · personalized account-creation welcome. Its Verify button is a
-       personalize-URL button → pass the login suffix (the worker's login
-       username, else their first name) so it deep-links to the Karya Vaani
-       worker login. */
-    var acComp = kvBodyComp([firstName]);
-    acComp.push({ type: 'button', sub_type: 'url', index: 0, parameters: [{ type: 'text', text: String(rec.loginUsername || firstName.toLowerCase()) }] });
-    sends.push(window.KVWhatsApp.sendTemplate(to, 'account_creation', 'en_US', acComp));
+    /* 1 · personalized account-creation welcome. The approved template has TWO
+       body variables ({{1}} name, {{2}} account/app) and a STATIC Verify button
+       (fixed URL → the Karya Vaani login, configured on the template), so we
+       send two body params and no button param. */
+    sends.push(window.KVWhatsApp.sendTemplate(to, 'account_creation', 'en_US', kvBodyComp([firstName, 'Karya Vaani'])));
     labels.push('welcome · ' + firstName);
     /* 2 · language notice with dynamic future dates */
     if (lang === 'ta') {

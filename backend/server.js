@@ -618,12 +618,22 @@ app.post('/api/translate', async (req, res) => {
   const src = toNllb(source || 'eng_Latn');
   try {
     const map = {};
+    let fellBack = false;
     for (const tgt of toTargets) {
-      map[tgt] = useSarvam
-        ? await sarvamTranslateFull(text, source || 'EN', tgt, script)
-        : await translateFull(text, src, toNllb(tgt));
+      if (useSarvam) {
+        try {
+          map[tgt] = await sarvamTranslateFull(text, source || 'EN', tgt, script);
+        } catch (sErr) {
+          /* Sarvam down / out of credits → fall back to our local model */
+          console.warn('sarvam translate failed, falling back to local:', sErr.message);
+          map[tgt] = await translateFull(text, src, toNllb(tgt));
+          fellBack = true;
+        }
+      } else {
+        map[tgt] = await translateFull(text, src, toNllb(tgt));
+      }
     }
-    const engine = useSarvam ? 'sarvam' : 'local';
+    const engine = (useSarvam && !fellBack) ? 'sarvam' : 'local';
     if (toTargets.length === 1) {
       return res.json({ success: true, translation: map[toTargets[0]], provider: engine });
     }
@@ -803,7 +813,14 @@ app.post('/api/tts', async (req, res) => {
   try {
     let buf, contentType = 'audio/wav';
     if (useSarvam) {
-      buf = await sarvamTts(text, lang);
+      /* Sarvam primary → fall back to the local Vakyansh model if Sarvam errors
+         (e.g. out of credits) so voice never breaks. */
+      try {
+        buf = await sarvamTts(text, lang);
+      } catch (sErr) {
+        console.warn('sarvam tts failed, falling back to local:', sErr.message);
+        buf = await synthLocalTts(text, lang, controller.signal);
+      }
     } else {
       /* Local Vakyansh model is primary; if it errors (host down / a language
          model failed to load), fall back to Sarvam so voice never breaks. */
