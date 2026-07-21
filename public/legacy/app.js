@@ -8410,6 +8410,12 @@ function __kvOnReady(fn) {
   function kvTplFutureDate(days) { var d = new Date(); d.setDate(d.getDate() + (days || 14)); return kvTplFmtDate(d); }
   function kvTplNextMonth() { var d = new Date(); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' }); }
   function kvTplFirstName(name) { return (String(name || '').trim().split(/\s+/)[0]) || 'there'; }
+  /* known test-recipient names, so demo templates address the real person */
+  var KV_TEST_NAMES = { '919500200300': 'Sriramm Ramesh', '919840942405': 'Sriram TR', '919880947594': 'Tamil Tester' };
+  function kvNameForNumber(num) {
+    var d = String(num || '').replace(/\D/g, '');
+    return KV_TEST_NAMES[d] || KV_TEST_NAMES['91' + d.slice(-10)] || '';
+  }
   function kvTplLang(lang) {
     var s = String(lang || '').trim().toLowerCase();
     if (s.indexOf('tam') >= 0 || s === 'ta') return 'ta';
@@ -8419,8 +8425,9 @@ function __kvOnReady(fn) {
   /* Telugu minimum-wage template ('trial') — dynamic + named body variables:
      [ revision label, effective date (future), where details are, pay period,
        named contact person ] */
-  function kvWageParams() {
-    return ['2026', kvTplFutureDate(14), 'కార్య వాణి యాప్ మరియు నోటీసు బోర్డు', kvTplNextMonth(), 'ప్రియా మీనన్ · ప్లాంట్ HR'];
+  function kvWageParams(name) {
+    /* {{1}} is personalized with the recipient / worker name */
+    return [String(name || '2026'), kvTplFutureDate(14), 'కార్య వాణి యాప్ మరియు నోటీసు బోర్డు', kvTplNextMonth(), 'ప్రియా మీనన్ · ప్లాంట్ HR'];
   }
   function kvBodyComp(params) { return [{ type: 'body', parameters: params.map(function (v) { return { type: 'text', text: String(v) }; }) }]; }
 
@@ -8450,7 +8457,7 @@ function __kvOnReady(fn) {
       sends.push(window.KVWhatsApp.sendTemplate(to, 'tamil_transport_schedule_weekly_plan', 'ta', kvBodyComp([kvTplFutureDate(21)])));
       labels.push('Tamil transport');
     } else if (lang === 'te') {
-      sends.push(window.KVWhatsApp.sendTemplate(to, 'trial', 'te', kvBodyComp(kvWageParams())));
+      sends.push(window.KVWhatsApp.sendTemplate(to, 'trial', 'te', kvBodyComp(kvWageParams(rec.name))));
       labels.push('Telugu wage revision');
     }
     toast('Sending onboarding WhatsApp to ' + rec.name + '…', 'blue');
@@ -8473,7 +8480,7 @@ function __kvOnReady(fn) {
     var now = new Date();
     var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
     var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
-    var params = (typeof kvWageParams === 'function') ? kvWageParams() : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
+    var params = (typeof kvWageParams === 'function') ? kvWageParams((typeof kvNameForNumber === 'function' && kvNameForNumber(demoNumber)) || 'Sriramm Ramesh') : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
 
     /* focus (or create) the demo contact's conversation so the send is visible */
     var cid = (typeof chatEnsureLiveContact === 'function')
@@ -8687,7 +8694,7 @@ function __kvOnReady(fn) {
     var now = new Date();
     var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
     var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
-    var params = (typeof kvWageParams === 'function') ? kvWageParams() : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
+    var params = (typeof kvWageParams === 'function') ? kvWageParams((typeof kvNameForNumber === 'function' && kvNameForNumber(demoNumber)) || 'Sriramm Ramesh') : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
     if (window.KVWhatsApp && typeof window.KVWhatsApp.sendApprovedTemplate === 'function') {
       window.KVWhatsApp.sendApprovedTemplate(demoNumber, params).then(function (res) {
         if (typeof toast === 'function') {
