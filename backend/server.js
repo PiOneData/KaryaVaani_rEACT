@@ -1475,11 +1475,12 @@ app.get('/api/transport/consents', (req, res) => {
 app.post('/api/transport/consent', (req, res) => {
   const store = readStore();
   if (!store || !store.data) return res.status(503).json({ ok: false, error: 'Service starting.' });
-  const { code, name, consented, method, by } = req.body || {};
+  const { code, name, consented, method, by, comment } = req.body || {};
   if (!code) return res.status(400).json({ ok: false, error: 'worker code is required.' });
   store.data.nightConsents = store.data.nightConsents || {};
   const rec = {
     code: String(code), name: name || '', consented: !!consented,
+    comment: comment || '',
     method: method || 'operator', by: by || 'HR', at: new Date().toISOString()
   };
   store.data.nightConsents[String(code)] = rec;

@@ -250,6 +250,15 @@ export default function SecEmpHome() {
                   <span>Karya Vaani will deliver in your new choice</span>
                 </span>
               </button>
+              {' '}
+              <button className="emp-qa-btn" onClick={(event) => { window.empNightConsent() }} data-onclick="empNightConsent()">
+                <span className="emp-qa-ico" style={{ background: "var(--indigo)" }}>🌙</span>
+                {' '}
+                <span className="emp-qa-l">
+                  <strong>Night-shift consent</strong>
+                  <span>Consent for Shift C transport · OSHC Rule 83</span>
+                </span>
+              </button>
             </div>
           </div>
         </div>

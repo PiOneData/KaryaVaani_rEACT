@@ -11965,6 +11965,76 @@ function __kvOnReady(fn) {
     toast('Language changed to ' + l.name, 'green');
   }
 
+  /* ── Night-shift (Shift C) transport consent · OSHC Rule 83 ─────────────
+     Worker self-service: Yes / No + a free-text comment. Logged onto the
+     worker's onboarding record (nightShiftConsent / nightConsentAt /
+     nightConsentComment) so it surfaces in the female-employee detail modal,
+     and mirrored to the /api/transport/consent audit log. */
+  function empCurrentCap() {
+    var c = (typeof CHAT_CONTACTS !== 'undefined') ? CHAT_CONTACTS.find(function (x) { return x.id === EMP_ACTIVE; }) : null;
+    if (!c) return { c: null, rec: null };
+    var caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    var u = window.__KVUSER || {};
+    var rec = null;
+    if (u.linkedType === 'worker' && u.linkedId) rec = caps.find(function (r) { return r.backendId === u.linkedId || r.id === u.linkedId; });
+    if (!rec) rec = caps.find(function (r) { return r.name && String(r.name).toLowerCase() === String(c.name).toLowerCase(); });
+    return { c: c, rec: rec };
+  }
+  function empNightConsent() {
+    var ctx = empCurrentCap();
+    var c = ctx.c, rec = ctx.rec;
+    if (!c) { toast('No worker selected', 'red'); return; }
+    var prior = rec || {};
+    var priorComment = prior.nightConsentComment || '';
+    var priorState = (typeof prior.nightShiftConsent === 'boolean')
+      ? (prior.nightShiftConsent ? '<span class="pill green tiny">You consented' + (prior.nightConsentAt ? ' · ' + (typeof fmtD === 'function' ? fmtD(prior.nightConsentAt) : '') : '') + '</span>'
+        : '<span class="pill amber tiny">You declined' + (prior.nightConsentAt ? ' · ' + (typeof fmtD === 'function' ? fmtD(prior.nightConsentAt) : '') : '') + '</span>')
+      : '';
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Night-shift transport · OSHC Rule 83</span>' +
+        '<span class="modal-h-title">Consent for night shift</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="cap-hint" style="margin-bottom:12px">Do you consent to work night shift (Shift C) and to use the company night-transport arranged for you under OSHC Rule 83? Your consent is recorded and can be withdrawn any time.</div>' +
+        (priorState ? '<div style="margin-bottom:12px">Current on record: ' + priorState + '</div>' : '') +
+        '<label class="field-l" style="display:block;margin-bottom:6px">Comment (optional)</label>' +
+        '<textarea id="emp-nc-comment" class="input" rows="3" style="width:100%;resize:vertical" placeholder="e.g. I consent, please arrange pickup from my stop / I cannot do night shift because…">' + priorComment.replace(/</g, '&lt;') + '</textarea>' +
+        '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">' +
+          '<button class="btn primary" style="min-width:150px;justify-content:center" onclick="empSetNightConsent(true)">✓ Yes, I consent</button>' +
+          '<button class="btn danger" style="min-width:120px;justify-content:center" onclick="empSetNightConsent(false)">✕ No</button>' +
+        '</div>' +
+      '</div>',
+      560
+    );
+  }
+  function empSetNightConsent(consented) {
+    var ctx = empCurrentCap();
+    var c = ctx.c, rec = ctx.rec;
+    if (!c) { omCloseModal(); return; }
+    var ta = document.getElementById('emp-nc-comment');
+    var comment = ta ? String(ta.value || '').trim() : '';
+    var nowIso = new Date().toISOString();
+    if (rec && typeof obPersistRec === 'function') {
+      obPersistRec(rec, {
+        nightShiftConsent: !!consented,
+        nightConsentAt: nowIso,
+        nightConsentComment: comment,
+        nightConsentBy: 'self'
+      });
+    }
+    /* audit log — mirror to the transport-consent register */
+    var code = (rec && rec.id) || c.id || '';
+    if (code) {
+      fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code, name: c.name, consented: !!consented, comment: comment, method: 'self', by: c.name })
+      }).catch(function () {});
+    }
+    omCloseModal();
+    if (typeof empRender === 'function') empRender();
+    toast(consented ? 'Night-shift consent recorded — thank you' : 'Recorded: you declined night shift', consented ? 'green' : 'amber');
+  }
+
   function empRenderPersonalAnalytics(c, agg) {
     /* time-to-read for last 5 read messages */
     const ttrHost = document.getElementById('emp-an-ttr');
@@ -18099,7 +18169,18 @@ function __kvOnReady(fn) {
       kvKV('Inter-state migrant', rec.migrant ? 'Yes (ISMW / OSHC)' : 'No') +
       kvKV('Address', [a.addr1, a.addr2, a.city, a.district, a.pin, a.state].filter(Boolean).join(', ')) +
       kvKV('PPE issued', [ppe.uniform && ('Uniform ' + ppe.uniform), ppe.shoe && ('Shoe ' + ppe.shoe), ppe.helmet, ppe.glove].filter(Boolean).join(' · ')) +
-      kvKV('PPE fitment appointment', rec.fitmentAppt ? '<span class="pill blue tiny">' + rec.fitmentAppt + '</span>' : '<span class="pill outline tiny">Not scheduled</span>')
+      kvKV('PPE fitment appointment', rec.fitmentAppt ? '<span class="pill blue tiny">' + rec.fitmentAppt + '</span>' : '<span class="pill outline tiny">Not scheduled</span>') +
+      (rec.gender === 'Female'
+        ? kvKV('Night-shift consent · OSHC R.83',
+            (typeof rec.nightShiftConsent === 'boolean'
+              ? (rec.nightShiftConsent
+                  ? '<span class="pill green tiny">Consented' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>'
+                  : '<span class="pill amber tiny">Declined' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>')
+              : '<span class="pill outline tiny">Not captured</span>')) +
+          (rec.nightConsentComment
+            ? kvKV('Consent comment', '<span style="white-space:pre-wrap">' + String(rec.nightConsentComment).replace(/</g, '&lt;') + '</span>')
+            : '')
+        : '')
     );
     const aadhaarRow = rec.aadhaarVerified
       ? '<span class="pill green tiny">Verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
