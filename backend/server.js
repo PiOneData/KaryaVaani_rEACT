@@ -1528,6 +1528,7 @@ function ensureDemoUsers() {
       u.linkedId = firm.id; u.linkedName = firm.name; u.name = firm.name; touched = true;
     }
     if (!u.email && a.email) { u.email = a.email; touched = true; } // backfill for older seeds
+    if (a.title && u.title !== a.title) { u.title = a.title; touched = true; } // keep the role label current (e.g. Agency)
     if (touched) dbPut('users', u.username, u);
   });
   if (seeded.length) console.log('[auth] Seeded demo accounts: ' + seeded.join(', '));

@@ -3506,7 +3506,7 @@ function __kvOnReady(fn) {
     var safeCt = String(c.name).replace(/'/g, "\\'");
     host.innerHTML =
       '<div class="card-h" style="padding:0;margin-bottom:10px;align-items:flex-start">' +
-        '<div><div class="card-h-title" style="font-size:0.85rem">Workers deployed · ' + vwEsc(c.name) + '</div>' +
+        '<div><div class="card-h-title" style="font-size:0.85rem">Contract workers deployed · ' + vwEsc(c.name) + '</div>' +
           '<div class="card-h-sub" id="ctw-sub">Loading deployed workers…</div></div>' +
         '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">' +
           '<input id="ctw-search" placeholder="Search workers…" style="padding:6px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:0.8rem;max-width:170px">' +
@@ -14551,6 +14551,7 @@ function __kvOnReady(fn) {
       pan: (capVal('cap-pan') || '').toUpperCase(),
       panVerified: !!CAP_STATE.panVerified,
       gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
+      route: capVal('cap-route'), shift: capVal('cap-shift'),
       address: { addr1: capVal('cap-addr1'), addr2: capVal('cap-addr2'), city: capVal('cap-city'), district: capVal('cap-district'), pin: capVal('cap-pin'), state: capVal('cap-homestate') },
       migrant: getC('cap-migrant'),
       nightShiftConsent: getC('cap-nightconsent'),
@@ -15111,6 +15112,22 @@ function __kvOnReady(fn) {
     capSync();
   }
 
+  /* populate the single-capture transport route dropdown from the system routes */
+  function capPopulateRoutes() {
+    var el = document.getElementById('cap-route');
+    if (!el) return;
+    var opts = (typeof capRouteOptions === 'function') ? capRouteOptions() : [];
+    el.innerHTML = '<option value="">Select a route…</option>' +
+      opts.map(function (o) { return '<option value="' + o.label.replace(/"/g, '&quot;') + '">' + o.label + '</option>'; }).join('');
+  }
+  /* an agency (contractor login) only onboards contract workers — hide the
+     Direct option and lock the type to contract. */
+  function capApplyScope() {
+    var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    var db = document.getElementById('cap-type-direct');
+    if (db) db.style.display = scope ? 'none' : '';
+    if (scope && typeof capSetType === 'function') capSetType('contract');
+  }
   function initCap() {
     if (!document.getElementById('cap-lang-grid')) return;
     capRenderLangs();
@@ -15122,6 +15139,8 @@ function __kvOnReady(fn) {
     capPopulateManagers();
     capPopulateVendors();
     capPopulateDepartments();
+    capPopulateRoutes();
+    capApplyScope();
     capSync();
     if (typeof obLoadCaptures === 'function') obLoadCaptures();
   }
@@ -17572,6 +17591,8 @@ function __kvOnReady(fn) {
     if (typeof capSetType === 'function') capSetType('contract');
     var cf = document.getElementById('cap-contractor');
     if (cf && firm) cf.value = firm;
+    if (typeof capApplyScope === 'function') capApplyScope();
+    if (typeof capPopulateRoutes === 'function') capPopulateRoutes();
     if (typeof capPopulateBulkContractor === 'function') capPopulateBulkContractor();
     if (typeof obRenderDirectory === 'function') obRenderDirectory();
     if (typeof obTrackRender === 'function') obTrackRender();

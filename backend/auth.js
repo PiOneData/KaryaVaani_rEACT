@@ -34,7 +34,7 @@ const DEMO_ACCOUNTS = [
     name: '',               title: 'Worker / Labourer',    linkedType: 'employee',
     email: 'worker@karyavaani.demo' },
   { username: 'contractor', password: 'contractor@daikin', role: 'contractor',
-    name: '',               title: 'Contractor / Vendor',  linkedType: 'contractor',
+    name: '',               title: 'Agency',  linkedType: 'contractor',
     email: 'contractor@karyavaani.demo' },
   { username: 'operator',   password: 'operator@daikin',   role: 'operator',
     name: 'Sri Balaji Travels', title: 'Transport Operator', linkedType: 'operator',

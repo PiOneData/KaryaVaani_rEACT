@@ -167,7 +167,7 @@ export default function SecVendor() {
           </div>
           {' '}
           <div className="sd-drill-tab" onClick={(event) => { window.ctTab(event, 'workers') }} data-onclick="ctTab(event, 'workers')">
-            Workers deployed
+            Contract workers deployed
           </div>
           {' '}
           <div className="sd-drill-tab" onClick={(event) => { window.ctTab(event, 'tasks') }} data-onclick="ctTab(event, 'tasks')">

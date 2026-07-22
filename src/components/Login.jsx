@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 const DEMO = [
   { username: 'hr',         password: 'hr@daikin',         label: 'HR / Site Manager', sub: 'Full compliance workspace', accent: 'var(--indigo)' },
-  { username: 'contractor', password: 'contractor@daikin', label: 'Contractor / Vendor', sub: 'Your firm’s compliance home', accent: 'var(--amber-dk)' },
+  { username: 'contractor', password: 'contractor@daikin', label: 'Agency', sub: 'Your agency’s compliance home', accent: 'var(--amber-dk)' },
   { username: 'worker',     password: 'worker@daikin',     label: 'Worker / Labourer', sub: 'Your personal worker home', accent: 'var(--green-dk)' },
   { username: 'operator',   password: 'operator@daikin',   label: 'Transport Operator', sub: 'Your routes · consent & boarding', accent: '#2880A8' },
 ];

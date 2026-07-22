@@ -560,7 +560,7 @@ export default function SecOnboarding() {
               <div className="cap-pside-meta" id="cap-pside-meta">Profile not yet saved</div>
               {' '}
               <div className="cap-type-toggle" id="cap-type-toggle" style={{ margin: "14px 0 4px", width: "100%" }}>
-                <button className="cap-type-btn on" onClick={(event) => { window.capSetType('direct') }} data-onclick="capSetType('direct')">
+                <button className="cap-type-btn on" id="cap-type-direct" onClick={(event) => { window.capSetType('direct') }} data-onclick="capSetType('direct')">
                   Direct
                 </button>
                 {' '}
@@ -907,6 +907,14 @@ export default function SecOnboarding() {
                       <option>Morning</option>
                       <option>General</option>
                       <option>Night</option>
+                    </select>
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">Transport route</label>
+                    {' '}
+                    <select className="sel" id="cap-route">
+                      <option value="">Select a route…</option>
                     </select>
                   </div>
                 </div>
