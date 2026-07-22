@@ -17366,6 +17366,13 @@ function __kvOnReady(fn) {
     if (!r) return;
     OM_MODAL_CODE = code;
     const c = omWorkerCompliance(r);
+    // Transport assignment (also drives the Attendance & travel tab) — computed
+    // up-front so the night-shift consent can live in General information.
+    const travel = (typeof trWorkerTravel === 'function') ? trWorkerTravel(code, 14) : null;
+    const nightConsentVal = (travel && travel.assignment && typeof trConsent === 'function') ? trConsent(travel.assignment) : 'na';
+    const nightConsentRow = (nightConsentVal && nightConsentVal !== 'na')
+      ? kvKV('Night-shift consent · OSHC R.83', (typeof trConsentPill === 'function') ? trConsentPill(nightConsentVal) : nightConsentVal)
+      : '';
 
     const general =
       kv2col(
@@ -17373,7 +17380,8 @@ function __kvOnReady(fn) {
         kvKV('Department', r.dept) +
         kvKV('Contractor / employer', r.contractor || ctForWorkerCode(r.code)) +
         kvKV('Reporting manager', r.mgr + (r.mgrCode ? ' · ' + r.mgrCode : '')) +
-        kvKV('Preferred language', '<span class="pill outline">' + (r.lang || '—') + '</span>')
+        kvKV('Preferred language', '<span class="pill outline">' + (r.lang || '—') + '</span>') +
+        nightConsentRow
       ) +
       '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">From the OM Manpower attendance / mapping roster — the real workforce dataset.</div>';
 
@@ -17388,13 +17396,24 @@ function __kvOnReady(fn) {
       ) +
       '<div class="tiny muted" style="margin-top:10px">Click UAN / ESI to open the verifiable document viewer. Aadhaar is verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained (DPDP Act 2023).</div>';
 
-    // Documents tab = identification + any uploaded documents (filled async).
+    // Documents tab = identification + full document management (upload / view /
+    // update / delete). Any document can be added or replaced after onboarding —
+    // e.g. a pending appointment order can be uploaded here at any time.
     const documents = identification +
-      '<div class="card-h-title" style="font-size:0.9rem;margin:16px 0 4px">Uploaded documents</div>' +
-      '<div id="om-docs-uploaded" class="tiny muted">Loading documents…</div>';
+      '<div class="card-h-title" style="font-size:0.9rem;margin:16px 0 4px">Worker documents</div>' +
+      '<div class="cap-hint" style="margin:4px 0 10px">Add, view or update this associate\'s documents at any time — even after onboarding. Pending documents can be uploaded here; to replace one, upload the new copy and delete the old.</div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        '<select class="sel" id="ob-doc-type" style="width:auto" onchange="obDocTypeChange()">' +
+          ['Appointment letter', 'Employment contract', 'ID proof', 'PAN card', 'Aadhaar', 'Bank proof', 'Education certificate', 'Medical fitness', 'Police verification', 'Prior employment', 'Address proof', 'Other'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+        '</select>' +
+        '<input class="input" id="ob-doc-label" placeholder="Name this document (e.g. Appointment order)" style="display:none;max-width:240px">' +
+        '<input type="file" id="ob-doc-file" accept="image/*,application/pdf" style="display:none" onchange="obUploadDoc(\'' + code + '\')">' +
+        '<button class="btn primary" onclick="document.getElementById(\'ob-doc-file\').click()">Upload document</button>' +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:4px">Choose <strong>Other</strong> to name a custom document (appointment order, agreement, etc.).</div>' +
+      '<div id="ob-docs-list" class="tiny muted" style="margin-top:12px">Loading documents…</div>';
 
     // Attendance & travel tab — transport assignment + boarding history.
-    const travel = (typeof trWorkerTravel === 'function') ? trWorkerTravel(code, 14) : null;
     let attendance;
     if (travel) {
       const a = travel.assignment;
@@ -17416,8 +17435,7 @@ function __kvOnReady(fn) {
           kvKV('Home locality', a.locality) + kvKV('Pickup point', a.pickup) +
           kvKV('Pickup', '↑ ' + (a.pickupTime || '—') + ' → plant ' + (a.plantIn || '—')) +
           kvKV('Drop', '↓ plant ' + (a.plantOut || '—') + ' → ' + (a.dropTime || '—')) +
-          kvKV('Transport operator', a.operator || (typeof trRouteOperator === 'function' ? trRouteOperator(a.route) : '—')) +
-          kvKV('Night-shift consent · OSHC R.83', (typeof trConsentPill === 'function' && typeof trConsent === 'function') ? trConsentPill(trConsent(a)) : '—')
+          kvKV('Transport operator', a.operator || (typeof trRouteOperator === 'function' ? trRouteOperator(a.route) : '—'))
         ) +
         '<div class="card-h-title" style="font-size:0.9rem;margin:14px 0 4px">Travel history · last ' + travel.total + ' working days</div>' +
         '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Date</th><th>Day</th><th>Route</th><th>Pickup point</th><th>Pickup</th><th>Drop</th><th style="text-align:center">Boarding</th></tr></thead><tbody>' + trows + '</tbody></table></div>' +
@@ -17457,7 +17475,7 @@ function __kvOnReady(fn) {
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + (c.notifiedAt ? 'Last notified ' + new Date(c.notifiedAt).toLocaleString('en-IN') : 'Not yet notified') + '</span></div>' +
         '<div class="modal-footer-right">' + notifyBtn + '<button class="btn" onclick="omCloseModal()">Close</button></div>'
     });
-    if (typeof omLoadWorkerDocs === 'function') omLoadWorkerDocs(code);
+    if (typeof obLoadDocs === 'function') obLoadDocs(code);
   }
 
   /* fill the Documents tab with any documents uploaded for this associate. */
