@@ -222,6 +222,22 @@ export default function SecCtHome() {
             <div id="ct-id-list" />
           </div>
           {' '}
+          {/*  compliance documents — the agency uploads its statutory documents  */}
+          {' '}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Compliance documents</div>
+                {' '}
+                <div className="card-h-sub">Upload your statutory documents — visible to Daikin HR, and they drive your compliance score</div>
+              </div>
+            </div>
+            {' '}
+            <div id="ct-docs-upload" style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", margin: "8px 0 10px" }} />
+            {' '}
+            <div id="ct-docs-list" className="tiny muted">Loading documents…</div>
+          </div>
+          {' '}
           {/*  quick actions  */}
           {' '}
           <div className="card emp-qa-card">

@@ -38,7 +38,7 @@ app.get('/api/bootstrap', (req, res) => {
   // never ship documents / voice audio (base64), the comms log, the users table
   // (password hashes), or the per-week transport roster/attendance to the
   // browser — those are fetched via their own routes.
-  const { onboardingDocuments, communications, users, voiceCache, voiceWarm,
+  const { onboardingDocuments, contractorDocuments, communications, users, voiceCache, voiceWarm,
           transportRoster, transportAttendance, nightConsents, transportEvents,
           whatsappMessages, vendorWorkers, ...rest } = s.data;
   res.json(rest);
@@ -478,6 +478,52 @@ app.delete('/api/onboarding-documents/:workerId/:docId', (req, res) => {
     console.error('onboarding-document delete error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+/* ── Contractor (agency) compliance documents ──────────────────────────────
+   Agencies upload their statutory documents (CLRA, ESIC, PF, min-wage register,
+   migrant cover, safety, WC insurance, service agreement, GST, PAN). Stored per
+   contractor id; HR views them under the contractor. `complianceKey` links a doc
+   to a compliance subscore so the score can reflect what's on file.
+   POST   /api/contractor-documents             { contractorId, name, docType, complianceKey, dataUrl }
+   GET    /api/contractor-documents/:contractorId
+   DELETE /api/contractor-documents/:contractorId/:docId
+   ──────────────────────────────────────────────────────────────────────── */
+app.post('/api/contractor-documents', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded.' });
+  const { contractorId, name, docType, complianceKey, dataUrl } = req.body || {};
+  if (!contractorId || !dataUrl) return res.status(400).json({ ok: false, error: 'contractorId and dataUrl are required' });
+  if (String(dataUrl).length > 5 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'document too large (max ~3.5MB)' });
+  store.data.contractorDocuments = store.data.contractorDocuments || {};
+  const list = store.data.contractorDocuments[contractorId] = store.data.contractorDocuments[contractorId] || [];
+  const doc = {
+    id: 'ctd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    name: name || 'document', docType: docType || 'Other', complianceKey: complianceKey || null,
+    dataUrl: dataUrl, uploadedAt: new Date().toISOString()
+  };
+  list.push(doc);
+  try { dbPut('contractorDocuments', contractorId, list); res.json({ ok: true, doc: doc }); }
+  catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+app.get('/api/contractor-documents/:contractorId', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded.' });
+  const docs = (store.data.contractorDocuments || {})[req.params.contractorId] || [];
+  res.json({ ok: true, documents: docs });
+});
+app.delete('/api/contractor-documents/:contractorId/:docId', (req, res) => {
+  const store = readStore();
+  if (!store) return res.status(503).json({ ok: false, error: 'Not seeded.' });
+  const map = store.data.contractorDocuments || {};
+  const list = map[req.params.contractorId] || [];
+  const idx = list.findIndex(d => d.id === req.params.docId);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'document not found' });
+  list.splice(idx, 1);
+  map[req.params.contractorId] = list;
+  store.data.contractorDocuments = map;
+  try { dbPut('contractorDocuments', req.params.contractorId, list); res.json({ ok: true }); }
+  catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
 /* ── VAANI translation proxy ──────────────────────────────────────────────

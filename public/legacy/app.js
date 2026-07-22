@@ -4043,7 +4043,39 @@ function __kvOnReady(fn) {
               '<td style="text-align:right"><button class="btn tiny" onclick="ctViewDoc(\'' + c.id + '\',\'' + d.slug + '\')">View</button></td></tr>';
     });
     html += '</tbody></table>';
+    /* agency-uploaded documents (from the contractor login) shown to HR */
+    html += '<div id="ct-pane-uploaded" style="margin-top:16px"><div class="tiny muted">Loading agency-uploaded documents…</div></div>';
     document.getElementById('ct-pane-docs').innerHTML = html;
+
+    fetch((window.__KV_API_BASE || '') + '/api/contractor-documents/' + encodeURIComponent(c.id))
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        var host = document.getElementById('ct-pane-uploaded'); if (!host) return;
+        var docs = (j && j.documents) || [];
+        if (typeof CT_DOCS_CACHE !== 'undefined') CT_DOCS_CACHE[c.id] = docs;
+        var provided = {}; docs.forEach(function (d) { if (d.complianceKey) provided[d.complianceKey] = true; });
+        var reqKeys = (typeof CT_DOC_REQUIRED !== 'undefined') ? CT_DOC_REQUIRED : ['clra', 'esic', 'pf', 'minWage', 'migrant', 'safety'];
+        var chips = reqKeys.map(function (k) {
+          var ok = provided[k];
+          return '<span class="pill ' + (ok ? 'green' : 'red') + ' tiny" style="margin:2px" title="' + (typeof ctDocTypeLabel === 'function' ? ctDocTypeLabel(k) : k) + '">' + (ok ? '✓ ' : '✗ ') + (typeof ctDocTypeLabel === 'function' ? ctDocTypeLabel(k).replace(/ .*/, '') : k) + '</span>';
+        }).join('');
+        var onFile = reqKeys.filter(function (k) { return provided[k]; }).length;
+        var out = '<div class="card-h" style="padding:0;margin-bottom:8px"><div class="card-h-title" style="font-size:0.85rem">Agency-uploaded documents (' + docs.length + ')</div>' +
+          '<div class="card-h-sub">Submitted by the agency · statutory coverage on file: ' + onFile + '/' + reqKeys.length + '</div></div>' +
+          '<div style="margin-bottom:8px">' + chips + '</div>';
+        if (!docs.length) { out += '<div class="tiny muted">No documents uploaded by this agency yet.</div>'; }
+        else {
+          out += '<table class="t"><thead><tr><th>Compliance</th><th>File</th><th>Uploaded</th><th></th></tr></thead><tbody>' +
+            docs.map(function (d) {
+              return '<tr><td class="t-strong">' + (typeof ctDocTypeLabel === 'function' ? ctDocTypeLabel(d.complianceKey || d.docType) : d.docType) + '</td>' +
+                '<td class="mono tiny">📄 ' + (d.name || '—') + '</td>' +
+                '<td class="tiny">' + new Date(d.uploadedAt).toLocaleDateString('en-IN') + '</td>' +
+                '<td style="text-align:right"><button class="btn tiny" onclick="ctDocView(\'' + c.id + '\',\'' + d.id + '\')">View</button></td></tr>';
+            }).join('') + '</tbody></table>';
+        }
+        host.innerHTML = out;
+      })
+      .catch(function () { var host = document.getElementById('ct-pane-uploaded'); if (host) host.innerHTML = '<div class="tiny muted">Could not load agency-uploaded documents.</div>'; });
   }
 
   /* ── generate + open a realistic compliance document for the demo ──────────
@@ -12279,6 +12311,7 @@ function __kvOnReady(fn) {
 
     /* IDENTITY */
     ctRenderIdentity(c);
+    if (typeof ctRenderDocs === 'function') ctRenderDocs(c);
 
     /* CHAT */
     ctChatRender();
@@ -12450,6 +12483,96 @@ function __kvOnReady(fn) {
                        greens >= 4 ? 'Strong consistency — your firm is performing above the benchmark.' :
                        'Mixed trend — clearing your open actions this month will lift the score.';
     }
+  }
+
+  /* ── agency compliance documents (upload / view / compliance reflection) ──── */
+  var CT_DOC_TYPES = [
+    { key: 'clra', label: 'CLRA licence' },
+    { key: 'esic', label: 'ESIC employer code certificate' },
+    { key: 'pf', label: 'PF establishment code' },
+    { key: 'minWage', label: 'Minimum wage register' },
+    { key: 'migrant', label: 'Inter-state migrant (ISMW) cover' },
+    { key: 'safety', label: 'Safety / EHS certificate' },
+    { key: 'wc', label: 'WC insurance policy' },
+    { key: 'gst', label: 'GST certificate' },
+    { key: 'pan', label: 'PAN / CIN' },
+    { key: 'service', label: 'Service agreement' }
+  ];
+  var CT_DOC_REQUIRED = ['clra', 'esic', 'pf', 'minWage', 'migrant', 'safety'];
+  var CT_DOCS_CACHE = {};
+  function ctDocTypeLabel(k) { var d = CT_DOC_TYPES.find(function (x) { return x.key === k; }); return d ? d.label : (k || 'Document'); }
+
+  function ctRenderDocs(c) {
+    if (!c) return;
+    var up = document.getElementById('ct-docs-upload');
+    var host = document.getElementById('ct-docs-list');
+    if (!host) return;
+    if (up) {
+      up.innerHTML =
+        '<select class="sel" id="ct-doc-type" style="width:auto;font-size:0.8rem;max-width:230px">' +
+          CT_DOC_TYPES.map(function (d) { return '<option value="' + d.key + '">' + d.label + '</option>'; }).join('') +
+        '</select>' +
+        '<input type="file" id="ct-doc-file" accept="image/*,application/pdf" style="display:none" onchange="ctDocUpload(\'' + c.id + '\')">' +
+        '<button class="btn" onclick="document.getElementById(\'ct-doc-file\').click()">Upload document</button>';
+    }
+    host.innerHTML = '<div class="tiny muted">Loading documents…</div>';
+    fetch((window.__KV_API_BASE || '') + '/api/contractor-documents/' + encodeURIComponent(c.id))
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        var docs = (j && j.documents) || [];
+        CT_DOCS_CACHE[c.id] = docs;
+        var provided = {}; docs.forEach(function (d) { if (d.complianceKey) provided[d.complianceKey] = true; });
+        var checklist = '<div style="margin-bottom:10px">' + CT_DOC_REQUIRED.map(function (k) {
+          var ok = provided[k];
+          return '<span class="pill ' + (ok ? 'green' : 'red') + ' tiny" style="margin:2px" title="' + ctDocTypeLabel(k) + '">' + (ok ? '✓ ' : '✗ ') + ctDocTypeLabel(k).replace(/ .*/, '') + '</span>';
+        }).join('') + ' <span class="tiny muted">' + Object.keys(provided).filter(function (k) { return CT_DOC_REQUIRED.indexOf(k) >= 0; }).length + '/' + CT_DOC_REQUIRED.length + ' statutory docs on file</span></div>';
+        if (!docs.length) { host.innerHTML = checklist + '<div class="tiny muted">No documents uploaded yet. Upload your CLRA, ESIC, PF, min-wage, migrant-cover and safety documents above — Daikin HR will see them.</div>'; return; }
+        host.innerHTML = checklist + docs.map(function (d) {
+          return '<div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:0.82rem">' +
+            '<span><strong>' + ctDocTypeLabel(d.complianceKey || d.docType) + '</strong> · ' + d.name + ' <span class="tiny muted">· ' + new Date(d.uploadedAt).toLocaleDateString('en-IN') + '</span></span>' +
+            '<span style="white-space:nowrap"><button class="btn" onclick="ctDocView(\'' + c.id + '\',\'' + d.id + '\')">View</button> ' +
+            '<button class="btn danger" onclick="ctDocDelete(\'' + c.id + '\',\'' + d.id + '\')">Delete</button></span></div>';
+        }).join('');
+      })
+      .catch(function () { host.innerHTML = '<div class="tiny muted">Could not load documents.</div>'; });
+  }
+  function ctDocUpload(cid) {
+    var fi = document.getElementById('ct-doc-file'); var file = fi && fi.files && fi.files[0];
+    if (!file) return;
+    if (file.size > 3.5 * 1024 * 1024) { toast('File too large (max 3.5MB)', 'red'); return; }
+    var key = (document.getElementById('ct-doc-type') || {}).value || 'other';
+    var reader = new FileReader();
+    reader.onload = function () {
+      fetch((window.__KV_API_BASE || '') + '/api/contractor-documents', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractorId: cid, name: file.name, docType: ctDocTypeLabel(key), complianceKey: key, dataUrl: reader.result })
+      }).then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) {
+          if (j && j.ok) {
+            toast('Document uploaded · ' + ctDocTypeLabel(key), 'green');
+            var c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS.find(function (x) { return x.id === cid; }) : null;
+            if (c) ctRenderDocs(c);
+            if (typeof kvNotify === 'function') kvNotify('Agency document uploaded', ctDocTypeLabel(key) + ' added by ' + ((window.__KVUSER && window.__KVUSER.name) || 'agency'), 'info');
+          } else toast('Upload failed: ' + ((j && j.error) || 'unknown'), 'red');
+        })
+        .catch(function (e) { toast('Upload failed: ' + e.message, 'red'); });
+    };
+    reader.readAsDataURL(file);
+  }
+  function ctDocView(cid, docId) {
+    var docs = CT_DOCS_CACHE[cid] || []; var d = docs.find(function (x) { return x.id === docId; });
+    if (!d) return;
+    var isPdf = /^data:application\/pdf/i.test(d.dataUrl) || /\.pdf$/i.test(d.name);
+    var w = window.open('', '_blank'); if (!w) { toast('Popup blocked — allow popups', 'red'); return; }
+    w.document.write('<title>' + d.name + '</title><body style="margin:0;background:#222">' +
+      (isPdf ? '<iframe src="' + d.dataUrl + '" style="width:100%;height:100vh;border:0"></iframe>' : '<img src="' + d.dataUrl + '" style="max-width:100%;display:block;margin:0 auto">') + '</body>');
+  }
+  function ctDocDelete(cid, docId) {
+    if (!window.confirm('Delete this document?')) return;
+    fetch((window.__KV_API_BASE || '') + '/api/contractor-documents/' + encodeURIComponent(cid) + '/' + docId, { method: 'DELETE' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { if (j && j.ok) { toast('Document deleted', 'green'); var c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS.find(function (x) { return x.id === cid; }) : null; if (c) ctRenderDocs(c); } else toast('Delete failed', 'red'); })
+      .catch(function (e) { toast('Delete failed: ' + e.message, 'red'); });
   }
 
   function ctRenderIdentity(c) {
