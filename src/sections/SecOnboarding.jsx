@@ -653,25 +653,6 @@ export default function SecOnboarding() {
                   </div>
                   {' '}
                   <div className="field">
-                    <label className="field-l">
-                      {"Aadhaar number "}
-                      <span className="cap-req">*</span>
-                    </label>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <input className="input" id="cap-aadhaar" placeholder="XXXX XXXX XXXX" onInput={(event) => { window.capSync() }} style={{ flex: 1 }} />
-                      <button type="button" className="btn" onClick={(event) => { window.capVerifyAadhaar() }} data-onclick="capVerifyAadhaar()" title="Upload Aadhaar document and auto-verify">Upload &amp; verify</button>
-                    </div>
-                  </div>
-                  {' '}
-                  <div className="field">
-                    <label className="field-l">PAN number</label>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <input className="input" id="cap-pan" placeholder="ABCDE1234F" onInput={(event) => { window.capSync() }} style={{ flex: 1, textTransform: "uppercase" }} />
-                      <button type="button" className="btn" onClick={(event) => { window.capVerifyPan() }} data-onclick="capVerifyPan()" title="Validate the PAN format">Verify</button>
-                    </div>
-                  </div>
-                  {' '}
-                  <div className="field">
                     <label className="field-l">Emergency contact</label>
                     <input className="input" id="cap-emergency" placeholder="Name · relation · phone" />
                   </div>
@@ -1023,10 +1004,35 @@ export default function SecOnboarding() {
               <div className="card">
                 <div className="cap-sec-h">
                   <span className="cap-sec-n">5</span>
-                  {" Documents"}
+                  {" Documents & ID verification"}
                 </div>
+                {/*  Aadhaar + PAN — identity documents, uploaded & verified here  */}
+                {' '}
+                <div className="g2" style={{ gap: "10px 14px", marginBottom: "12px" }}>
+                  <div className="field">
+                    <label className="field-l">
+                      {"Aadhaar number "}
+                      <span className="cap-req">*</span>
+                    </label>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <input className="input" id="cap-aadhaar" placeholder="XXXX XXXX XXXX" onInput={(event) => { window.capSync() }} style={{ flex: 1 }} />
+                      <button type="button" className="btn" onClick={(event) => { window.capVerifyAadhaar() }} data-onclick="capVerifyAadhaar()" title="Upload Aadhaar document and auto-verify">Upload &amp; verify</button>
+                    </div>
+                  </div>
+                  {' '}
+                  <div className="field">
+                    <label className="field-l">PAN number</label>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <input className="input" id="cap-pan" placeholder="ABCDE1234F" onInput={(event) => { window.capSync() }} style={{ flex: 1, textTransform: "uppercase" }} />
+                      <button type="button" className="btn" onClick={(event) => { window.capVerifyPan() }} data-onclick="capVerifyPan()" title="Upload PAN document and validate">Upload &amp; verify</button>
+                    </div>
+                  </div>
+                </div>
+                {' '}
+                <hr className="div" />
+                {' '}
                 <div className="cap-hint" style={{ marginBottom: "10px" }}>
-                  Attach PAN, bank proof, education or prior-employment documents. They are stored against the worker and viewable later from the directory drilldown.
+                  Attach bank proof, education or prior-employment documents. They are stored against the worker and viewable later from the directory drilldown.
                 </div>
                 <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                   <select className="sel" id="cap-doc-type" style={{ width: "auto" }}>

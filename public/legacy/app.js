@@ -17690,14 +17690,67 @@ function __kvOnReady(fn) {
 
   /* PAN format validation (AAAAA9999A) + verify for the capture form */
   function kvPanValid(p) { return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(p || '').toUpperCase().trim()); }
+
+  /* PAN upload + verify modal (mirrors the Aadhaar one): upload the PAN card,
+     enter/confirm the number, validate the format, verify. */
+  let _KV_PAN_TARGET = null, _KV_PAN_DONE = null;
+  function kvPanVerify(targetId, onDone) {
+    _KV_PAN_TARGET = targetId; _KV_PAN_DONE = onDone || null;
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">PAN verification</span>' +
+        '<span class="modal-h-title">Upload &amp; verify PAN</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="cap-hint" style="margin-bottom:10px">Upload the PAN card (image or PDF) and enter the number, or type it. The format is validated (AAAAA9999A). Only the PAN is retained.</div>' +
+        '<div class="cap-drop" onclick="document.getElementById(\'kv-pan-file\').click()">' +
+          '<div class="cap-drop-ico">⬆</div><div class="cap-drop-t">Drop the PAN card, or click to upload</div>' +
+          '<div class="cap-drop-s" id="kv-pan-status">PNG / JPG / PDF of the PAN card</div>' +
+          '<input type="file" id="kv-pan-file" accept="image/*,application/pdf" style="display:none" onchange="kvPanFile(this)"></div>' +
+        '<div class="field" style="margin-top:12px"><label class="field-l">PAN number</label>' +
+          '<input class="input" id="kv-pan-num" placeholder="ABCDE1234F" style="text-transform:uppercase" oninput="kvPanCheck()"></div>' +
+        '<div id="kv-pan-result" class="tiny" style="min-height:18px"></div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Format-validated · masked storage</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" id="kv-pan-verify" disabled onclick="kvPanSave()">Verify</button>' +
+        '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>'
+    );
+    /* pre-fill from the target field if a PAN was already typed */
+    var cur = document.getElementById(targetId), pn = document.getElementById('kv-pan-num');
+    if (cur && pn && cur.value) { pn.value = cur.value.toUpperCase(); kvPanCheck(); }
+  }
+  function kvPanCheck() {
+    var inp = document.getElementById('kv-pan-num'), out = document.getElementById('kv-pan-result'), btn = document.getElementById('kv-pan-verify');
+    var raw = (inp ? inp.value : '').toUpperCase().trim();
+    var ok = kvPanValid(raw);
+    if (out) out.innerHTML = !raw ? '' : ok
+      ? '<span style="color:var(--green-dk)">✓ Valid PAN · ' + raw + '</span>'
+      : '<span style="color:var(--red-dk)">✕ Invalid format — expected AAAAA9999A</span>';
+    if (btn) btn.disabled = !ok;
+    return ok;
+  }
+  function kvPanFile(input) {
+    var file = input && input.files && input.files[0]; if (!file) return;
+    var status = document.getElementById('kv-pan-status');
+    if (status) status.textContent = 'Document attached ✓ — enter or confirm the PAN number below';
+    CAP_STATE.panDoc = file.name;
+  }
+  function kvPanSave() {
+    var raw = (document.getElementById('kv-pan-num') || {}).value || '';
+    var clean = raw.toUpperCase().trim();
+    if (!kvPanValid(clean)) { toast('Enter a valid PAN (format ABCDE1234F)', 'red'); return; }
+    var t = _KV_PAN_TARGET && document.getElementById(_KV_PAN_TARGET);
+    if (t) t.value = clean;
+    var done = _KV_PAN_DONE; _KV_PAN_DONE = null;
+    toast('PAN verified · ' + clean, 'green');
+    omCloseModal();
+    if (done) done(clean);
+  }
   function capVerifyPan() {
-    var el = document.getElementById('cap-pan');
-    var v = (el ? el.value : '').toUpperCase().trim();
-    if (!kvPanValid(v)) { toast('Enter a valid PAN (format ABCDE1234F)', 'red'); return; }
-    if (el) el.value = v;
-    CAP_STATE.panVerified = true;
-    if (typeof capSync === 'function') capSync();
-    toast('PAN verified', 'green');
+    kvPanVerify('cap-pan', function (pan) {
+      var el = document.getElementById('cap-pan'); if (el) el.value = pan;
+      CAP_STATE.panVerified = true;
+      if (typeof capSync === 'function') capSync();
+    });
   }
 
   /* the firm a logged-in contractor is scoped to — they onboard only their own
