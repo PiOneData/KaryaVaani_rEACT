@@ -11865,12 +11865,14 @@ function __kvOnReady(fn) {
       const dropT = trDropAt(a.ro, sLetter, a.pickupIdx || 0);
       const plantIn = trM2T((TR_SHIFT_PLANT[sLetter] || TR_SHIFT_PLANT.A).in);
       const plantOut = trM2T((TR_SHIFT_PLANT[sLetter] || TR_SHIFT_PLANT.A).out);
+      const operator = (typeof trRouteOperator === 'function') ? trRouteOperator(a.route) : '';
       if (titleEl) titleEl.textContent = 'Weekly roster · ' + (a.routeName || a.route);
-      if (subEl) subEl.textContent = shiftLabel + ' · board at ' + a.pickup + ' · reach plant ' + plantIn;
+      if (subEl) subEl.textContent = shiftLabel + ' · board at ' + a.pickup + ' · reach plant ' + plantIn + (operator ? ' · operated by ' + operator : '');
       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       let html = '<div class="note indigo" style="margin-bottom:10px;font-size:0.78rem">' +
         '<strong>' + (a.routeName || a.route) + '</strong> · ' + shiftLabel + ' · pickup at <strong>' + a.pickup + '</strong> ' + pickupT +
-        ' → plant ' + plantIn + ' · drop ' + plantOut + ' → ' + a.pickup + ' ' + dropT + '</div>';
+        ' → plant ' + plantIn + ' · drop ' + plantOut + ' → ' + a.pickup + ' ' + dropT +
+        (operator ? '<br><span style="opacity:0.85">🚌 Transport operator: <strong>' + operator + '</strong></span>' : '') + '</div>';
       html += days.map(function (d) {
         const standDown = (d === 'Sat' && (a.route === 'B3' || a.route === 'B5'));
         return '<div class="emp-sched">' +
@@ -18108,12 +18110,14 @@ function __kvOnReady(fn) {
       '<div class="card-h-title" style="font-size:0.85rem">Worker documents</div>' +
       '<div class="cap-hint" style="margin:4px 0 10px">Add or manage this worker\'s documents — appointment letter, employment contract, ID proof, PAN, bank proof, education, medical fitness, police verification, prior employment. Uploaded by the agency or HR, and visible to both.</div>' +
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-        '<select class="sel" id="ob-doc-type" style="width:auto">' +
+        '<select class="sel" id="ob-doc-type" style="width:auto" onchange="obDocTypeChange()">' +
           ['Appointment letter', 'Employment contract', 'ID proof', 'PAN card', 'Aadhaar', 'Bank proof', 'Education certificate', 'Medical fitness', 'Police verification', 'Prior employment', 'Address proof', 'Other'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
         '</select>' +
+        '<input class="input" id="ob-doc-label" placeholder="Name this document (e.g. Appointment order)" style="display:none;max-width:240px">' +
         '<input type="file" id="ob-doc-file" accept="image/*,application/pdf" style="display:none" onchange="obUploadDoc(\'' + docKey + '\')">' +
         '<button class="btn primary" onclick="document.getElementById(\'ob-doc-file\').click()">Upload document</button>' +
       '</div>' +
+      '<div class="tiny muted" style="margin-top:4px">Choose <strong>Other</strong> to name a custom document (appointment order, agreement, etc.).</div>' +
       '<div id="ob-docs-list" class="tiny muted" style="margin-top:12px">Loading documents…</div>';
     const c = obWorkerCompliance(rec);
     const itemsHtml = c.items.map(function (it) {
@@ -18257,7 +18261,12 @@ function __kvOnReady(fn) {
             : '<div class="input" style="background:#f8fafc">' + (rec.shift || '—') + '</div>') +
         '</div>' +
       '</div>' +
-      (rec.route ? '<div class="tiny muted" style="margin-top:6px">Shown in the transport ' + (rec.shift || '—') + ' batch for <strong>' + rec.route + '</strong>.</div>' : '');
+      (rec.route ? '<div class="tiny muted" style="margin-top:6px">Shown in the transport ' + (rec.shift || '—') + ' batch for <strong>' + rec.route + '</strong>' +
+        (function () {
+          var ro = (typeof TR_ROUTES !== 'undefined') ? TR_ROUTES.find(function (x) { return x.route === rec.route || x.code === rec.route; }) : null;
+          var op = (ro && typeof trRouteOperator === 'function') ? trRouteOperator(ro.code) : '';
+          return op ? ' · 🚌 operated by <strong>' + op + '</strong>' : '';
+        })() + '.</div>' : '');
     kvTabModal({
       eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract') + ' · ' + obStageLabel(rec),
       title: rec.name + ' · ' + rec.category,
@@ -18300,12 +18309,25 @@ function __kvOnReady(fn) {
       })
       .catch(function () { host.innerHTML = '<div class="tiny muted">Could not load documents.</div>'; });
   }
+  /* show the custom-name field only for "Other" documents */
+  function obDocTypeChange() {
+    var sel = document.getElementById('ob-doc-type');
+    var lbl = document.getElementById('ob-doc-label');
+    if (sel && lbl) lbl.style.display = (sel.value === 'Other') ? '' : 'none';
+  }
   function obUploadDoc(workerKey) {
     const fileInput = document.getElementById('ob-doc-file');
     const file = fileInput && fileInput.files && fileInput.files[0];
     if (!file) return;
     if (file.size > 3 * 1024 * 1024) { toast('File too large (max 3MB)', 'red'); return; }
-    const docType = (document.getElementById('ob-doc-type') || {}).value || 'Other';
+    let docType = (document.getElementById('ob-doc-type') || {}).value || 'Other';
+    /* for an "Other" document, use the name the user typed so HR/agency knows
+       exactly what it is (e.g. "Appointment order") */
+    if (docType === 'Other') {
+      const custom = ((document.getElementById('ob-doc-label') || {}).value || '').trim();
+      if (!custom) { toast('Name the document (e.g. Appointment order) for an "Other" upload', 'red'); return; }
+      docType = custom;
+    }
     const host = document.getElementById('ob-docs-list'); if (host) host.innerHTML = '<div class="tiny muted">Uploading…</div>';
     const reader = new FileReader();
     reader.onload = function () {
