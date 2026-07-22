@@ -8939,27 +8939,43 @@ function __kvOnReady(fn) {
           VB_LANGS.map(function (l) { return '<option value="' + l.code + '"' + (l.code === 'TE' ? ' selected' : '') + '>' + l.name + '</option>'; }).join('') +
         '</select>' +
         '<button class="cv-qsd-btn" id="cv-qsd-vbtn" onclick="cvQSendVoice(\'' + q.preset + '\')">Send voice note to test recipients</button>' +
-        '<button class="cv-qsd-btn" id="cv-qsd-vtbtn" onclick="cvQSendVoiceWithTemplate(\'' + q.preset + '\')">+ approved template (trial)</button>' +
+        (function () {
+          var t = (typeof kvPresetTemplate === 'function') ? kvPresetTemplate(q.preset) : null;
+          return t ? '<button class="cv-qsd-btn" id="cv-qsd-vtbtn" onclick="cvQSendVoiceWithTemplate(\'' + q.preset + '\')">+ send ' + t.label + ' template</button>' : '';
+        })() +
       '</div>';
   }
 
-  /* Send the Meta-approved 'trial' template (business-initiated) AND the
-     session voice note together to the test recipients. The template needs no
-     session window; the voice note delivers inside the recipient's 24h window
-     (a voice note is a session message — it is NOT itself template-approved). */
+  /* map a broadcast preset → the right approved WhatsApp template:
+       transport → the Tamil transport-schedule template
+       wage/minimum-wage → the Telugu minimum-wage 'trial' template
+     Returns { template, language, components, label } or null if the preset has
+     no approved template. */
+  function kvPresetTemplate(preset) {
+    if (preset === 'transport') {
+      return { template: 'tamil_transport_schedule_weekly_plan', language: 'ta',
+        components: kvBodyComp([kvTplFutureDate(21)]), label: 'Tamil transport schedule' };
+    }
+    if (preset === 'wage' || preset === 'minwage' || preset === 'minimumwage') {
+      return { template: 'trial', language: 'te',
+        components: kvBodyComp(kvWageParams(kvNameForNumber('919500200300') || 'Sriramm Ramesh')), label: 'Telugu wage revision' };
+    }
+    return null;
+  }
+  /* Send the approved WhatsApp template FOR THIS PRESET (business-initiated) AND
+     the session voice note to the test recipients. The transport preset sends
+     the transport template; the wage preset sends the wage template. */
   function cvQSendVoiceWithTemplate(preset) {
-    var demoNumber = '919500200300';
-    var now = new Date();
-    var dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
-    var monthStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' });
-    var params = (typeof kvWageParams === 'function') ? kvWageParams((typeof kvNameForNumber === 'function' && kvNameForNumber(demoNumber)) || 'Sriramm Ramesh') : ['2026', dateStr, 'Karya Vaani App', monthStr, 'Plant HR'];
-    if (window.KVWhatsApp && typeof window.KVWhatsApp.sendApprovedTemplate === 'function') {
-      window.KVWhatsApp.sendApprovedTemplate(demoNumber, params).then(function (res) {
+    var t = kvPresetTemplate(preset);
+    if (t && window.KVWhatsApp && typeof window.KVWhatsApp.sendTemplate === 'function') {
+      window.KVWhatsApp.sendTemplate('919500200300', t.template, t.language, t.components).then(function (res) {
         if (typeof toast === 'function') {
-          if (res && res.ok) toast('Approved template "trial" sent', 'green');
+          if (res && res.ok) toast('Approved template sent · ' + t.label + ' (' + (res.sent || 1) + ')', 'green');
           else toast('Template send failed: ' + ((res && res.error) || 'gateway'), 'red');
         }
       }).catch(function () { if (typeof toast === 'function') toast('Template send failed', 'red'); });
+    } else if (!t && typeof toast === 'function') {
+      toast('No approved WhatsApp template for this broadcast — sending the voice note only', 'amber');
     }
     cvQSendVoice(preset);
   }
