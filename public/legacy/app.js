@@ -3638,6 +3638,34 @@ function __kvOnReady(fn) {
     host.innerHTML = html;
   }
 
+  /* Night-shift (OSHC Rule 83) consent row for a vendor-deployed worker.
+     Prefers the real self-service / HR consent captured on the onboarding
+     record; falls back to the transport-roster consent; for a female worker
+     with nothing on file yet, shows "pending". Returns '' when not applicable. */
+  function vwNightConsentRow(w) {
+    var code = w.code || w.id;
+    var caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    var cap = caps.find(function (r) {
+      return (code && (r.id === code || r.backendId === code)) ||
+             (r.name && w.name && String(r.name).toLowerCase() === String(w.name).toLowerCase());
+    });
+    if (cap && typeof cap.nightShiftConsent === 'boolean') {
+      return kvKV('Night-shift consent · OSHC R.83', cap.nightShiftConsent
+          ? '<span class="pill green tiny">Consented' + (cap.nightConsentAt ? ' · ' + fmtD(cap.nightConsentAt) : '') + '</span>'
+          : '<span class="pill amber tiny">Declined' + (cap.nightConsentAt ? ' · ' + fmtD(cap.nightConsentAt) : '') + '</span>') +
+        (cap.nightConsentComment ? kvKV('Consent comment', '<span style="white-space:pre-wrap">' + String(cap.nightConsentComment).replace(/</g, '&lt;') + '</span>') : '');
+    }
+    var travel = (typeof trWorkerTravel === 'function') ? trWorkerTravel(code, 14) : null;
+    var val = (travel && travel.assignment && typeof trConsent === 'function') ? trConsent(travel.assignment) : null;
+    var ovr = (typeof TR_STATE !== 'undefined' && TR_STATE.consents) ? TR_STATE.consents[code] : null;
+    if (ovr) val = ovr.consented ? 'yes' : 'no';
+    var isFemale = /^f/i.test(String(w.gender || ''));
+    if ((val && val !== 'na') || isFemale) {
+      return kvKV('Night-shift consent · OSHC R.83', (typeof trConsentPill === 'function') ? trConsentPill(val || 'pending') : (val || 'pending'));
+    }
+    return '';
+  }
+
   /* worker-detail drilldown — uses the same rich tabbed modal shell as the
      worker directory (kvTabModal), populated with the vendor worker's real
      fields, so both surfaces present the same level of detail. */
@@ -3672,18 +3700,33 @@ function __kvOnReady(fn) {
       kvKV('Category', vwEsc(w.category || '—')) +
       kvKV('Designation', vwEsc(w.designation || '—')) +
       kvKV('Department', vwEsc(w.department || '—')) +
+      (w.gender ? kvKV('Gender', vwEsc(w.gender)) : '') +
       kvKV('Preferred language', w.language ? '<span class="pill outline">' + vwEsc(w.language) + '</span>' : '—') +
-      kvKV('Migrant', isMigrant ? '<span class="pill amber tiny">Yes</span>' : 'No')
+      kvKV('Migrant', isMigrant ? '<span class="pill amber tiny">Yes</span>' : 'No') +
+      vwNightConsentRow(w)
     ) + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Vendor deployment record — imported vendor data, or estimated from the contractor’s declared deployment.</div>';
 
-    /* Documents */
+    /* Documents — same upload / view / update tab as the worker directory modal.
+       Documents can be added or replaced at any time (even after onboarding);
+       they share the onboarding document store keyed by the worker code. */
+    var docKey = String(w.code || w.id || '').replace(/'/g, "\\'");
     var documents = kv2col(
       kvKV('UAN (EPFO)', vwEsc(w.uan || '—')) +
       kvKV('ESI (IP number)', vwEsc(w.esi || '—')) +
       kvKV('Aadhaar eKYC', '<span class="pill amber tiny">Not on file</span>')
     ) +
-      '<div class="card-h-title" style="font-size:0.9rem;margin:16px 0 4px">Uploaded documents</div>' +
-      '<div class="tiny muted">Identification and document proofs are captured during onboarding. Imported / estimated vendor workers carry no uploaded documents in this view — complete onboarding to attach ID proofs.</div>';
+      '<div class="card-h-title" style="font-size:0.9rem;margin:16px 0 4px">Worker documents</div>' +
+      '<div class="cap-hint" style="margin:4px 0 10px">Add, view or update this worker\'s documents at any time — even after onboarding. Pending documents (e.g. appointment order) can be uploaded here; to replace one, upload the new copy and delete the old.</div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        '<select class="sel" id="ob-doc-type" style="width:auto" onchange="obDocTypeChange()">' +
+          ['Appointment letter', 'Employment contract', 'ID proof', 'PAN card', 'Aadhaar', 'Bank proof', 'Education certificate', 'Medical fitness', 'Police verification', 'Prior employment', 'Address proof', 'Other'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+        '</select>' +
+        '<input class="input" id="ob-doc-label" placeholder="Name this document (e.g. Appointment order)" style="display:none;max-width:240px">' +
+        '<input type="file" id="ob-doc-file" accept="image/*,application/pdf" style="display:none" onchange="obUploadDoc(\'' + docKey + '\')">' +
+        '<button class="btn primary" onclick="document.getElementById(\'ob-doc-file\').click()">Upload document</button>' +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:4px">Choose <strong>Other</strong> to name a custom document (appointment order, agreement, etc.).</div>' +
+      '<div id="ob-docs-list" class="tiny muted" style="margin-top:12px">Loading documents…</div>';
 
     /* Compliance — score + statutory checklist */
     var esicOk = /active|valid|ok|compliant|clear|good/i.test(w.esicStatus || '');
@@ -3729,6 +3772,7 @@ function __kvOnReady(fn) {
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + vwEsc(w.contractor || '') + '</span></div>' +
         '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div>'
     });
+    if (typeof obLoadDocs === 'function') obLoadDocs(w.code || w.id);
   }
 
   /* ── generic modal (injected into body) ── */
