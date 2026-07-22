@@ -18101,18 +18101,20 @@ function __kvOnReady(fn) {
           : kvKV('Work order', e.workorder) + kvKV('Vendor / contractor', e.contractor) + kvKV('CLRA licence', e.clra) + kvKV('Shift', e.shift)) +
         kvKV('Date of joining', e.doj)
       ) +
-      '<div class="tiny muted" style="margin:10px 0">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained.</div>' +
-      // ── worker documents (uploaded, stored in DB, retrievable) ──
-      '<div class="card-h-title" style="font-size:0.85rem;margin-top:14px">Worker documents</div>' +
-      '<div class="cap-hint" style="margin:4px 0 8px">Upload PAN, bank proof, education or prior-employment documents — stored against this worker and retrievable any time.</div>' +
+      '<div class="tiny muted" style="margin:10px 0">Aadhaar verified via upload + UIDAI Verhoeff checksum; only the last 4 digits are retained. Manage all worker documents in the <strong>Documents</strong> tab.</div>';
+
+    /* ── worker documents tab · add / view / delete (agency + HR) ── */
+    const documents =
+      '<div class="card-h-title" style="font-size:0.85rem">Worker documents</div>' +
+      '<div class="cap-hint" style="margin:4px 0 10px">Add or manage this worker\'s documents — appointment letter, employment contract, ID proof, PAN, bank proof, education, medical fitness, police verification, prior employment. Uploaded by the agency or HR, and visible to both.</div>' +
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
         '<select class="sel" id="ob-doc-type" style="width:auto">' +
-          ['PAN card', 'Bank proof', 'Education certificate', 'Prior employment', 'Address proof', 'Other'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+          ['Appointment letter', 'Employment contract', 'ID proof', 'PAN card', 'Aadhaar', 'Bank proof', 'Education certificate', 'Medical fitness', 'Police verification', 'Prior employment', 'Address proof', 'Other'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
         '</select>' +
         '<input type="file" id="ob-doc-file" accept="image/*,application/pdf" style="display:none" onchange="obUploadDoc(\'' + docKey + '\')">' +
-        '<button class="btn" onclick="document.getElementById(\'ob-doc-file\').click()">Upload document</button>' +
+        '<button class="btn primary" onclick="document.getElementById(\'ob-doc-file\').click()">Upload document</button>' +
       '</div>' +
-      '<div id="ob-docs-list" class="tiny muted" style="margin-top:10px">Loading documents…</div>';
+      '<div id="ob-docs-list" class="tiny muted" style="margin-top:12px">Loading documents…</div>';
     const c = obWorkerCompliance(rec);
     const itemsHtml = c.items.map(function (it) {
       const ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
@@ -18263,7 +18265,8 @@ function __kvOnReady(fn) {
       tabs: [
         { id: 'general', label: 'General information', html: general + trEd },
         { id: 'journey', label: 'Verification & induction', html: journey },
-        { id: 'ident', label: 'Identification documents', html: identification },
+        { id: 'ident', label: 'Identification', html: identification },
+        { id: 'documents', label: 'Documents', html: documents },
         { id: 'compliance', label: 'Compliance', html: compliance }
       ],
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + (rec.mobile ? 'Worker mobile ' + rec.mobile : '') + '</span></div>' +
