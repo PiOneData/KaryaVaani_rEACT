@@ -8666,7 +8666,7 @@ function __kvOnReady(fn) {
     safety:    { emoji: '⚠️', label: 'SAFETY',    tier: 'A', style: 'Band' },
     welfare:   { emoji: '💚', label: 'WELFARE',   tier: 'C', style: 'Frame' },
     transport: { emoji: '🚌', label: 'TRANSPORT', tier: 'C', style: 'Frame' },
-    hr:        { emoji: '📋', label: 'HR',         tier: 'B', style: 'Stripe' },
+    hr:        { emoji: '💼', label: 'HR',         tier: 'B', style: 'Stripe' },
     spp:       { emoji: '🤝', label: 'SPP',        tier: 'B', style: 'Stripe' }
   };
   function kvCatHeader(cat) {
