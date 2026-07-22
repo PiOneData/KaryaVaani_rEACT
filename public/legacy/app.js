@@ -3710,10 +3710,21 @@ function __kvOnReady(fn) {
        Documents can be added or replaced at any time (even after onboarding);
        they share the onboarding document store keyed by the worker code. */
     var docKey = String(w.code || w.id || '').replace(/'/g, "\\'");
+    /* Aadhaar eKYC state — read the verified override (session map, else the
+       bootstrap snapshot, else the worker record) so an earlier verification
+       is reflected; otherwise offer the upload + Verhoeff-verify flow. */
+    var aadCode = w.code || w.id;
+    var aadOv = (typeof OM_COMPLY !== 'undefined' && OM_COMPLY[aadCode]) ||
+                (window.__KVDATA && window.__KVDATA.workerCompliance && window.__KVDATA.workerCompliance[aadCode]) || {};
+    var aadVerified = aadOv.aadhaarVerified || w.aadhaarVerified;
+    var aadLast4 = aadOv.aadhaarLast4 || w.aadhaarLast4;
+    var aadhaarRow = aadVerified
+      ? '<span class="pill green tiny">Verified' + (aadLast4 ? ' · XXXX XXXX ' + aadLast4 : '') + '</span>'
+      : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="vwOpenAadhaar(\'' + String(w.id).replace(/'/g, "\\'") + '\')">Upload &amp; verify</button>';
     var documents = kv2col(
       kvKV('UAN (EPFO)', vwEsc(w.uan || '—')) +
       kvKV('ESI (IP number)', vwEsc(w.esi || '—')) +
-      kvKV('Aadhaar eKYC', '<span class="pill amber tiny">Not on file</span>')
+      kvKV('Aadhaar eKYC', aadhaarRow)
     ) +
       '<div class="card-h-title" style="font-size:0.9rem;margin:16px 0 4px">Worker documents</div>' +
       '<div class="cap-hint" style="margin:4px 0 10px">Add, view or update this worker\'s documents at any time — even after onboarding. Pending documents (e.g. appointment order) can be uploaded here; to replace one, upload the new copy and delete the old.</div>' +
@@ -3773,6 +3784,58 @@ function __kvOnReady(fn) {
         '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div>'
     });
     if (typeof obLoadDocs === 'function') obLoadDocs(w.code || w.id);
+  }
+
+  /* Aadhaar eKYC upload + verify for a vendor-deployed worker — same OCR +
+     UIDAI Verhoeff-checksum flow as the worker directory (reuses omAadhaarFile
+     / omAadhaarCheck on the shared om-aad-* fields), persisted per worker code
+     via /api/worker-compliance so it survives reopen/reload. */
+  function vwOpenAadhaar(id) {
+    var w = VW_STATE.workers.find(function (x) { return String(x.id) === String(id); });
+    if (!w) return;
+    var back = String(w.id).replace(/'/g, "\\'");
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left">' +
+        '<span class="modal-h-eye">Aadhaar eKYC · ' + vwEsc(w.code || '') + '</span>' +
+        '<span class="modal-h-title">' + vwEsc(w.name || '') + '</span>' +
+      '</div><span class="modal-h-close" onclick="vwWorkerDetail(\'' + back + '\')">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="cap-hint" style="margin-bottom:10px">Upload the Aadhaar document — the number is read automatically and validated (UIDAI Verhoeff checksum). You can also type it. The number is masked and only the last 4 digits are stored, with consent under the DPDP Act 2023.</div>' +
+        '<div class="cap-drop" id="om-aad-drop" onclick="document.getElementById(\'om-aad-file\').click()">' +
+          '<div class="cap-drop-ico">⬆</div>' +
+          '<div class="cap-drop-t">Drop the Aadhaar image here, or click to upload</div>' +
+          '<div class="cap-drop-s" id="om-aad-ocr-status">PNG / JPG of the Aadhaar card</div>' +
+          '<input type="file" id="om-aad-file" accept="image/*" style="display:none" onchange="omAadhaarFile(this)">' +
+        '</div>' +
+        '<div class="field" style="margin-top:12px"><label class="field-l">Aadhaar number</label>' +
+          '<input class="input" id="om-aad-num" inputmode="numeric" placeholder="12-digit Aadhaar (auto-filled from upload or type)" oninput="omAadhaarCheck()"></div>' +
+        '<div id="om-aad-result" class="tiny" style="min-height:18px"></div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Verhoeff-validated · masked storage</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" id="om-aad-verify" disabled onclick="vwAadhaarVerify(\'' + back + '\')">Verify &amp; save</button>' +
+        '<button class="btn" onclick="vwWorkerDetail(\'' + back + '\')">Cancel</button></div></div>'
+    );
+  }
+  function vwAadhaarVerify(id) {
+    var w = VW_STATE.workers.find(function (x) { return String(x.id) === String(id); });
+    if (!w) return;
+    var inp = document.getElementById('om-aad-num');
+    var raw = (inp ? inp.value : '').replace(/\D/g, '');
+    if (!verhoeffValid(raw)) { toast('Enter a valid Aadhaar first', 'red'); return; }
+    var code = w.code || w.id;
+    fetch((window.__KV_API_BASE || '') + '/api/worker-compliance', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, aadhaarVerified: true, aadhaarLast4: raw.slice(-4) })
+    }).then(function (rr) { return rr.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          if (typeof OM_COMPLY !== 'undefined') OM_COMPLY[code] = j.override;
+          w.aadhaarVerified = true; w.aadhaarLast4 = raw.slice(-4);
+          toast('Aadhaar verified · ' + maskAadhaar(raw), 'green');
+          vwWorkerDetail(id);   // reopen with updated state
+        } else { toast('Could not save: ' + (j.error || 'unknown'), 'red'); }
+      })
+      .catch(function (e) { toast('Save failed: ' + e.message, 'red'); });
   }
 
   /* ── generic modal (injected into body) ── */
