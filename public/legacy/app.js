@@ -18120,6 +18120,9 @@ function __kvOnReady(fn) {
     if (!rec.aadhaarVerified || (rec.pan && !rec.panVerified)) {
       toast('Verify both Aadhaar and PAN before moving to induction', 'red'); return;
     }
+    if (!rec.route || !rec.shift) {
+      toast('Assign a transport route and shift before moving to induction', 'red'); return;
+    }
     obPersistRec(rec, { journeyStage: 'induction', inductionStatus: 'scheduled' });
     obRefreshOnboardViews(); obOpenCapture(i, 'journey');
     toast(rec.name + ' moved to induction training', 'green');
@@ -18295,6 +18298,13 @@ function __kvOnReady(fn) {
     const a = rec.address || {};
     const e = rec.employment || {};
     const ppe = rec.ppe || {};
+    /* Date formatter — declared HERE (before `general`) on purpose: the female
+       night-consent line inside `general` calls fmtD, and a later `var fmtD`
+       would be hoisted-but-undefined at that point, throwing and preventing the
+       modal from opening (this was the "female employee detail won't open" bug). */
+    var fmtD = function (v) { if (!v) return '—'; var d = new Date(v.length === 10 ? v + 'T00:00:00' : v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
+    /* Show only the last 4 of a PAN (Aadhaar already stores only last-4). */
+    var maskPan = function (p) { p = String(p || ''); return p ? '••••••' + p.slice(-4) : '—'; };
     const general = kv2col(
       kvKV('Worker ID', rec.id) + kvKV('Name', rec.name) +
       kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
@@ -18323,11 +18333,11 @@ function __kvOnReady(fn) {
     );
     const aadhaarRow = rec.aadhaarVerified
       ? '<span class="pill green tiny">Verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
-      : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>';
+      : '<span class="pill red tiny">Not verified</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Verify</button>';
     const panRow = rec.pan
       ? (rec.panVerified
-          ? '<span class="pill green tiny">Verified · ' + rec.pan + '</span>'
-          : '<span class="mono">' + rec.pan + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify</button>')
+          ? '<span class="pill green tiny">Verified · ' + maskPan(rec.pan) + '</span>'
+          : '<span class="mono">' + maskPan(rec.pan) + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify</button>')
       : '<span class="pill outline tiny">Not provided</span>';
     const identification =
       kv2col(
@@ -18369,7 +18379,6 @@ function __kvOnReady(fn) {
     const compliance =
       '<div class="g2" style="gap:10px;margin-bottom:12px">' +
         '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
-        '<div class="kpi"><div class="kpi-eye">Status</div><div class="kpi-val" style="font-size:1.1rem;color:' + (c.status === 'compliant' ? 'var(--green-dk)' : 'var(--red-dk)') + '">' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</div></div>' +
       '</div>' +
       '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) + ctLink;
     /* ── verification & induction (journey timeline + HR actions) ──
@@ -18381,17 +18390,16 @@ function __kvOnReady(fn) {
     var stage = obJourneyStage(rec);
     var isHR = obIsHR();
     var verified = !!rec.aadhaarVerified && (rec.pan ? !!rec.panVerified : true);
-    var fmtD = function (v) { if (!v) return '—'; var d = new Date(v.length === 10 ? v + 'T00:00:00' : v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
     var aStep = rec.aadhaarVerified
       ? '<span class="pill green tiny">Aadhaar verified' + (rec.aadhaarLast4 ? ' · XXXX XXXX ' + rec.aadhaarLast4 : '') + '</span>'
       : (isHR
-          ? '<span class="pill red tiny">Aadhaar pending</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Upload &amp; verify</button>'
+          ? '<span class="pill red tiny">Aadhaar pending</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCaptureAadhaar(' + i + ')">Verify</button>'
           : '<span class="pill red tiny">Aadhaar pending · awaiting HR</span>');
     var pStep = !rec.pan
       ? '<span class="pill outline tiny">No PAN on record</span>'
-      : (rec.panVerified ? '<span class="pill green tiny">PAN verified · ' + rec.pan + '</span>'
-         : (isHR ? '<span class="mono">' + rec.pan + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify PAN</button>'
-                 : '<span class="mono">' + rec.pan + '</span> <span class="pill amber tiny">awaiting HR</span>'));
+      : (rec.panVerified ? '<span class="pill green tiny">PAN verified · ' + maskPan(rec.pan) + '</span>'
+         : (isHR ? '<span class="mono">' + maskPan(rec.pan) + '</span> <button class="btn primary" style="padding:4px 10px;font-size:0.72rem" onclick="obVerifyCapturePan(' + i + ')">Verify PAN</button>'
+                 : '<span class="mono">' + maskPan(rec.pan) + '</span> <span class="pill amber tiny">awaiting HR</span>'));
     var indBlock;
     if (stage === 'imported' || stage === 'verified') {
       indBlock =
@@ -18404,10 +18412,10 @@ function __kvOnReady(fn) {
         '<div style="margin-top:16px">' +
           (!isHR
             ? '<div class="note indigo" style="font-size:0.74rem">Verification and induction are managed by HR. Current stage: <strong>' + obStageLabel(rec) + '</strong>.</div>'
-            : (verified
+            : ((verified && rec.route && rec.shift)
                 ? '<button class="btn primary" onclick="obMoveToInduction(' + i + ')">Move to induction training →</button>'
-                : '<button class="btn" disabled title="Verify PAN + Aadhaar first">Move to induction training →</button>' +
-                  '<div class="tiny muted" style="margin-top:6px">Verify both documents above to enable induction.</div>')) +
+                : '<button class="btn" disabled title="Verify Aadhaar/PAN and assign a transport route + shift first">Move to induction training →</button>' +
+                  '<div class="tiny muted" style="margin-top:6px">' + (!verified ? 'Verify both documents above' : 'Assign a transport route + shift (General tab)') + ' to enable induction.</div>')) +
         '</div>';
     } else {
       var done = stage === 'complete';
@@ -18428,8 +18436,7 @@ function __kvOnReady(fn) {
             '<div style="font-size:0.84rem;font-weight:600">' + m + '</div>' +
             '<div style="flex:0 0 auto">' +
               (d ? '<span class="pill green tiny">Completed</span>'
-                 : (isHR && !done ? '<button class="btn" style="padding:3px 10px;font-size:0.72rem" onclick="obToggleIndModule(' + i + ',' + mi + ')">Mark complete</button>'
-                                  : '<span class="pill outline tiny">Pending</span>')) +
+                 : '<span class="pill outline tiny">Pending</span>') +
             '</div>' +
           '</div>' +
         '</div>';
@@ -18450,7 +18457,7 @@ function __kvOnReady(fn) {
               '</div>');
       indBlock =
         '<div class="card-h-title" style="font-size:0.85rem;margin-top:8px">Step 2 · Induction training · <span style="color:var(--blue)">' + (rec.category || 'Unskilled') + '</span></div>' +
-        '<div class="cap-hint" style="margin:4px 0 10px">Training modules are set by the worker\'s skill level. ' + (isHR ? 'Mark each module complete, set the training window, then mark the whole induction complete.' : 'HR marks each training module complete.') + ' <strong>' + doneCount + ' of ' + mods.length + '</strong> modules done.</div>' +
+        '<div class="cap-hint" style="margin:4px 0 10px">Training modules are set by the worker\'s skill level. ' + (isHR ? 'Set the training window here; module completion and induction sign-off are done in the Induction page.' : 'HR marks each training module complete in the Induction page.') + ' <strong>' + doneCount + ' of ' + mods.length + '</strong> modules done.</div>' +
         modHtml +
         (done ? '<div class="note green" style="margin:10px 0 12px;font-size:0.78rem">✓ Induction completed' + (rec.inductionCompletedAt ? ' on ' + fmtD(rec.inductionCompletedAt) : '') + '. Training window ' + fmtD(rec.inductionStart) + ' → ' + fmtD(rec.inductionEnd) + '.</div>' : '') +
         dateSection +
@@ -18458,9 +18465,8 @@ function __kvOnReady(fn) {
           '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
             (isHR
               ? '<button class="btn" onclick="obSaveInduction(' + i + ')">Save schedule</button>' +
-                '<button class="btn primary" onclick="obCompleteInduction(' + i + ')">Mark induction completed ✓</button>' +
-                (allDone ? '' : '<span class="tiny" style="color:var(--red-dk)">Complete all ' + mods.length + ' modules to finish induction.</span>')
-              : '<div class="note indigo" style="font-size:0.74rem">Induction is managed by HR. Current stage: <strong>' + obStageLabel(rec) + '</strong>.</div>') +
+                '<span class="tiny muted">Mark modules and induction complete in the <strong>Induction</strong> page — this view reflects that status.</span>'
+              : '<div class="note indigo" style="font-size:0.74rem">Induction is managed by HR in the Induction page. Current stage: <strong>' + obStageLabel(rec) + '</strong>.</div>') +
           '</div>');
     }
     /* worker login for a newly created female employee (HR only) */
@@ -18481,8 +18487,8 @@ function __kvOnReady(fn) {
     /* transport / shift roster — editable separately (HR), read-only for contractor */
     var trRouteOpts = (typeof capRouteOptions === 'function') ? capRouteOptions() : [];
     var trEd =
-      '<div class="card-h-title" style="font-size:0.85rem;margin-top:14px">Transport · shift roster</div>' +
-      '<div class="cap-hint" style="margin:4px 0 8px">Route and shift place this worker in the transport route batch. Edit them here to move the worker between routes / shifts.</div>' +
+      '<div class="card-h-title" style="font-size:0.85rem;margin-top:14px">Transport · shift roster <span style="color:var(--red-dk)">*</span></div>' +
+      '<div class="cap-hint" style="margin:4px 0 8px">Route and shift are <strong>required</strong> — assign both to place this worker in a transport batch. The worker can\'t move to induction until both are set.</div>' +
       '<div class="g2" style="gap:10px 14px">' +
         '<div class="field"><label class="field-l">Route</label>' +
           (obIsHR()
