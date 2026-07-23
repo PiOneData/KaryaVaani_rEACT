@@ -52,6 +52,7 @@ const COLLECTIONS = {
   appointmentOrders:   { table: 'appointment_orders',    kind: 'array', id: (r) => r.id },
   voiceCache:          { table: 'voice_cache',           kind: 'array', id: (r) => r.hash },
   voiceWarm:           { table: 'voice_warm',            kind: 'map' },
+  autoWelcomeSent:     { table: 'auto_welcome_sent',     kind: 'map' },
   communications:      { table: 'communications',        kind: 'array', id: (r) => r.id },
   whatsappMessages:    { table: 'whatsapp_messages',      kind: 'array', id: (r) => r.id },
   chatThreads:         { table: 'chat_threads',          kind: 'map' },

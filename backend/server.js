@@ -1343,6 +1343,73 @@ app.post('/api/whatsapp/send-welcome-voice', async (req, res) => {
   }
 });
 
+/* ── Auto welcome-voice on the worker's "Yes" reply ─────────────────────────
+   When a worker taps Yes on the karyavaani_onboard_en onboarding template, that
+   reply opens their 24h window — the only time a session voice note can be
+   delivered. This trigger detects the affirmative reply and sends the welcome
+   voice in the worker's onboarding language, exactly once per number. Called
+   fire-and-forget from /api/whatsapp/ingest; never blocks the webhook ack. */
+const AUTO_WELCOME_AFFIRMATIVE = /^\s*(yes|yeah|yep|ok(ay)?|confirm(ed)?)\b/i;
+
+/* Find an onboarded worker by WhatsApp number (match on the last 10 digits). */
+function findWorkerByPhone(store, phone) {
+  const d = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (d.length !== 10) return null;
+  const list = (store.data && store.data.onboardingCaptures) || [];
+  return list.find((c) => c.mobile && String(c.mobile).replace(/\D/g, '').slice(-10) === d) || null;
+}
+
+async function maybeAutoWelcomeVoice(rec) {
+  try {
+    if (!rec || rec.direction !== 'in' || rec.channel !== 'whatsapp') return;
+    if (!AUTO_WELCOME_AFFIRMATIVE.test(String(rec.text || ''))) return;
+    const store = readStore();
+    if (!store || !store.data) return;
+    const phone = rec.from;
+    const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10) return;
+    /* Only react to a Yes/No button-reply OR a typed "yes" from a KNOWN
+       onboarded worker — so a stray "yes" in free chat never fires a welcome. */
+    const t = String(rec.type || '').toLowerCase();
+    const isButtonReply = t.includes('button') || t.includes('interactive');
+    const worker = findWorkerByPhone(store, phone);
+    if (!isButtonReply && !worker) return;
+    /* Dedup: send the auto welcome voice at most once per number. */
+    store.data.autoWelcomeSent = store.data.autoWelcomeSent || {};
+    if (store.data.autoWelcomeSent[digits]) return;
+    const lang = (worker && worker.lang) || '';
+    const register = welcomeRegisterFor(lang);
+    const { hash, ext } = await getOrCreateWelcomeVoice(register);
+    const link = PUBLIC_BASE_URL + '/api/voice/' + hash + '.' + ext;
+    const { json } = await commsFetch('/v1/whatsapp/send-audio', {
+      method: 'POST',
+      body: JSON.stringify({ to: phone, link, lang, caption: 'Welcome to Karya Vaani' })
+    });
+    /* mark sent only after the gateway accepted it, so a transient failure can retry */
+    if (json && json.ok !== false) {
+      store.data.autoWelcomeSent[digits] = { register, worker: (worker && worker.id) || null, at: new Date().toISOString() };
+      dbPut('autoWelcomeSent', digits, store.data.autoWelcomeSent[digits]);
+    }
+    logComm({ channel: 'whatsapp', kind: 'voice', to: [phone], recipients: 1, preview: 'auto welcome voice · ' + register + ' (Yes reply)', status: waStatus(json), provider: json && json.provider });
+    console.log('[auto-welcome] ' + register + ' welcome voice → ' + digits + ' on affirmative reply');
+  } catch (e) {
+    console.error('[auto-welcome] failed:', e.message);
+  }
+}
+
+/* Admin: clear the auto-welcome dedup marker for a number so tapping Yes again
+   re-sends the welcome voice (handy for testing the flow end-to-end). */
+app.post('/api/whatsapp/auto-welcome/reset', (req, res) => {
+  const digits = String((req.body || {}).to || '').replace(/\D/g, '').slice(-10);
+  if (digits.length !== 10) return res.status(400).json({ ok: false, error: 'valid `to` required' });
+  const store = readStore();
+  if (!store || !store.data) return res.status(503).json({ ok: false, error: 'store not ready' });
+  const had = !!(store.data.autoWelcomeSent && store.data.autoWelcomeSent[digits]);
+  if (store.data.autoWelcomeSent) delete store.data.autoWelcomeSent[digits];
+  dbDel('autoWelcomeSent', digits);
+  res.json({ ok: true, cleared: had });
+});
+
 /* ── Vendor workers: imported per-contractor deployment rosters ──────────────
    The master worker roster has no contractor field, so the full list of workers
    deployed under a vendor is sourced from an explicit vendor-data import. Stored
@@ -1463,6 +1530,10 @@ app.post('/api/whatsapp/ingest', (req, res) => {
   if (idx >= 0) arr[idx] = record; else arr.push(record);
   while (arr.length > 5000) arr.shift();
   dbPut('whatsappMessages', key, record);
+  /* Fire-and-forget: if this is a worker's "Yes" reply to the onboarding
+     template, auto-send their language's welcome voice into the now-open 24h
+     window. Never blocks or fails the webhook ack. */
+  maybeAutoWelcomeVoice(record);
   res.json({ ok: true });
 });
 
