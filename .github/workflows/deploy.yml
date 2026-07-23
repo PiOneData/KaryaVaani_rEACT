@@ -125,7 +125,10 @@ jobs:
             META_VERIFY_TOKEN=${{ secrets.META_VERIFY_TOKEN }}
             META_APP_SECRET=${{ secrets.META_APP_SECRET }}
             COMMS_VERIFY_SIGNATURE=false
-            WHATSAPP_TEST_RECIPIENT=919500200300,919840942405,919880947594:ta,918122222261
+            # GO-LIVE: test redirect removed — every outbound message now goes to
+            # the real requested recipient (each worker gets only their own send).
+            # To re-enable test mode, set a comma-separated recipient list here.
+            WHATSAPP_TEST_RECIPIENT=
             # Sarvam AI translation engine (optional alternative to IndicTrans2)
             SARVAM_API_URL=https://api.sarvam.ai
             SARVAM_API_KEY=${{ secrets.SARVAM_API_KEY }}
