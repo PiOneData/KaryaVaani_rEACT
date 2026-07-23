@@ -920,6 +920,22 @@ function __kvOnReady(fn) {
   function setLangFor(name, code) {
     WORKER_LANGUAGE[name] = code;
   }
+  /* Map an onboarding language NAME ("Telugu"/"Tamil"/"Hindi"…) to a LANGUAGES
+     code ("TE"/"TA"/"HI"). WORKER_LANGUAGE stores CODES, so an onboarding lang
+     name must be converted or langOf can't match it and falls back to English. */
+  function obLangNameToCode(v) {
+    var s = String(v || '').trim().toLowerCase();
+    if (!s) return 'EN';
+    var hit = LANGUAGES.find(function (l) { return l.name.toLowerCase() === s || l.code.toLowerCase() === s || (l.nativeName && l.nativeName.toLowerCase() === s); });
+    if (hit) return hit.code;
+    if (s.indexOf('telug') >= 0) return 'TE';
+    if (s.indexOf('tamil') >= 0) return 'TA';
+    if (s.indexOf('hind') >= 0) return 'HI';
+    if (s.indexOf('odi') >= 0 || s.indexOf('oriya') >= 0) return 'OR';
+    if (s.indexOf('beng') >= 0) return 'BN';
+    if (s.indexOf('japan') >= 0) return 'JP';
+    return 'EN';
+  }
   function langTagHtml(name, compact) {
     const l = langOf(name);
     if (compact) {
@@ -4650,7 +4666,12 @@ function __kvOnReady(fn) {
       PPE_STATE[name] = { shoe: (r.ppe && r.ppe.shoe) || '—', uniform: (r.ppe && r.ppe.uniform) || '—', gloves: '—',
         status: hasSizes ? 'confirmed' : 'missing', orderedOn: null, deliverBy: r.fitmentAppt || '—',
         vendor: (r.employment && r.employment.contractor) || '—', receipt: null };
-      if (typeof WORKER_LANGUAGE !== 'undefined' && r.lang) WORKER_LANGUAGE[name] = r.lang;
+      /* Seed the induction language from the worker's ONBOARDING language,
+         mapped to a code — but ONLY if not already set, so a manual change in
+         the induction language picker isn't reverted on the next grid render. */
+      if (typeof WORKER_LANGUAGE !== 'undefined' && r.lang && WORKER_LANGUAGE[name] == null) {
+        WORKER_LANGUAGE[name] = obLangNameToCode(r.lang);
+      }
       out.push({
         name: name,
         type: r.type === 'contract' ? 'Contract' : 'Direct',
@@ -4900,6 +4921,27 @@ function __kvOnReady(fn) {
     renderIndGrid();
   }
 
+  /* Induction language picker — shown ABOVE the induction timeline. Defaults to
+     the worker's onboarding language (seeded in obSyncInductionJoinees). */
+  function indLangPickerHtml(name) {
+    var cur = langOf(name);
+    var safeName = name.replace(/'/g, "\\'");
+    var opts = LANGUAGES.map(function (l) {
+      var active = (l.code === cur.code);
+      return '<span class="lang-opt' + (active ? ' active' : '') + '" onclick="changeWorkerLanguage(\'' + safeName + '\',\'' + l.code + '\')" title="' + l.name + ' · pack coverage ' + l.coverage + '%">' +
+        '<span class="lang-glyph">' + l.nativeName + '</span><span>' + l.code + '</span>' +
+        '<span class="lang-cov">' + l.coverage + '%</span></span>';
+    }).join('');
+    return '<div class="lang-picker" style="margin-bottom:14px">' +
+      '<div class="lang-picker-h"><span class="lp-title">Induction language</span>' +
+        '<span class="lp-sub">Defaults to the worker\'s onboarding language · VAANI translates content + safety briefings</span></div>' +
+      '<div class="lang-options">' + opts + '</div>' +
+      '<div class="lang-coverage-line"><span>Pack coverage</span>' +
+        '<div class="lc-bar"><span style="width:' + cur.coverage + '%"></span></div>' +
+        '<span class="lc-pct">' + cur.coverage + '%</span></div>' +
+    '</div>';
+  }
+
   function openIndDrill(name) {
     SELECTED_IND = name;
     renderIndGrid();
@@ -4956,9 +4998,9 @@ function __kvOnReady(fn) {
         '</div>';
       });
       sh2 += '</div>';
-      list.innerHTML = th + sh2;
+      list.innerHTML = indLangPickerHtml(name) + th + sh2;
     } else {
-    list.innerHTML = '<div class="drill-list-h"><span>Induction modules</span><span class="tiny muted">' + ind.modules.length + ' modules · ' + (ind.track === 'direct' ? 'Common + Direct + Role' : 'Common + Contract + Role') + '</span></div>';
+    list.innerHTML = indLangPickerHtml(name) + '<div class="drill-list-h"><span>Induction modules</span><span class="tiny muted">' + ind.modules.length + ' modules · ' + (ind.track === 'direct' ? 'Common + Direct + Role' : 'Common + Contract + Role') + '</span></div>';
     ind.modules.forEach(m => {
       const cls = m.status; /* gated/done/inprog/scheduled */
       let statBlock = '';
@@ -5031,30 +5073,8 @@ function __kvOnReady(fn) {
     }
     sh += '</div>';
 
-    /* language picker */
-    const cur = langOf(name);
-    sh += '<div class="lang-picker">';
-    sh += '  <div class="lang-picker-h">' +
-            '<span class="lp-title">Induction language</span>' +
-            '<span class="lp-sub">VAANI translates content + role-specific safety briefings</span>' +
-          '</div>';
-    sh += '  <div class="lang-options">';
-    LANGUAGES.forEach(l => {
-      const active = (l.code === cur.code);
-      const safeName = name.replace(/'/g, "\\'");
-      sh += '<span class="lang-opt' + (active ? ' active' : '') + '" onclick="changeWorkerLanguage(\'' + safeName + '\',\'' + l.code + '\')" title="' + l.name + ' · pack coverage ' + l.coverage + '%">' +
-              '<span class="lang-glyph">' + l.nativeName + '</span>' +
-              '<span>' + l.code + '</span>' +
-              '<span class="lang-cov">' + l.coverage + '%</span>' +
-            '</span>';
-    });
-    sh += '  </div>';
-    sh += '  <div class="lang-coverage-line">' +
-            '<span>Pack coverage</span>' +
-            '<div class="lc-bar"><span style="width:' + cur.coverage + '%"></span></div>' +
-            '<span class="lc-pct">' + cur.coverage + '%</span>' +
-          '</div>';
-    sh += '</div>';
+    /* (Induction language picker moved above the induction timeline — see
+       indLangPickerHtml prepended to the module/timeline list.) */
 
     /* statutory note */
     sh += '<div class="note" style="margin-top:16px"><strong>Statutory basis:</strong> Factories Act 1948 s.41-B (safety of workers using hazardous processes) + Schedule 21 (safety officer competency). Worker cannot be permitted on shop floor without PPE issued and fitment confirmed. Induction modules tagged ⚠ are mandatory; gated modules cannot start until PPE is on hand and ESIC is enrolled.</div>';
