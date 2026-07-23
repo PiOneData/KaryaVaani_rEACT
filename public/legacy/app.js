@@ -1643,7 +1643,7 @@ function __kvOnReady(fn) {
     buildSdGridSorter();
     renderWkGrid();
     renderCwGrid();
-    renderSdGrid();
+    obRenderSharedDocStore();
     renderVerificationDashboard();
     wkRenderRegistry();
   }
@@ -12775,6 +12775,47 @@ function __kvOnReady(fn) {
       })
       .catch(function () { host.innerHTML = '<div class="tiny muted">Could not load documents.</div>'; });
   }
+
+  /* Resolve the logged-in agency (contractor login) to a contractor record. */
+  function obAgencyContractor() {
+    var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    if (!scope) return null;
+    var u = window.__KVUSER || {};
+    var id = (u.linkedType === 'contractor' && u.linkedId) ? u.linkedId : null;
+    var c = (typeof CONTRACTORS !== 'undefined')
+      ? CONTRACTORS.find(function (x) { return (id && x.id === id) || String(x.name).toLowerCase() === String(scope).toLowerCase(); })
+      : null;
+    return c || { id: id || scope, name: scope };
+  }
+  /* Shared document store: an AGENCY login sees its OWN Daikin-required
+     compliance documents (CLRA / ESIC / PF / min-wage / migrant / safety) with
+     upload + status — reusing the contractor-documents store — instead of the
+     per-worker document-type grid that HR sees. */
+  function obRenderSharedDocStore() {
+    var agency = obAgencyContractor();
+    var host = document.getElementById('ob-agency-docs');
+    var empCard = document.getElementById('ob-empdoc-card');
+    if (agency && host) {
+      if (empCard) empCard.style.display = 'none';
+      host.style.display = '';
+      host.innerHTML =
+        '<div class="card">' +
+          '<div class="card-h"><div>' +
+            '<div class="card-h-title">Your compliance documents · ' + (agency.name || '') + '</div>' +
+            '<div class="card-h-sub">Upload and keep your Daikin-required statutory documents current — CLRA, ESIC, PF, minimum-wage, migrant cover and safety. Daikin HR sees these.</div>' +
+          '</div></div>' +
+          '<div id="ct-docs-upload" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px"></div>' +
+          '<div id="ct-docs-list" class="tiny muted">Loading documents…</div>' +
+        '</div>';
+      if (typeof ctRenderDocs === 'function') ctRenderDocs(agency);
+      return;
+    }
+    if (host) { host.style.display = 'none'; host.innerHTML = ''; }
+    if (empCard) empCard.style.display = '';
+    if (typeof renderSdGrid === 'function') renderSdGrid();
+  }
+  window.obRenderSharedDocStore = obRenderSharedDocStore;
+
   function ctDocUpload(cid) {
     var fi = document.getElementById('ct-doc-file'); var file = fi && fi.files && fi.files[0];
     if (!file) return;

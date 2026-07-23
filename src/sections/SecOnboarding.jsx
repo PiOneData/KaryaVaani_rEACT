@@ -1237,7 +1237,10 @@ export default function SecOnboarding() {
       </div>
       {' '}
       <div id="ob-docs" className="subpane" style={{ display: "none" }}>
-        <div className="card">
+        {/*  Agency login: the agency's own Daikin-required compliance documents
+             (rendered by obRenderSharedDocStore); hidden for HR.  */}
+        <div id="ob-agency-docs" style={{ display: "none" }} />
+        <div className="card" id="ob-empdoc-card">
           <div className="card-h">
             <div>
               <div className="card-h-title">Shared document store</div>
