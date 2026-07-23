@@ -1111,7 +1111,7 @@ export default function SecOnboarding() {
                   <div className="cap-drop-t">Drop your Excel (.xlsx) or CSV here, or click to browse</div>
                   {' '}
                   <div className="cap-drop-s">
-                    Columns: name, type, mobile, aadhaar, pan, gender, route, shift, language, category, contractor, uniform, shoe — one worker per row. Aadhaar stays a 12-digit whole number.
+                    Columns: name, type, mobile, aadhaar, pan, gender, shift, language, category, contractor, uniform, shoe — one worker per row. Aadhaar stays a 12-digit whole number. Transport route is assigned by HR after upload.
                   </div>
                   {' '}
                   <div className="pill green" id="cap-drop-file" style={{ display: "none", marginTop: "10px" }} />
@@ -1157,7 +1157,6 @@ export default function SecOnboarding() {
                         <th>Mobile</th>
                         <th>Aadhaar</th>
                         <th>Gender</th>
-                        <th>Route</th>
                         <th>Shift</th>
                         <th>Row check</th>
                       </tr>

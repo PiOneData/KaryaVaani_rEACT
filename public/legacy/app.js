@@ -15044,12 +15044,13 @@ function __kvOnReady(fn) {
   }
 
   function capDownloadTemplate() {
-    var routes = capRouteOptions();
-    var headers = ['name', 'type', 'mobile', 'aadhaar', 'pan', 'gender', 'route', 'shift', 'language', 'category', 'contractor', 'uniform', 'shoe'];
+    /* Route is intentionally NOT a column — the transport route is assigned and
+       updated by HR after upload, so the agency does not provide it here. */
+    var headers = ['name', 'type', 'mobile', 'aadhaar', 'pan', 'gender', 'shift', 'language', 'category', 'contractor', 'uniform', 'shoe'];
     var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
     var sample = [
-      ['Ramesh Naidu', 'direct', '9876543210', '123456789012', 'ABCDE1234F', 'Male', (routes[0] ? routes[0].label : 'Route 1 · Tada'), 'Morning', 'Telugu', 'Skilled', (scope || ''), 'L', '9'],
-      ['Lalita Devi', 'contract', '9811122233', '234567890123', 'PQRSX6789K', 'Female', (routes[1] ? routes[1].label : 'Route 2 · Sullurpet'), 'Night', 'Hindi', 'Semi-skilled', (scope || 'Ark HR'), 'M', '6']
+      ['Ramesh Naidu', 'direct', '9876543210', '123456789012', 'ABCDE1234F', 'Male', 'Morning', 'Telugu', 'Skilled', (scope || ''), 'L', '9'],
+      ['Lalita Devi', 'contract', '9811122233', '234567890123', 'PQRSX6789K', 'Female', 'Night', 'Hindi', 'Semi-skilled', (scope || 'Ark HR'), 'M', '6']
     ];
     if (typeof XLSX !== 'undefined') {
       var wb = XLSX.utils.book_new();
@@ -15061,11 +15062,10 @@ function __kvOnReady(fn) {
       });
       ws['!cols'] = headers.map(function () { return { wch: 16 }; });
       XLSX.utils.book_append_sheet(wb, ws, 'Workers');
-      /* reference sheet listing the only allowed routes / genders / shifts */
-      var ref = [['ALLOWED ROUTES (use exactly)'], ['code', 'route']]
-        .concat(routes.map(function (o) { return [o.code, o.label]; }))
-        .concat([[''], ['ALLOWED GENDER'], ['Male'], ['Female'], ['Other'], [''], ['ALLOWED SHIFT'], ['Morning'], ['General'], ['Night'],
-                 [''], ['Aadhaar must be a 12-digit whole number (kept as text).']]);
+      /* reference sheet listing the allowed genders / shifts */
+      var ref = [['ALLOWED GENDER'], ['Male'], ['Female'], ['Other'], [''], ['ALLOWED SHIFT'], ['Morning'], ['General'], ['Night'],
+                 [''], ['Aadhaar must be a 12-digit whole number (kept as text).'],
+                 [''], ['Transport route is assigned by HR after upload — do not include it here.']];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'Allowed values');
       XLSX.writeFile(wb, 'karya-vaani-worker-upload-template.xlsx');
       toast('Upload template downloaded (.xlsx)', 'green');
@@ -15142,14 +15142,12 @@ function __kvOnReady(fn) {
   }
 
   function capBulkSample() {
-    var routes = capRouteOptions();
-    var rl = function (i) { return routes[i] ? routes[i].label : ''; };
     var firm = (typeof kvOnboardScope === 'function' && kvOnboardScope()) || 'Ark HR';
     var mk = function (o) { return capBuildRow(function (k) { return o[k] == null ? '' : String(o[k]); }); };
     capBulkShow([
-      mk({ name: 'Ramesh Naidu', type: 'contract', mobile: '9876543210', aadhaar: '123456789012', pan: 'ABCDE1234F', gender: 'Male', route: rl(0), shift: 'Morning', language: 'Telugu', category: 'Skilled', contractor: firm, uniform: 'L', shoe: '9' }),
-      mk({ name: 'Lalita Devi', type: 'contract', mobile: '9811122233', aadhaar: '234567890123', pan: 'PQRSX6789K', gender: 'Female', route: rl(1), shift: 'Night', language: 'Hindi', category: 'Semi-skilled', contractor: firm, uniform: 'M', shoe: '6' }),
-      mk({ name: 'Suresh Kumar', type: 'contract', mobile: '9700045566', aadhaar: '345678901234', pan: 'LMNOP2345Q', gender: 'Male', route: rl(2), shift: 'General', language: 'Telugu', category: 'Skilled', contractor: firm, uniform: 'XL', shoe: '10' })
+      mk({ name: 'Ramesh Naidu', type: 'contract', mobile: '9876543210', aadhaar: '123456789012', pan: 'ABCDE1234F', gender: 'Male', shift: 'Morning', language: 'Telugu', category: 'Skilled', contractor: firm, uniform: 'L', shoe: '9' }),
+      mk({ name: 'Lalita Devi', type: 'contract', mobile: '9811122233', aadhaar: '234567890123', pan: 'PQRSX6789K', gender: 'Female', shift: 'Night', language: 'Hindi', category: 'Semi-skilled', contractor: firm, uniform: 'M', shoe: '6' }),
+      mk({ name: 'Suresh Kumar', type: 'contract', mobile: '9700045566', aadhaar: '345678901234', pan: 'LMNOP2345Q', gender: 'Male', shift: 'General', language: 'Telugu', category: 'Skilled', contractor: firm, uniform: 'XL', shoe: '10' })
     ], 'sample batch');
   }
 
@@ -15160,7 +15158,8 @@ function __kvOnReady(fn) {
     if (r.mobile.replace(/\D/g, '').length < 10) return false;
     if (r.aadhaar.replace(/\D/g, '').length !== 12) return false;
     if (!r.gender) return false;
-    if (!r.route) return false;
+    /* route is not collected here — HR assigns it after upload — so it is not a
+       gate on import readiness */
     if (r.gender === 'Female' && r.shift === 'Night' && !r.nightConsent) return false;
     return true;
   }
@@ -15169,7 +15168,6 @@ function __kvOnReady(fn) {
     if (r.mobile.replace(/\D/g, '').length < 10) return 'Mobile < 10 digits';
     if (r.aadhaar.replace(/\D/g, '').length !== 12) return 'Aadhaar not 12 digits';
     if (!r.gender) return 'Gender not set';
-    if (!r.route) return 'Route not set';
     if (r.gender === 'Female' && r.shift === 'Night' && !r.nightConsent) return 'Night consent needed';
     return '';
   }
@@ -15198,7 +15196,6 @@ function __kvOnReady(fn) {
     if (subEl) subEl.textContent = valid + ' of ' + rows.length + ' rows ready · review the dropdowns, then start onboarding';
     var cntEl = document.getElementById('cap-bulk-count');
     if (cntEl) cntEl.textContent = valid + ' of ' + rows.length + ' valid';
-    var routeOpts = capRouteOptions();
     var sel = function (i, field, cur, list) {
       return '<select class="sel" style="padding:3px 6px;font-size:0.72rem;min-width:120px" onchange="capBulkEdit(' + i + ',\'' + field + '\',this.value)">' +
         '<option value=""' + (cur ? '' : ' selected') + '>— select —</option>' +
@@ -15216,7 +15213,6 @@ function __kvOnReady(fn) {
         '<td class="mono tiny">' + (r.mobile || '—') + '</td>' +
         '<td class="mono tiny">' + (r.aadhaar ? r.aadhaar.replace(/\D/g, '') : '<span style="color:var(--red-dk)">—</span>') + '</td>' +
         '<td>' + sel(i, 'gender', r.gender, CAP_GENDERS) + '</td>' +
-        '<td>' + sel(i, 'route', r.route, routeOpts.map(function (o) { return { value: o.label, label: o.label }; })) + '</td>' +
         '<td>' + sel(i, 'shift', r.shift, CAP_SHIFTS) + '</td>' +
         '<td>' + (ok
           ? '<span class="pill green tiny">Ready</span>'
