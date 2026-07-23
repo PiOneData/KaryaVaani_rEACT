@@ -3784,17 +3784,16 @@ function __kvOnReady(fn) {
       '</div>' +
       '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml);
 
-    /* Attendance & travel */
-    var attendance = '<div class="tiny muted">No transport route is assigned to this associate. The plant transport roster covers directly-rostered workers; contractor-deployed workers travel via their contractor’s arrangement. Boarding history will appear here once they are added to a route.</div>';
-
+    /* Attendance & travel tab intentionally removed from the vendor-compliance
+       worker modal — contractor-deployed workers travel via their contractor's
+       arrangement, so boarding history is not shown here. */
     kvTabModal({
       eyebrow: 'Worker · ' + vwEsc(w.code || '') + (comp != null ? ' · ' + compStatus.toLowerCase() : ''),
       title: vwEsc(w.name || '') + (w.designation ? ' · ' + vwEsc(w.designation) : ''),
       tabs: [
         { id: 'general', label: 'General information', html: general },
         { id: 'docs', label: 'Documents', html: documents },
-        { id: 'compliance', label: 'Compliance', html: compliance },
-        { id: 'attendance', label: 'Attendance & travel', html: attendance }
+        { id: 'compliance', label: 'Compliance', html: compliance }
       ],
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + vwEsc(w.contractor || '') + '</span></div>' +
         '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div>'
