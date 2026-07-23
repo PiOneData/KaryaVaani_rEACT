@@ -97,9 +97,11 @@ services:
       - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-karya-vaani-verify}
       - META_APP_SECRET=${META_APP_SECRET:-}
       - COMMS_VERIFY_SIGNATURE=${COMMS_VERIFY_SIGNATURE:-false}
-      # TEST ONLY: redirect every outbound message to this one number.
-      # Remove (set empty) to send to real recipients in production.
-      - WHATSAPP_TEST_RECIPIENT=${WHATSAPP_TEST_RECIPIENT:-919500200300,919840942405,919880947594:ta,918122222261}
+      # TEST ONLY: set WHATSAPP_TEST_RECIPIENT (comma-separated) to redirect every
+      # outbound message to those number(s). Empty/unset = send to the REAL
+      # recipient (production). No baked-in default here, or an empty .env value
+      # would fall through to it and silently keep test mode on.
+      - WHATSAPP_TEST_RECIPIENT=${WHATSAPP_TEST_RECIPIENT:-}
     restart: unless-stopped
 
   frontend:
