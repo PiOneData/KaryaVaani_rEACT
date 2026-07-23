@@ -12748,13 +12748,37 @@ function __kvOnReady(fn) {
     };
     reader.readAsDataURL(file);
   }
+  /* Open an uploaded document (a base64 data: URL) in a new tab. Chrome blocks
+     navigating a tab/iframe to a data: URL — a PDF just renders a BLANK tab — so
+     convert the data URL to a blob: URL first, which the browser renders
+     reliably for both PDFs (native viewer) and images. */
+  function kvOpenDocument(d) {
+    if (!d || !d.dataUrl) { toast('Document unavailable', 'red'); return; }
+    try {
+      var parts = String(d.dataUrl).split(',');
+      var meta = parts[0] || '';
+      var mimeMatch = meta.match(/data:([^;]+)/);
+      var mime = (mimeMatch && mimeMatch[1]) || (/\.pdf$/i.test(d.name || '') ? 'application/pdf' : 'application/octet-stream');
+      var payload = parts.slice(1).join(',');
+      var blob;
+      if (/;base64/i.test(meta)) {
+        var bin = atob(payload), len = bin.length, arr = new Uint8Array(len);
+        for (var i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+        blob = new Blob([arr], { type: mime });
+      } else {
+        blob = new Blob([decodeURIComponent(payload)], { type: mime });
+      }
+      var url = URL.createObjectURL(blob);
+      var w = window.open(url, '_blank');
+      if (!w) { toast('Popup blocked — allow popups to view the document', 'red'); URL.revokeObjectURL(url); return; }
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    } catch (e) { toast('Could not open document: ' + (e && e.message || e), 'red'); }
+  }
+  window.kvOpenDocument = kvOpenDocument;
+
   function ctDocView(cid, docId) {
     var docs = CT_DOCS_CACHE[cid] || []; var d = docs.find(function (x) { return x.id === docId; });
-    if (!d) return;
-    var isPdf = /^data:application\/pdf/i.test(d.dataUrl) || /\.pdf$/i.test(d.name);
-    var w = window.open('', '_blank'); if (!w) { toast('Popup blocked — allow popups', 'red'); return; }
-    w.document.write('<title>' + d.name + '</title><body style="margin:0;background:#222">' +
-      (isPdf ? '<iframe src="' + d.dataUrl + '" style="width:100%;height:100vh;border:0"></iframe>' : '<img src="' + d.dataUrl + '" style="max-width:100%;display:block;margin:0 auto">') + '</body>');
+    kvOpenDocument(d);
   }
   function ctDocDelete(cid, docId) {
     if (!window.confirm('Delete this document?')) return;
@@ -18558,13 +18582,7 @@ function __kvOnReady(fn) {
   function obViewDoc(workerKey, docId) {
     const docs = OB_DOCS[workerKey] || [];
     const d = docs.find(function (x) { return x.id === docId; });
-    if (!d) return;
-    const isPdf = /^data:application\/pdf/i.test(d.dataUrl) || /\.pdf$/i.test(d.name);
-    const w = window.open('', '_blank');
-    if (!w) { toast('Popup blocked — allow popups to view the document', 'red'); return; }
-    w.document.write('<title>' + d.name + '</title><body style="margin:0;background:#222">' +
-      (isPdf ? '<iframe src="' + d.dataUrl + '" style="width:100%;height:100vh;border:0"></iframe>'
-             : '<img src="' + d.dataUrl + '" style="max-width:100%;display:block;margin:0 auto">') + '</body>');
+    kvOpenDocument(d);
   }
   function obDeleteDoc(workerKey, docId) {
     if (!window.confirm('Delete this document?')) return;
