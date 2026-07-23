@@ -83,6 +83,22 @@
       return KVWhatsApp.sendTemplate(to, templateName || 'trial', language || 'te', components);
     },
 
+    /* send the generic welcome VOICE NOTE chosen by LANGUAGE alone — no worker
+       name is spoken, so the same clip is reused for every worker of that
+       language (Tanglish / Telugu / Hinglish, voiced by Sarvam bulbul:v3).
+       Deliverable only inside the worker's 24h window, so call this AFTER the
+       worker taps Yes/No on the onboarding template. opts.register forces a
+       specific register; opts.caption overrides the audio caption. */
+    sendWelcomeVoice: function (to, lang, opts) {
+      opts = opts || {};
+      var list = Array.isArray(to) ? to : [to];
+      var recipients = list.map(cleanNumber).filter(function (n) { return n; });
+      if (!recipients.length) return Promise.resolve({ ok: false, error: 'missing recipient' });
+      return post('/api/whatsapp/send-welcome-voice', {
+        to: recipients, lang: lang || '', register: opts.register, caption: opts.caption
+      }).catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
+    },
+
     /* poll the message log (inbound + outbound + statuses + events) */
     messages: function (params) {
       var qs = params ? '?' + new URLSearchParams(params).toString() : '';

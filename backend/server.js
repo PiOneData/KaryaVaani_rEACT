@@ -1213,6 +1213,133 @@ app.post('/api/whatsapp/send-voice', async (req, res) => {
   }
 });
 
+/* ── Language-based welcome voice notes ─────────────────────────────────────
+   A generic, name-LESS onboarding welcome voice note, one clip per language
+   register. Because no worker name is spoken, each clip is synthesized ONCE,
+   stored in the DB (voiceCache, keyed by a hash of its script text) and reused
+   for every worker of that language — the send is chosen by LANGUAGE ALONE, so
+   we never regenerate audio per individual.
+
+   Registers are colloquial + code-mixed the way workers actually speak —
+   Tanglish (Tamil-English), Hinglish (Hindi-English) and colloquial Telugu.
+   They are voiced DIRECTLY by Sarvam bulbul:v3 with NO NLLB/translate step:
+   translating would formalize them into pure native script and lose the
+   code-mixing. Add more registers here as their scripts are approved. */
+const WELCOME_VOICE_SCRIPTS = {
+  tanglish: {
+    sarvamLang: 'TA',
+    label: 'Tanglish (Tamil-English)',
+    text: 'வணக்கம்! Karya Vaani குடும்பத்துக்கு உங்களை அன்போட வரவேற்கிறோம். ' +
+      'உங்க onboarding successful-ஆ complete ஆயிடுச்சு. உங்க shift roster, induction schedule, ' +
+      'மற்றும் safety details எல்லாம் Karya Vaani app-ல ready-ஆ இருக்கு. ' +
+      'WhatsApp-ல வந்திருக்க message-ல Yes button-ஐ press பண்ணி confirm பண்ணுங்க. ' +
+      'அப்புறம் நாங்க உங்க language-ல voice message மூலமா எல்லா updates-ஐயும் அனுப்புவோம். ' +
+      'Safe-ஆ work பண்ணுங்க, எந்த doubt இருந்தாலும் எங்களுக்கு message பண்ணுங்க. Nandri!'
+  },
+  telugu: {
+    sarvamLang: 'TE',
+    label: 'Telugu (colloquial)',
+    text: 'నమస్కారం! Karya Vaani కుటుంబానికి మీకు స్వాగతం. ' +
+      'మీ onboarding successful గా complete అయ్యింది. మీ shift roster, induction schedule, ' +
+      'safety details అన్నీ Karya Vaani app లో ready గా ఉన్నాయి. ' +
+      'WhatsApp లో వచ్చిన message లో Yes button press చేసి confirm చేయండి. ' +
+      'అప్పుడు మేము మీ భాషలో voice message ద్వారా అన్ని updates పంపిస్తాము. ' +
+      'జాగ్రత్తగా పని చేయండి, ఏదైనా doubt ఉంటే మాకు message చేయండి. ధన్యవాదాలు!'
+  },
+  hinglish: {
+    sarvamLang: 'HI',
+    label: 'Hinglish (Hindi-English)',
+    text: 'नमस्ते! Karya Vaani parivaar mein aapka swagat hai. ' +
+      'Aapka onboarding successfully complete ho gaya hai. Aapka shift roster, induction schedule ' +
+      'aur safety details sab Karya Vaani app par ready hain. ' +
+      'WhatsApp par aaye message mein Yes button press karke confirm kijiye. ' +
+      'Uske baad hum aapki bhasha mein voice message ke through saari updates bhejenge. ' +
+      'Safe rehkar kaam kijiye, koi bhi doubt ho to hamein message kijiye. Dhanyavaad!'
+  }
+};
+
+/* Map a worker's stored language (rec.lang: 'Tamil' | 'ta' | 'te' | 'Hindi' …)
+   to a welcome-voice register. Unknown → Hinglish (widely understood default). */
+function welcomeRegisterFor(lang) {
+  const s = String(lang || '').trim().toLowerCase();
+  if (s === 'tanglish' || s.startsWith('ta') || s.includes('tamil')) return 'tanglish';
+  if (s === 'telugu' || s.startsWith('te') || s.includes('telugu')) return 'telugu';
+  if (s === 'hinglish' || s.startsWith('hi') || s.includes('hindi')) return 'hinglish';
+  return 'hinglish';
+}
+
+/* Stable cache key for a register's welcome clip — derived from the script text,
+   so editing a script regenerates its audio automatically on next request. */
+function welcomeVoiceHash(script) { return ttsHash(script.text + '|welcome-voice|ogg'); }
+
+/* Get (or synthesize-and-store ONCE) the OGG/Opus welcome voice for a register.
+   Sarvam-only (bulbul:v3) — the local Vakyansh model can't voice code-mixed
+   text. Returns { hash, register, ext, generated }. */
+async function getOrCreateWelcomeVoice(registerKey) {
+  const script = WELCOME_VOICE_SCRIPTS[registerKey];
+  if (!script) throw new Error('unknown welcome register: ' + registerKey);
+  const hash = welcomeVoiceHash(script);
+  const hit = voiceCacheGet(hash);
+  if (hit && hit.audio) {
+    return { hash, register: registerKey, ext: String(hit.contentType || '').includes('ogg') ? 'ogg' : 'wav', generated: false };
+  }
+  if (!SARVAM_API_KEY) throw new Error('SARVAM_API_KEY not set — welcome voices require Sarvam bulbul:v3');
+  const wav = await sarvamTts(script.text, script.sarvamLang);
+  let audio = wav, contentType = 'audio/wav';
+  try { audio = await transcodeToOpus(wav); contentType = 'audio/ogg'; }
+  catch (e) { console.error('[welcome-voice] opus transcode failed, storing WAV (WhatsApp may reject):', e.message); }
+  voiceCachePut(hash, audio, contentType);
+  return { hash, register: registerKey, ext: contentType === 'audio/ogg' ? 'ogg' : 'wav', generated: true };
+}
+
+/* Pre-generate every welcome register once, sequentially, into the DB so the
+   first real send is instant. Skips any already cached; safe to re-run. */
+async function prewarmWelcomeVoices() {
+  if (!SARVAM_API_KEY) { console.warn('[welcome-voice] SARVAM_API_KEY not set — skipping welcome prewarm'); return; }
+  for (const key of Object.keys(WELCOME_VOICE_SCRIPTS)) {
+    try {
+      const r = await getOrCreateWelcomeVoice(key);
+      console.log('[welcome-voice] ' + key + ' · ' + (r.generated ? 'generated' : 'cached') + ' (' + r.hash.slice(0, 12) + '.' + r.ext + ')');
+    } catch (e) { console.error('[welcome-voice] prewarm ' + key + ' failed:', e.message); }
+  }
+}
+
+/* GET /api/whatsapp/welcome-voices — list registers + whether each is cached. */
+app.get('/api/whatsapp/welcome-voices', (req, res) => {
+  const list = Object.keys(WELCOME_VOICE_SCRIPTS).map((k) => {
+    const s = WELCOME_VOICE_SCRIPTS[k];
+    const hit = voiceCacheGet(welcomeVoiceHash(s));
+    return { register: k, label: s.label, sarvamLang: s.sarvamLang, cached: !!(hit && hit.audio) };
+  });
+  res.json({ ok: true, registers: list });
+});
+
+/* POST /api/whatsapp/send-welcome-voice  Body: { to, lang?, register?, caption? }
+   Send the generic welcome voice note chosen by LANGUAGE ALONE (no per-worker
+   synthesis). Deliverable only inside the recipient's 24h window (audio is a
+   session message) — i.e. after the worker taps Yes/No on the onboarding
+   template. `register` overrides the lang→register mapping when supplied. */
+app.post('/api/whatsapp/send-welcome-voice', async (req, res) => {
+  const { to, lang, register: regOverride, caption } = req.body || {};
+  const recips = Array.isArray(to) ? to : (to ? [to] : []);
+  if (!recips.length) return res.status(400).json({ ok: false, error: '`to` is required' });
+  const register = (regOverride && WELCOME_VOICE_SCRIPTS[regOverride]) ? regOverride : welcomeRegisterFor(lang);
+  try {
+    const { hash, ext, generated } = await getOrCreateWelcomeVoice(register);
+    const link = PUBLIC_BASE_URL + '/api/voice/' + hash + '.' + ext;
+    const { status, json } = await commsFetch('/v1/whatsapp/send-audio', {
+      method: 'POST',
+      body: JSON.stringify({ to, link, lang, caption: caption || 'Welcome to Karya Vaani' })
+    });
+    logComm({ channel: 'whatsapp', kind: 'voice', to: recips, recipients: recips.length, preview: 'welcome voice · ' + register, status: waStatus(json), provider: json && json.provider });
+    res.status(status).json({ ...json, register, link, generated });
+  } catch (err) {
+    console.error('send-welcome-voice error:', err.message);
+    logComm({ channel: 'whatsapp', kind: 'voice', to: recips, recipients: recips.length, preview: 'welcome voice · ' + register, status: 'failed', error: err.message });
+    res.status(502).json({ ok: false, error: 'welcome voice send failed: ' + err.message });
+  }
+});
+
 /* ── Vendor workers: imported per-contractor deployment rosters ──────────────
    The master worker roster has no contractor field, so the full list of workers
    deployed under a vendor is sourced from an explicit vendor-data import. Stored
@@ -1698,5 +1825,8 @@ Promise.resolve(initDb())
     // never blocks boot; skips anything already cached. Disable with VOICE_PREWARM=off.
     if (process.env.VOICE_PREWARM !== 'off') {
       setTimeout(() => { prewarmVoices().catch((e) => console.error('[voice] prewarm error:', e.message)); }, 4000);
+      // Welcome voices use Sarvam (separate hosted service from the single-worker
+      // local model), so they can warm in parallel with the template prewarm.
+      setTimeout(() => { prewarmWelcomeVoices().catch((e) => console.error('[welcome-voice] prewarm error:', e.message)); }, 6000);
     }
   });

@@ -8798,38 +8798,32 @@ function __kvOnReady(fn) {
     var to = rec.mobile || '';
     if (!to) { if (!opts.auto) toast('No mobile / WhatsApp number on record', 'red'); return; }
     if (!window.KVWhatsApp) { if (!opts.auto) toast('WhatsApp gateway unavailable', 'red'); return; }
-    var lang = kvTplLang(rec.lang);
     var firstName = kvTplFirstName(rec.name);
     var sends = [], labels = [];
-    /* 1 · personalized account-creation welcome. The approved template has TWO
-       body variables ({{1}} name, {{2}} account/app) and a STATIC Verify button
-       (fixed URL → the Karya Vaani login, configured on the template), so we
-       send two body params and no button param. */
-    sends.push(window.KVWhatsApp.sendTemplate(to, 'account_creation', 'en_US', kvBodyComp([firstName, 'Karya Vaani'])));
-    labels.push('welcome · ' + firstName);
-    /* 2 · language notice with dynamic future dates */
-    if (lang === 'ta') {
-      sends.push(window.KVWhatsApp.sendTemplate(to, 'tamil_transport_schedule_weekly_plan', 'ta', kvBodyComp([kvTplFutureDate(21)])));
-      labels.push('Tamil transport');
-    } else if (lang === 'te') {
-      sends.push(window.KVWhatsApp.sendTemplate(to, 'trial', 'te', kvBodyComp(kvWageParams(rec.name))));
-      labels.push('Telugu wage revision');
-    }
-    /* 3 · personalized welcome VOICE NOTE (delivers only inside the worker's
-       24h session window — a template opens no window, so the worker must have
-       messaged the business number in the last 24h to hear this). */
-    var vlang = (lang === 'ta') ? 'ta' : 'te';
-    var vtext = 'Namaste ' + firstName + ', welcome to Karya Vaani. Your onboarding is complete. Your transport route, weekly shift roster and induction schedule are available in the app. Be at your pickup point five minutes early and stay safe.';
-    sends.push(fetch((window.__KV_API_BASE || '') + '/api/whatsapp/send-voice', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: to, text: vtext, lang: vlang, provider: 'local', caption: 'Welcome · ' + firstName })
-    }).then(function (r) { return r.json().catch(function () { return { ok: false }; }); }).catch(function () { return { ok: false }; }));
-    labels.push('voice note');
+    /* 1 · personalized onboarding welcome — approved template
+       `karyavaani_onboard_en`. Triggered to the worker on their OWN WhatsApp
+       number (rec.mobile) the moment they're onboarded. The template carries
+       three buttons: Yes, No and View details. Yes/No are quick-reply buttons —
+       when the worker taps either, WhatsApp delivers a button_reply inbound
+       message (parsed in comms-server providers/aoc.js) which OPENS the 24h
+       customer-service window, so a follow-up welcome voice note can then be
+       delivered off that Yes reply (session audio only delivers inside the
+       window). `View details` is a static-URL button (fixed URL → the Karya
+       Vaani website/app page, configured on the template), so it takes no
+       button param.
+       Body: {{1}} = worker first name. If the approved template defines a
+       different set of body variables, adjust this one param list to match. */
+    sends.push(window.KVWhatsApp.sendTemplate(to, 'karyavaani_onboard_en', 'en', kvBodyComp([firstName])));
+    labels.push('onboarding welcome · ' + firstName);
+    /* Onboarding sends ONLY the karyavaani_onboard_en template — no language
+       notice, no immediate voice note. The template's Yes/No quick-reply opens
+       the worker's 24h window; the welcome voice note is sent afterwards (inside
+       that window), triggered off the worker's Yes reply, not here. */
     toast('Sending onboarding WhatsApp to ' + rec.name + '…', 'blue');
     Promise.all(sends).then(function (results) {
       var ok = results.filter(function (r) { return r && r.ok; }).length;
       if (ok) {
-        toast('✓ Sent ' + ok + ' approved template(s) to ' + rec.name + ' · ' + labels.join(' + '), 'green');
+        toast('✓ Sent onboarding template to ' + rec.name + ' · ' + labels.join(' + '), 'green');
         if (typeof kvNotify === 'function') kvNotify('WhatsApp sent · ' + rec.name, labels.join(' + ') + ' → ' + to, 'success');
       } else { toast('WhatsApp send failed for ' + rec.name, 'red'); }
     }).catch(function (e) { toast('WhatsApp send failed: ' + e.message, 'red'); });
