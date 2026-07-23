@@ -11874,6 +11874,9 @@ function __kvOnReady(fn) {
     /* schedule */
     empRenderSchedule(c);
 
+    /* attendance & travel (boarding history, same as the worker directory) */
+    empRenderTravel(c);
+
     /* onboarding / induction status (only for workers with an onboarding record) */
     empRenderOnboarding(c);
 
@@ -13175,7 +13178,25 @@ function __kvOnReady(fn) {
   /* fleet operators — route index i → TR_OPERATORS[i % 4] (identical rule to the
      backend), so each route has one operator and an operator owns fixed routes. */
   const TR_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'APSRTC Contract Fleet', 'Sricity Logistics'];
+  /* Per-worker operator override, applied at the ROUTE level (one operator owns
+     a route, so this reflects on the worker login AND the transport page for
+     that route). E Pavithra's (OMC0002) route is operated by Sri Balaji Travels. */
+  const TR_OPERATOR_OVERRIDE_WORKER = { 'OMC0002': 'Sri Balaji Travels' };
+  let _trOpOverrideRoutes = null;
+  function trOperatorOverrideForRoute(routeCode) {
+    if (_trOpOverrideRoutes === null) {
+      if (!TR_ROUTES || !TR_ROUTES.length) return null;   // routes not loaded yet — don't cache
+      _trOpOverrideRoutes = {};
+      Object.keys(TR_OPERATOR_OVERRIDE_WORKER).forEach(function (wcode) {
+        var r = TR_ROUTES[trHash(wcode) % TR_ROUTES.length];   // same rule as trAssign
+        if (r) _trOpOverrideRoutes[r.code] = TR_OPERATOR_OVERRIDE_WORKER[wcode];
+      });
+    }
+    return _trOpOverrideRoutes[routeCode] || null;
+  }
   function trRouteOperator(routeCode) {
+    const ov = trOperatorOverrideForRoute(routeCode);
+    if (ov) return ov;
     const i = TR_ROUTES.findIndex(function (r) { return r.code === routeCode; });
     return TR_OPERATORS[(i < 0 ? 0 : i) % TR_OPERATORS.length];
   }
@@ -13196,8 +13217,7 @@ function __kvOnReady(fn) {
     const gender = ((h >>> 15) % 5) < 2 ? 'F' : 'M';              // ~40% women
     const plate = 'AP-29-' + (3800 + (h % 1099));
     const agency = type === 'emp' ? 'Daikin direct' : TR_AGENCIES[(h >>> 18) % TR_AGENCIES.length];
-    const routeIdx = TR_ROUTES.indexOf(route);
-    const operator = TR_OPERATORS[(routeIdx < 0 ? 0 : routeIdx) % TR_OPERATORS.length];
+    const operator = trRouteOperator(route.code);
     // OSHC Rule 83 night-shift consent — required for women; base is deterministic
     // (most consented at onboarding, some still pending), overridden by the store.
     const nightConsent = gender === 'F' ? (((h >>> 20) % 100) < 80 ? 'yes' : 'pending') : 'na';
@@ -13464,6 +13484,10 @@ function __kvOnReady(fn) {
 
   /* today's boarding status for a worker, deterministic per code+date. */
   function trTodayBrd(code) {
+    /* Newly onboarded workers have no ID-card boarding scans yet, so they must
+       always read as pending (never a synthetic "boarded") until they actually
+       start travelling. */
+    if (typeof CAP_STATE !== 'undefined' && (CAP_STATE.recent || []).some(function (r) { return r.id === code; })) return 'pend';
     const n = trHash(code + '|brd|' + trTodayISO()) % 100;
     return n < 82 ? 'ok' : (n < 92 ? 'pend' : 'miss');
   }
@@ -13546,6 +13570,52 @@ function __kvOnReady(fn) {
     return { assignment: a, rows: rows, present: present, total: total, pct: total ? Math.round(present / total * 100) : 0 };
   }
   window.trWorkerTravel = trWorkerTravel;
+
+  /* Shared Attendance & travel HTML for a worker's trWorkerTravel(...) result —
+     used by the OM worker-directory modal AND the worker-login page. */
+  function omTravelHtml(travel) {
+    if (!travel) return '<div class="tiny muted">No transport route is assigned yet. Boarding history will appear here once a route is assigned.</div>';
+    var a = travel.assignment;
+    var cap = function (s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
+    var trows = travel.rows.map(function (t) {
+      return '<tr><td>' + t.date + '</td><td class="muted">' + t.day + '</td>' +
+        '<td><span class="t-strong">' + t.route + '</span></td>' +
+        '<td>' + t.pickup + '</td>' +
+        '<td class="mono">↑ ' + (t.pickupTime || '—') + '</td>' +
+        '<td class="mono">↓ ' + (t.dropTime || '—') + '</td>' +
+        '<td style="text-align:center">' + (t.boarded ? '<span class="pill green tiny">Boarded</span>' : '<span class="pill red tiny">Absent</span>') + '</td></tr>';
+    }).join('');
+    return '<div class="g2" style="gap:10px;margin-bottom:12px">' +
+        '<div class="kpi"><div class="kpi-eye">Assigned route · ' + cap(a.shift) + ' shift</div><div class="kpi-val" style="font-size:1.1rem">' + a.route + '</div><div class="kpi-sub">' + a.routeName + '</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Boarding attendance</div><div class="kpi-val" style="color:' + (travel.pct >= 85 ? 'var(--green-dk)' : 'var(--amber-dk)') + '">' + travel.pct + '%</div><div class="kpi-sub">' + travel.present + '/' + travel.total + ' of last ' + travel.total + ' working days</div></div>' +
+      '</div>' +
+      kv2col(
+        kvKV('Home locality', a.locality) + kvKV('Pickup point', a.pickup) +
+        kvKV('Pickup', '↑ ' + (a.pickupTime || '—') + ' → plant ' + (a.plantIn || '—')) +
+        kvKV('Drop', '↓ plant ' + (a.plantOut || '—') + ' → ' + (a.dropTime || '—')) +
+        kvKV('Transport operator', a.operator || (typeof trRouteOperator === 'function' ? trRouteOperator(a.route) : '—'))
+      ) +
+      '<div class="card-h-title" style="font-size:0.9rem;margin:14px 0 4px">Travel history · last ' + travel.total + ' working days</div>' +
+      '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Date</th><th>Day</th><th>Route</th><th>Pickup point</th><th>Pickup</th><th>Drop</th><th style="text-align:center">Boarding</th></tr></thead><tbody>' + trows + '</tbody></table></div>' +
+      '<div class="note amber" style="margin-top:10px;font-size:0.74rem">Boarding is captured from the ID-card provider’s turnstile scans — live API integration pending; the history reflects the roster + boarding record.</div>';
+  }
+  window.omTravelHtml = omTravelHtml;
+
+  /* worker-login attendance/travel — resolve the signed-in worker's OM code
+     (by name, matching the directory), then reuse the same travel view. */
+  function empWorkerCode(c) {
+    var roster = (window.__KVDATA && window.__KVDATA.omMapping) || (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []);
+    var w = roster.find(function (x) { return c && x.name && String(x.name).toLowerCase() === String(c.name).toLowerCase(); }) ||
+            (c && c.code ? roster.find(function (x) { return x.code === c.code; }) : null);
+    return (w && w.code) || (c && c.code) || (c && c.id) || '';
+  }
+  function empRenderTravel(c) {
+    var host = document.getElementById('emp-travel-list');
+    if (!host) return;
+    var code = empWorkerCode(c);
+    var travel = (typeof trWorkerTravel === 'function' && code) ? trWorkerTravel(code, 14) : null;
+    host.innerHTML = omTravelHtml(travel);
+  }
 
   /* attendance loaded for the selected week+date, keyed by route|shift. */
   function trLoadAttendance() {
@@ -17554,35 +17624,7 @@ function __kvOnReady(fn) {
       '<div id="ob-docs-list" class="tiny muted" style="margin-top:12px">Loading documents…</div>';
 
     // Attendance & travel tab — transport assignment + boarding history.
-    let attendance;
-    if (travel) {
-      const a = travel.assignment;
-      const cap = function (s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
-      const trows = travel.rows.map(function (t) {
-        return '<tr><td>' + t.date + '</td><td class="muted">' + t.day + '</td>' +
-          '<td><span class="t-strong">' + t.route + '</span></td>' +
-          '<td>' + t.pickup + '</td>' +
-          '<td class="mono">↑ ' + (t.pickupTime || '—') + '</td>' +
-          '<td class="mono">↓ ' + (t.dropTime || '—') + '</td>' +
-          '<td style="text-align:center">' + (t.boarded ? '<span class="pill green tiny">Boarded</span>' : '<span class="pill red tiny">Absent</span>') + '</td></tr>';
-      }).join('');
-      attendance =
-        '<div class="g2" style="gap:10px;margin-bottom:12px">' +
-          '<div class="kpi"><div class="kpi-eye">Assigned route · ' + cap(a.shift) + ' shift</div><div class="kpi-val" style="font-size:1.1rem">' + a.route + '</div><div class="kpi-sub">' + a.routeName + '</div></div>' +
-          '<div class="kpi"><div class="kpi-eye">Boarding attendance</div><div class="kpi-val" style="color:' + (travel.pct >= 85 ? 'var(--green-dk)' : 'var(--amber-dk)') + '">' + travel.pct + '%</div><div class="kpi-sub">' + travel.present + '/' + travel.total + ' of last ' + travel.total + ' working days</div></div>' +
-        '</div>' +
-        kv2col(
-          kvKV('Home locality', a.locality) + kvKV('Pickup point', a.pickup) +
-          kvKV('Pickup', '↑ ' + (a.pickupTime || '—') + ' → plant ' + (a.plantIn || '—')) +
-          kvKV('Drop', '↓ plant ' + (a.plantOut || '—') + ' → ' + (a.dropTime || '—')) +
-          kvKV('Transport operator', a.operator || (typeof trRouteOperator === 'function' ? trRouteOperator(a.route) : '—'))
-        ) +
-        '<div class="card-h-title" style="font-size:0.9rem;margin:14px 0 4px">Travel history · last ' + travel.total + ' working days</div>' +
-        '<div style="overflow-x:auto"><table class="t"><thead><tr><th>Date</th><th>Day</th><th>Route</th><th>Pickup point</th><th>Pickup</th><th>Drop</th><th style="text-align:center">Boarding</th></tr></thead><tbody>' + trows + '</tbody></table></div>' +
-        '<div class="note amber" style="margin-top:10px;font-size:0.74rem">Boarding is captured from the ID-card provider’s turnstile scans — live API integration pending; the history reflects the roster + boarding record.</div>';
-    } else {
-      attendance = '<div class="tiny muted">No transport route is assigned to this associate.</div>';
-    }
+    const attendance = omTravelHtml(travel);
 
     const itemsHtml = c.items.map(function (it) {
       const ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';

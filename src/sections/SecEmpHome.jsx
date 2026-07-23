@@ -152,6 +152,20 @@ export default function SecEmpHome() {
             {' '}
             <div id="emp-schedule-list" />
           </div>
+          {' '}
+          {/*  attendance & travel · boarding history from the transport roster  */}
+          {' '}
+          <div className="card" id="emp-travel-card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Attendance &amp; travel</div>
+                {' '}
+                <div className="card-h-sub">Your assigned route, boarding attendance and recent travel history</div>
+              </div>
+            </div>
+            {' '}
+            <div id="emp-travel-list" />
+          </div>
         </div>
         {' '}
         {/*  RIGHT · personal analytics + identity + actions  */}
