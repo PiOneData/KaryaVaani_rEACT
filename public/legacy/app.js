@@ -3439,7 +3439,7 @@ function __kvOnReady(fn) {
      import), in a paginated + searchable + column-sortable table (compliance
      sortable), each row drilling into worker details. The onboarding ledger
      cross-reference is kept as a secondary section below. */
-  var VW_STATE = { sortCol: 'name', sortDir: 1, workers: [], contractor: null };
+  var VW_STATE = { sortCol: 'onboardedAt', sortDir: -1, workers: [], contractor: null };
   var VW_IMPORT = { contractor: null, rows: [] };
 
   function vwEsc(s) {
@@ -3533,7 +3533,7 @@ function __kvOnReady(fn) {
       '<div style="overflow-x:auto"><table class="t"><thead><tr>' +
         vwHeader('name', 'Worker') + vwHeader('code', 'Code') + vwHeader('category', 'Category') +
         vwHeader('designation', 'Designation') + vwHeader('esicStatus', 'ESIC') + vwHeader('clraStatus', 'CLRA') +
-        vwHeader('compliancePct', 'Compliance') + '<th>Details</th>' +
+        vwHeader('compliancePct', 'Compliance') + vwHeader('onboardedAt', 'Onboarded') + '<th>Details</th>' +
       '</tr></thead><tbody id="ctw-body"></tbody></table></div>' +
       '<div id="ctw-pagination" class="om-pg"></div>' +
       '<div id="ctw-onboarding"></div>';
@@ -3596,7 +3596,26 @@ function __kvOnReady(fn) {
     var deployed = (c && c.deployed) || VW_STATE.workers.length;
     vwRenderFilters();
     var f = VW_STATE.filters || {};
-    var all = VW_STATE.workers.slice();
+    /* Merge newly onboarded contract workers (from the Onboarding module) into
+       the deployed list — same columns + an Onboarded date — instead of the
+       separate section that used to sit below the table. */
+    var cname = String((c && c.name) || VW_STATE.contractor || '').toLowerCase();
+    var onboardedRows = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : [])
+      .map(function (r, i) { return { r: r, i: i }; })
+      .filter(function (x) { return x.r.type === 'contract' && String((x.r.employment && x.r.employment.contractor) || '').toLowerCase() === cname; })
+      .map(function (x) {
+        var r = x.r;
+        var comp = (typeof obWorkerCompliance === 'function') ? obWorkerCompliance(r) : null;
+        return {
+          id: r.id, code: r.id, name: r.name, category: r.category || '—',
+          designation: r.designation || r.category || '—',
+          esicStatus: r.esi ? 'active' : 'pending',
+          clraStatus: (r.employment && r.employment.clra) ? 'active' : '—',
+          compliancePct: comp ? comp.score : null, migrant: r.migrant,
+          onboardedAt: r.createdAt || r.updatedAt || '', _onboarded: true, _ci: x.i
+        };
+      });
+    var all = onboardedRows.concat(VW_STATE.workers.slice());
     var rows = all.filter(function (w) {
       if (f.category && String(w.category || '') !== f.category) return false;
       if (f.esic && String(w.esicStatus || '') !== f.esic) return false;
@@ -3616,18 +3635,22 @@ function __kvOnReady(fn) {
       return 0;
     });
     KVTABLE.set({
-      key: 'ctw', tbody: 'ctw-body', pager: 'ctw-pagination', pageSize: 12, cols: 8, rows: rows,
-      text: function (w) { return [w.name, w.code, w.category, w.designation, w.department, w.esicStatus, w.clraStatus].join(' '); },
+      key: 'ctw', tbody: 'ctw-body', pager: 'ctw-pagination', pageSize: 12, cols: 9, rows: rows,
+      text: function (w) { return [w.name, w.code, w.category, w.designation, w.department, w.esicStatus, w.clraStatus, w._onboarded ? 'onboarded' : ''].join(' '); },
       empty: 'No imported workers for this contractor yet — click “Import vendor data”.',
       row: function (w) {
-        return '<tr style="cursor:pointer" onclick="vwWorkerDetail(\'' + String(w.id).replace(/'/g, "\\'") + '\')">' +
-          '<td class="t-strong">' + vwEsc(w.name || '—') + (w.migrant ? ' <span class="pill amber tiny">Migrant</span>' : '') + '</td>' +
+        var click = w._onboarded ? ('obOpenCapture(' + w._ci + ')') : ('vwWorkerDetail(\'' + String(w.id).replace(/'/g, "\\'") + '\')');
+        var od = w.onboardedAt ? new Date(w.onboardedAt) : null;
+        var odStr = od && !isNaN(od.getTime()) ? od.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (w._onboarded ? 'Recent' : '—');
+        return '<tr style="cursor:pointer" onclick="' + click + '">' +
+          '<td class="t-strong">' + vwEsc(w.name || '—') + (w._onboarded ? ' <span class="pill blue tiny">Onboarded</span>' : '') + (w.migrant ? ' <span class="pill amber tiny">Migrant</span>' : '') + '</td>' +
           '<td class="mono tiny">' + vwEsc(w.code || '—') + '</td>' +
           '<td>' + vwEsc(w.category || '—') + '</td>' +
           '<td>' + vwEsc(w.designation || '—') + '</td>' +
           '<td>' + vwStatusPill(w.esicStatus) + '</td>' +
           '<td>' + vwStatusPill(w.clraStatus) + '</td>' +
           '<td>' + vwCompliance(w.compliancePct) + '</td>' +
+          '<td class="tiny">' + odStr + '</td>' +
           '<td><button class="btn tiny">View</button></td>' +
         '</tr>';
       }
@@ -3635,8 +3658,13 @@ function __kvOnReady(fn) {
   }
 
   function vwRenderOnboarding(c) {
+    /* Newly onboarded contract workers are now merged into the main
+       "Contract workers deployed" table (with an Onboarded date + sort), so the
+       separate section below it is no longer rendered. */
     var host = document.getElementById('ctw-onboarding');
-    if (!host) return;
+    if (host) host.innerHTML = '';
+    return;
+    /* eslint-disable no-unreachable */
     var onboarded = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).map(function (r, i) { return { r: r, i: i }; })
       .filter(function (x) { return x.r.type === 'contract' && (((x.r.employment && x.r.employment.contractor) || '') === c.name); });
     if (!onboarded.length) { host.innerHTML = ''; return; }
@@ -15005,6 +15033,7 @@ function __kvOnReady(fn) {
       .then(function (j) {
         if (j && j.ok && j.capture) {
           rec.backendId = j.capture.id;
+          rec.createdAt = j.capture.createdAt || rec.createdAt;
           /* DEMO: auto-send the WhatsApp welcome + language template + voice note
              to the worker as soon as they're onboarded (toggle: #cap-autowa). */
           if (typeof kvAutoWaEnabled === 'function' && kvAutoWaEnabled() && rec.mobile && typeof kvSendOnboardingWhatsApp === 'function') {
@@ -15404,7 +15433,7 @@ function __kvOnReady(fn) {
         body: JSON.stringify(Object.assign({ aadhaar: r.aadhaar }, rec, { photo: undefined }))
       }).then(function (resp) { return resp.json().catch(function () { return {}; }); })
         .then(function (j) {
-          if (j && j.ok && j.capture) { rec.backendId = j.capture.id; }
+          if (j && j.ok && j.capture) { rec.backendId = j.capture.id; rec.createdAt = j.capture.createdAt || rec.createdAt; }
           else if (j && j.error) { toast('Import: ' + r.name + ' — ' + j.error, 'amber'); }
           if (typeof obRenderDirectory === 'function') obRenderDirectory();
           if (typeof obTrackRender === 'function') obTrackRender();
