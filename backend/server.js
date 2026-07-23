@@ -1230,31 +1230,28 @@ const WELCOME_VOICE_SCRIPTS = {
     sarvamLang: 'TA',
     label: 'Tanglish (Tamil-English)',
     text: 'வணக்கம்! Karya Vaani குடும்பத்துக்கு உங்களை அன்போட வரவேற்கிறோம். ' +
-      'உங்க onboarding successful-ஆ complete ஆயிடுச்சு. உங்க shift roster, induction schedule, ' +
-      'மற்றும் safety details எல்லாம் Karya Vaani app-ல ready-ஆ இருக்கு. ' +
-      'WhatsApp-ல வந்திருக்க message-ல Yes button-ஐ press பண்ணி confirm பண்ணுங்க. ' +
-      'அப்புறம் நாங்க உங்க language-ல voice message மூலமா எல்லா updates-ஐயும் அனுப்புவோம். ' +
-      'Safe-ஆ work பண்ணுங்க, எந்த doubt இருந்தாலும் எங்களுக்கு message பண்ணுங்க. Nandri!'
+      'உங்க onboarding successful-ஆ complete ஆயிடுச்சு, confirm பண்ணதுக்கு ரொம்ப thanks. ' +
+      'உங்க shift roster, induction schedule, மற்றும் safety details எல்லாம் Karya Vaani app-ல ready-ஆ இருக்கு. ' +
+      'இனிமேல் எல்லா important updates-ஐயும் நாங்க இதே WhatsApp-ல உங்க language-ல voice message மூலமா அனுப்புவோம். ' +
+      'Safe-ஆ work பண்ணுங்க, எந்த doubt இருந்தாலும் இங்கயே எங்களுக்கு message பண்ணுங்க. Nandri!'
   },
   telugu: {
     sarvamLang: 'TE',
     label: 'Telugu (colloquial)',
     text: 'నమస్కారం! Karya Vaani కుటుంబానికి మీకు స్వాగతం. ' +
-      'మీ onboarding successful గా complete అయ్యింది. మీ shift roster, induction schedule, ' +
-      'safety details అన్నీ Karya Vaani app లో ready గా ఉన్నాయి. ' +
-      'WhatsApp లో వచ్చిన message లో Yes button press చేసి confirm చేయండి. ' +
-      'అప్పుడు మేము మీ భాషలో voice message ద్వారా అన్ని updates పంపిస్తాము. ' +
-      'జాగ్రత్తగా పని చేయండి, ఏదైనా doubt ఉంటే మాకు message చేయండి. ధన్యవాదాలు!'
+      'మీ onboarding successful గా complete అయ్యింది, confirm చేసినందుకు చాలా thanks. ' +
+      'మీ shift roster, induction schedule, safety details అన్నీ Karya Vaani app లో ready గా ఉన్నాయి. ' +
+      'ఇక నుండి అన్ని important updates ను మేము ఇదే WhatsApp లో మీ భాషలో voice message ద్వారా పంపిస్తాము. ' +
+      'జాగ్రత్తగా పని చేయండి, ఏదైనా doubt ఉంటే ఇక్కడే మాకు message చేయండి. ధన్యవాదాలు!'
   },
   hinglish: {
     sarvamLang: 'HI',
     label: 'Hinglish (Hindi-English)',
     text: 'नमस्ते! Karya Vaani parivaar mein aapka swagat hai. ' +
-      'Aapka onboarding successfully complete ho gaya hai. Aapka shift roster, induction schedule ' +
-      'aur safety details sab Karya Vaani app par ready hain. ' +
-      'WhatsApp par aaye message mein Yes button press karke confirm kijiye. ' +
-      'Uske baad hum aapki bhasha mein voice message ke through saari updates bhejenge. ' +
-      'Safe rehkar kaam kijiye, koi bhi doubt ho to hamein message kijiye. Dhanyavaad!'
+      'Aapka onboarding successfully complete ho gaya hai, confirm karne ke liye bahut dhanyavaad. ' +
+      'Aapka shift roster, induction schedule aur safety details sab Karya Vaani app par ready hain. ' +
+      'Ab se saari important updates hum isi WhatsApp par aapki bhasha mein voice message ke through bhejenge. ' +
+      'Safe rehkar kaam kijiye, koi bhi doubt ho to yahin hamein message kijiye. Dhanyavaad!'
   }
 };
 
