@@ -750,16 +750,20 @@ function voiceCacheGet(hash) {
   const list = (s && s.data && s.data.voiceCache) || [];
   return list.find((v) => v.hash === hash) || null;
 }
-function voiceCachePut(hash, buf, contentType) {
+function voiceCachePut(hash, buf, contentType, pinned) {
   const s = readStore();
   if (!s || !s.data) return;
   s.data.voiceCache = s.data.voiceCache || [];
   const rec = { hash, audio: buf.toString('base64'), contentType: contentType || 'audio/wav', bytes: buf.length, createdAt: new Date().toISOString() };
+  if (pinned) rec.pinned = true;
   s.data.voiceCache.push(rec);
   dbPut('voiceCache', hash, rec);
-  // evict oldest beyond the cap so the cache can't grow without bound
+  // evict the OLDEST UNPINNED entry beyond the cap. Pinned entries (the language
+  // welcome voices) are never evicted, so they never need re-synthesis.
   while (s.data.voiceCache.length > VOICE_CACHE_MAX) {
-    const old = s.data.voiceCache.shift();
+    const idx = s.data.voiceCache.findIndex((v) => !v.pinned);
+    if (idx < 0) break;   // everything left is pinned — nothing to evict
+    const old = s.data.voiceCache.splice(idx, 1)[0];
     if (old && old.hash) dbDel('voiceCache', old.hash);
   }
 }
@@ -1278,6 +1282,8 @@ async function getOrCreateWelcomeVoice(registerKey) {
   const hash = welcomeVoiceHash(script);
   const hit = voiceCacheGet(hash);
   if (hit && hit.audio) {
+    // pin any previously-cached clip too (idempotent, no re-synthesis)
+    if (!hit.pinned) { hit.pinned = true; dbPut('voiceCache', hash, hit); }
     return { hash, register: registerKey, ext: String(hit.contentType || '').includes('ogg') ? 'ogg' : 'wav', generated: false };
   }
   if (!SARVAM_API_KEY) throw new Error('SARVAM_API_KEY not set — welcome voices require Sarvam bulbul:v3');
@@ -1285,7 +1291,7 @@ async function getOrCreateWelcomeVoice(registerKey) {
   let audio = wav, contentType = 'audio/wav';
   try { audio = await transcodeToOpus(wav); contentType = 'audio/ogg'; }
   catch (e) { console.error('[welcome-voice] opus transcode failed, storing WAV (WhatsApp may reject):', e.message); }
-  voiceCachePut(hash, audio, contentType);
+  voiceCachePut(hash, audio, contentType, true);   // pin: welcome voices are never evicted
   return { hash, register: registerKey, ext: contentType === 'audio/ogg' ? 'ogg' : 'wav', generated: true };
 }
 
@@ -1306,7 +1312,7 @@ app.get('/api/whatsapp/welcome-voices', (req, res) => {
   const list = Object.keys(WELCOME_VOICE_SCRIPTS).map((k) => {
     const s = WELCOME_VOICE_SCRIPTS[k];
     const hit = voiceCacheGet(welcomeVoiceHash(s));
-    return { register: k, label: s.label, sarvamLang: s.sarvamLang, cached: !!(hit && hit.audio) };
+    return { register: k, label: s.label, sarvamLang: s.sarvamLang, cached: !!(hit && hit.audio), pinned: !!(hit && hit.pinned) };
   });
   res.json({ ok: true, registers: list });
 });
