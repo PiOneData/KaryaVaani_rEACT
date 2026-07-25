@@ -966,8 +966,8 @@ function __kvOnReady(fn) {
     const s = IND_STATE[name];
     if (!s) return { cls: 'scheduled', label: 'Not started' };
     const p = indProgressOf(name);
-    if (p.gated > 0)                return { cls: 'gated',     label: 'Gated' };
-    if (p.done === p.total)         return { cls: 'done',      label: '✓ Complete' };
+    if (p.done === p.total && p.total > 0) return { cls: 'done', label: '✓ Complete' };
+    if (p.gated > 0)                return { cls: 'inprog',    label: 'In progress' };
     if (s.startedOn && p.done > 0)  return { cls: 'inprog',    label: 'In progress' };
     if (s.startedOn)                return { cls: 'inprog',    label: 'In progress' };
     return { cls: 'scheduled', label: 'Scheduled' };
@@ -3640,8 +3640,7 @@ function __kvOnReady(fn) {
       empty: 'No imported workers for this contractor yet — click “Import vendor data”.',
       row: function (w) {
         var click = w._onboarded ? ('obOpenCapture(' + w._ci + ')') : ('vwWorkerDetail(\'' + String(w.id).replace(/'/g, "\\'") + '\')');
-        var od = w.onboardedAt ? new Date(w.onboardedAt) : null;
-        var odStr = od && !isNaN(od.getTime()) ? od.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (w._onboarded ? 'Recent' : '—');
+        var odStr = w.onboardedAt ? (typeof kvFmtDate === 'function' ? kvFmtDate(w.onboardedAt) : w.onboardedAt) : (w._onboarded ? 'Recent' : '—');
         return '<tr style="cursor:pointer" onclick="' + click + '">' +
           '<td class="t-strong">' + vwEsc(w.name || '—') + (w._onboarded ? ' <span class="pill blue tiny">Onboarded</span>' : '') + (w.migrant ? ' <span class="pill amber tiny">Migrant</span>' : '') + '</td>' +
           '<td class="mono tiny">' + vwEsc(w.code || '—') + '</td>' +
@@ -4761,7 +4760,7 @@ function __kvOnReady(fn) {
       .catch(function (e) { toast('HR ops email failed: ' + e.message, 'red'); });
   }
 
-  let IND_SORT = { col: 'riskRank', dir: -1 };
+  let IND_SORT = { col: 'joinDate', dir: -1 };   /* newest joinees first */
   let IND_QUERY = '';
   let IND_FILTER = null;            /* one of: 'ppeMissing' | 'ppeDraft' | 'gated' | 'language:XX' */
   let SELECTED_IND = null;
@@ -4816,10 +4815,25 @@ function __kvOnReady(fn) {
     if (r >= 10)   return { cls: 'amber', label: 'Watch' };
     return { cls: 'green', label: 'Low' };
   }
+  /* Shared date formatter — one consistent 'DD Mon YYYY' style across the app
+     (induction join dates, vendor onboarded dates, …). Strips trailing '· …'
+     notes, maps 'onboarded' text, and assumes the demo year for bare 'DD Mon'. */
+  function kvFmtDate(v) {
+    if (v == null || v === '') return '—';
+    var s = String(v).replace(/\s*·.*$/, '').trim();
+    if (/^onboard/i.test(s)) return 'Onboarded';
+    var d = new Date(/^\d{1,2}\s+[A-Za-z]{3}$/.test(s) ? s + ' 2026' : s);
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  window.kvFmtDate = kvFmtDate;
   function indJoinSortVal(label) {
-    /* extract day number for rough sorting */
-    const m = (label || '').match(/(\d+)\s+\w+/);
-    return m ? parseInt(m[1]) : 999;
+    /* real timestamp so join-date sort works across demo ('25 Apr') and
+       onboarded (ISO) joinees; undated ones sort oldest */
+    var s = String(label || '').replace(/\s*·.*$/, '').trim();
+    if (!s || /^onboard/i.test(s)) return 0;
+    var d = new Date(/^\d{1,2}\s+[A-Za-z]{3}$/.test(s) ? s + ' 2026' : s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
   }
 
   function renderIndGrid() {
@@ -4901,7 +4915,7 @@ function __kvOnReady(fn) {
         '<td class="t-strong">' + j.name + '</td>' +
         '<td><span class="pill outline tiny">' + j.type + '</span></td>' +
         '<td>' + j.anchor + '</td>' +
-        '<td>' + j.joinDate + '</td>' +
+        '<td>' + kvFmtDate(j.joinDate) + '</td>' +
         '<td>' + langTagHtml(j.name, false) + '</td>' +
         '<td>' + ppePillHtml(j.name) + '</td>' +
         '<td>' + indProgHtml(j.name) + '</td>' +
@@ -4938,7 +4952,7 @@ function __kvOnReady(fn) {
   }
 
   function resetIndSort() {
-    IND_SORT = { col: 'riskRank', dir: -1 };
+    IND_SORT = { col: 'joinDate', dir: -1 };
     IND_QUERY = '';
     IND_FILTER = null;
     const inp = document.getElementById('ind-search');
@@ -5033,7 +5047,7 @@ function __kvOnReady(fn) {
       let statBlock = '';
       if (m.status === 'done') statBlock = '<span class="ind-status done">✓ Done</span>';
       else if (m.status === 'inprog') statBlock = '<span class="ind-status inprog">⌛ In progress</span>';
-      else if (m.status === 'gated') statBlock = '<span class="ind-status gated">⛔ Gated</span>';
+      else if (m.status === 'gated') statBlock = '<span class="ind-status inprog">⌛ In progress</span>';
       else statBlock = '<span class="ind-status scheduled">📅 Scheduled</span>';
 
       list.insertAdjacentHTML('beforeend',
@@ -13287,9 +13301,10 @@ function __kvOnReady(fn) {
     const plate = 'AP-29-' + (3800 + (h % 1099));
     const agency = type === 'emp' ? 'Daikin direct' : TR_AGENCIES[(h >>> 18) % TR_AGENCIES.length];
     const operator = trRouteOperator(route.code);
-    // OSHC Rule 83 night-shift consent — required for women; base is deterministic
+    // OSHC Rule 83 night-shift consent — applies ONLY to women on the NIGHT shift
+    // (Shift C). General/morning-shift women are 'na'. Base is deterministic
     // (most consented at onboarding, some still pending), overridden by the store.
-    const nightConsent = gender === 'F' ? (((h >>> 20) % 100) < 80 ? 'yes' : 'pending') : 'na';
+    const nightConsent = (gender === 'F' && shift === 'night') ? (((h >>> 20) % 100) < 80 ? 'yes' : 'pending') : 'na';
     return {
       code: w.code, name: w.name, dept: w.department || '—', desig: w.designation || '',
       locality: town, route: route.code, routeName: route.route, pickup: pickup, pickupIdx: pickupIdx,
@@ -13368,12 +13383,10 @@ function __kvOnReady(fn) {
   function trCollectConsent(code) {
     const a = trRoster().find(function (x) { return x.code === code; });
     if (!a) return;
-    if (window.KVWhatsApp && a.mobile) {
-      window.KVWhatsApp.notify(a.mobile,
-        'Namaste ' + a.name + ', do you consent to night-shift (Shift C) transport under OSHC Rule 83? ' +
-        'Your bus is operated by ' + trRouteOperator(a.route) + '. Reply YES to confirm. — Karya Vaani',
-        { label: 'Consent request sent to ' + a.name });
-    }
+    /* NB: consent is RECORDED here. A free-form WhatsApp text is not sent (it
+       would fail outside the worker's 24h window and surface a misleading
+       "WhatsApp send failed" toast); consent is requested via an approved
+       template elsewhere. */
     return fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: a.code, name: a.name, consented: true, method: 'whatsapp', by: (window.__KVUSER && window.__KVUSER.name) || 'Operator' })
@@ -13381,7 +13394,7 @@ function __kvOnReady(fn) {
       .then(function (j) {
         if (j && j.ok) {
           TR_STATE.consents = TR_STATE.consents || {}; TR_STATE.consents[a.code] = j.consent;
-          toast('Night-shift consent confirmed for ' + a.name + ' · OSHC Rule 83 logged', 'green');
+          toast('Consent collected for ' + a.name + ' · OSHC Rule 83 logged', 'green');
           if (TR_STATE.gkOpenRoute) trGkOpenRoster(TR_STATE.gkOpenRoute);
           trGkRenderNight();
           if (typeof trLogEvent === 'function') trLogEvent('consent-collected', { code: a.code, silent: true });
@@ -13593,7 +13606,7 @@ function __kvOnReady(fn) {
         plate: 'Bus ' + ro.code,
         agency: rec.type === 'direct' ? 'Daikin (direct)' : (contractor || '—'),
         operator: (typeof trRouteOperator === 'function' ? trRouteOperator(ro.code) : ''),
-        nightConsent: rec.gender === 'Female' ? (rec.nightShiftConsent ? 'yes' : 'pending') : 'na',
+        nightConsent: (rec.gender === 'Female' && shift === 'night') ? (rec.nightShiftConsent ? 'yes' : 'pending') : 'na',
         _onboarded: true, _ci: i
       };
     }).filter(Boolean);
@@ -13956,7 +13969,7 @@ function __kvOnReady(fn) {
         '<td class="tr-agency">' + a.agency + '</td>' +
         '<td style="color:var(--txt3)">' + a.pickup + '</td>' +
         '<td><span class="dep">↑' + pu + '</span> <span class="tr-dim">/</span> <span class="dep dn">↓' + dp + '</span></td>' +
-        '<td>' + brdCell + ' <button class="rd-mini warn" onclick="event.stopPropagation();trReportOffRoute(\'' + a.code + '\')" title="Log an off-route drop for this worker">⚠</button></td>' +
+        '<td>' + brdCell + (brd === 'ok' ? ' <button class="rd-mini warn" onclick="event.stopPropagation();trReportOffRoute(\'' + a.code + '\')" title="Log an off-route drop for this worker">⚠</button>' : '') + '</td>' +
         '<td>' + consCell + '</td></tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--txt4);padding:16px">No workers on this route for shift ' + s + '.</td></tr>';
     const drawer = document.getElementById('tr-roster-drawer');
@@ -15618,6 +15631,18 @@ function __kvOnReady(fn) {
     var db = document.getElementById('cap-type-direct');
     if (db) db.style.display = scope ? 'none' : '';
     if (scope && typeof capSetType === 'function') capSetType('contract');
+    /* An agency only onboards CONTRACT workers, so the direct-vs-contract framing
+       is HR-only. Swap the page title/subtitle to contract-only wording for an
+       agency login, and restore the HR wording otherwise. */
+    var titleEl = document.getElementById('ob-page-title');
+    var subEl = document.getElementById('ob-page-sub');
+    if (scope) {
+      if (titleEl) titleEl.innerHTML = 'Verify, induct, attest your <em>contract workers</em>';
+      if (subEl) subEl.textContent = 'Every worker you onboard is a contract worker deployed under ' + scope + ' — capture details, verify documents, induct and attest, all in one track.';
+    } else {
+      if (titleEl) titleEl.innerHTML = 'Verify, induct, attest — <em>differently</em> for direct vs. contract';
+      if (subEl) subEl.innerHTML = 'Single worker entity with a <span class="mono">worker_type</span> discriminator. Direct employees and contract workers share a document store and audit trail; statutory requirements diverge where they must.';
+    }
   }
   function initCap() {
     if (!document.getElementById('cap-lang-grid')) return;
@@ -18335,6 +18360,24 @@ function __kvOnReady(fn) {
     toast('✓ Induction training completed for ' + rec.name, 'green');
     if (typeof kvNotify === 'function') kvNotify('Induction completed · ' + rec.name, rec.category + ' · all training modules done. Ready to push to HRIS.', 'success');
   }
+  /* Send the OSHC Rule 83 night-shift consent form to a female worker over
+     WhatsApp. For now this records consent (Pending → Consented) and logs it to
+     the transport consent audit; a real approved consent TEMPLATE send hooks in
+     here later. */
+  function obSendConsentForm(i) {
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var nowIso = new Date().toISOString();
+    obPersistRec(rec, { nightShiftConsent: true, nightConsentAt: nowIso, nightConsentBy: 'whatsapp-form' });
+    if (rec.id) {
+      fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: rec.id, name: rec.name, consented: true, method: 'whatsapp-form', by: (window.__KVUSER && window.__KVUSER.name) || 'Agency' })
+      }).catch(function () {});
+    }
+    obRefreshOnboardViews(); obOpenCapture(i, 'general');
+    toast('Consent form sent on WhatsApp · status updated to Consented', 'green');
+  }
+  window.obSendConsentForm = obSendConsentForm;
 
   /* provision / view a worker login for a (female) employee */
   function obCreateWorkerLogin(i) {
@@ -18456,7 +18499,12 @@ function __kvOnReady(fn) {
               ? (rec.nightShiftConsent
                   ? '<span class="pill green tiny">Consented' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>'
                   : '<span class="pill amber tiny">Declined' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>')
-              : '<span class="pill outline tiny">Not captured</span>')) +
+              : '<span class="pill amber tiny">Pending</span>') +
+            /* Night-shift females who haven't consented yet get a WhatsApp
+               consent-form action (for now it records consent → Consented). */
+            ((/night/i.test(rec.shift || '') && rec.nightShiftConsent !== true)
+              ? ' <button class="btn primary" style="padding:3px 9px;font-size:0.7rem" onclick="obSendConsentForm(' + i + ')">Send consent form on WhatsApp</button>'
+              : '')) +
           (rec.nightConsentComment
             ? kvKV('Consent comment', '<span style="white-space:pre-wrap">' + String(rec.nightConsentComment).replace(/</g, '&lt;') + '</span>')
             : '')
@@ -18592,6 +18640,9 @@ function __kvOnReady(fn) {
         modHtml +
         (done ? '<div class="note green" style="margin:10px 0 12px;font-size:0.78rem">✓ Induction completed' + (rec.inductionCompletedAt ? ' on ' + fmtD(rec.inductionCompletedAt) : '') + '. Training window ' + fmtD(rec.inductionStart) + ' → ' + fmtD(rec.inductionEnd) + '.</div>' : '') +
         dateSection +
+        ((!done && rec.inductionStart && rec.inductionEnd)
+          ? '<div class="note green" style="margin-top:10px;font-size:0.78rem">✓ Induction schedule saved · ' + fmtD(rec.inductionStart) + ' → ' + fmtD(rec.inductionEnd) + ' · logged to the worker record.</div>'
+          : '') +
         (done ? '' :
           '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
             (isHR

@@ -14,13 +14,13 @@ export default function SecOnboarding() {
         <div className="page-h-left">
           <div className="page-eyebrow">Module 2 · single worker entity, two tracks</div>
           {' '}
-          <h1 className="page-title">
+          <h1 className="page-title" id="ob-page-title">
             {"Verify, induct, attest — "}
             <em>differently</em>
             {" for direct vs. contract"}
           </h1>
           {' '}
-          <p className="page-sub">
+          <p className="page-sub" id="ob-page-sub">
             {"Single worker entity with a "}
             <span className="mono">worker_type</span>
             {" discriminator. Direct employees and contract workers share a document store and audit trail; statutory requirements diverge where they must."}

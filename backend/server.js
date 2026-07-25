@@ -1379,11 +1379,12 @@ async function maybeAutoWelcomeVoice(rec) {
     if (store.data.autoWelcomeSent[digits]) return;
     const lang = (worker && worker.lang) || '';
     const register = welcomeRegisterFor(lang);
-    const { hash, ext } = await getOrCreateWelcomeVoice(register);
+    const label = (WELCOME_VOICE_SCRIPTS[register] && WELCOME_VOICE_SCRIPTS[register].label) || register;
+    const { hash, ext } = await getOrCreateWelcomeVoice(register);   // served from DB cache (pinned) — never regenerated
     const link = PUBLIC_BASE_URL + '/api/voice/' + hash + '.' + ext;
     const { json } = await commsFetch('/v1/whatsapp/send-audio', {
       method: 'POST',
-      body: JSON.stringify({ to: phone, link, lang, caption: 'Welcome to Karya Vaani' })
+      body: JSON.stringify({ to: phone, link, lang, caption: 'Welcome to Karya Vaani · ' + label })
     });
     /* mark sent only after the gateway accepted it, so a transient failure can retry */
     if (json && json.ok !== false) {

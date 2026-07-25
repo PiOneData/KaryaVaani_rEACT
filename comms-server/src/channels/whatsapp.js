@@ -38,9 +38,27 @@ function resolveRecipients(requested, lang) {
   return forced;
 }
 
-/* Human-readable log line for a template send: the template name followed by
-   its body variable values, so the message log/chat shows the actual content
-   instead of an opaque "[template:trial]". */
+/* Known approved template bodies, so the message log/chat shows the REAL message
+   text (with {{n}} filled from the send params) instead of an opaque
+   "[name] param". Add a template here when it is approved in the AOC portal. */
+const TEMPLATE_BODIES = {
+  karyavaani_onboard_en:
+    '📋 HR\n\nWelcome to Karya Vaani, {{1}}.\n\nYour account has been onboarded.\n\n' +
+    'Would you like a quick guided introduction to using Karya Vaani?\n\n' +
+    'Reply with:\n*YES* – to receive the guided walkthrough.\n' +
+    '*NO* – if you do not need assistance at this time.\n' +
+    '*VIEW DETAILS* to visit the Karya Vaani website.'
+};
+function fillTemplateBody(body, params) {
+  return String(body).replace(/\{\{(\d+)\}\}/g, (_, n) => {
+    const v = params[parseInt(n, 10) - 1];
+    return v != null ? String(v) : '';
+  });
+}
+
+/* Human-readable log line for a template send: the actual rendered body when the
+   template is known, else the template name followed by its body variable values
+   — so the message log/chat shows the real content, not an opaque "[template]". */
 function templateLogText(template, components) {
   const params = [];
   (components || []).forEach((c) => {
@@ -48,6 +66,7 @@ function templateLogText(template, components) {
       if (p && p.text != null) params.push(String(p.text));
     });
   });
+  if (TEMPLATE_BODIES[template]) return fillTemplateBody(TEMPLATE_BODIES[template], params);
   return params.length ? `[${template}] ${params.join(' · ')}` : `[template:${template}]`;
 }
 
