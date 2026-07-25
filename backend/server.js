@@ -1510,6 +1510,41 @@ function whatsappKey(r) {
   return ['anon', dir, r.from || r.to || '', r.timestamp || r.at || '', String(r.text || '').slice(0, 24)].join('|');
 }
 
+/* WhatsApp status timestamps arrive as Unix epoch seconds (Meta/AOC) or already
+   as an ISO string — normalise to ISO so read/delivered times log consistently. */
+function waStatusTime(ts) {
+  if (ts == null || ts === '') return null;
+  if (typeof ts === 'number' || /^\d+$/.test(String(ts))) {
+    const n = Number(ts);
+    const d = new Date(n < 1e12 ? n * 1000 : n);   // seconds → ms
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? String(ts) : d.toISOString();
+}
+
+/* When a delivery status (sent/delivered/read/failed) arrives, stamp it onto the
+   matching OUTBOUND message (by wamid / AOC messageId) so every sent message
+   carries its own deliveredAt / readAt time — that's the WhatsApp "read time". */
+function applyStatusToOutbound(store, status) {
+  const wid = status.wamid || status.messageId;
+  if (!wid) return;
+  const norm = (x) => String(x || '').split(':')[0];   // AOC appends ':1' etc.
+  const arr = store.data.whatsappMessages || [];
+  const msg = arr.find((m) => m.direction === 'out' && (
+    m.wamid === wid || m.messageId === wid || norm(m.messageId) === norm(wid) || norm(m.wamid) === norm(wid)
+  ));
+  if (!msg) return;
+  const st = String(status.status || '').toLowerCase();
+  const when = waStatusTime(status.timestamp) || new Date().toISOString();
+  msg.status = st || msg.status;
+  msg.lastStatusAt = when;
+  if (st === 'delivered' && !msg.deliveredAt) msg.deliveredAt = when;
+  if (st === 'read') { msg.readAt = when; if (!msg.deliveredAt) msg.deliveredAt = when; }
+  if (st === 'failed' && !msg.failedAt) msg.failedAt = when;
+  try { dbPut('whatsappMessages', msg.id || whatsappKey(msg), msg); } catch (e) { /* best-effort */ }
+}
+
 /* ingest a forwarded message/status from the comms server and persist it to
    Postgres, so the chat history survives comms-server / deploy restarts. */
 app.post('/api/whatsapp/ingest', (req, res) => {
@@ -1530,6 +1565,11 @@ app.post('/api/whatsapp/ingest', (req, res) => {
   if (idx >= 0) arr[idx] = record; else arr.push(record);
   while (arr.length > 5000) arr.shift();
   dbPut('whatsappMessages', key, record);
+  /* Correlate a delivery/read status onto the sent message so it carries its
+     deliveredAt / readAt time (the WhatsApp read receipt). */
+  if (record.direction === 'status') {
+    try { applyStatusToOutbound(store, record); } catch (e) { console.error('status correlate error:', e.message); }
+  }
   /* Fire-and-forget: if this is a worker's "Yes" reply to the onboarding
      template, auto-send their language's welcome voice into the now-open 24h
      window. Never blocks or fails the webhook ack. */
@@ -1564,6 +1604,34 @@ app.get('/api/whatsapp/messages', async (req, res) => {
   } catch (err) {
     res.status(502).json({ ok: false, error: 'comms server unreachable: ' + err.message });
   }
+});
+
+/* Read-receipt log: every sent WhatsApp message with its delivered/read time.
+   Query: ?to=<number> (last-10-digit match), ?since=<ISO>, ?limit=<n>. */
+app.get('/api/whatsapp/read-receipts', (req, res) => {
+  const store = readStore();
+  const all = (store && store.data && store.data.whatsappMessages) || [];
+  const { to, since, limit } = req.query;
+  let items = all.filter((m) => m.direction === 'out');
+  if (to) {
+    const d = String(to).replace(/\D/g, '').slice(-10);
+    items = items.filter((m) => String(m.to || '').replace(/\D/g, '').slice(-10) === d);
+  }
+  if (since) items = items.filter((m) => String(m.readAt || m.deliveredAt || m.lastStatusAt || '') >= String(since));
+  items = items.map((m) => ({
+    messageId: m.messageId || m.wamid, to: m.to,
+    text: String(m.text || '').slice(0, 120), template: (m.template && (m.template.name || m.template)) || null,
+    status: m.status || 'sent',
+    sentAt: m.timestamp || m.ingestedAt || m.at || null,
+    deliveredAt: m.deliveredAt || null, readAt: m.readAt || null, failedAt: m.failedAt || null
+  }));
+  items.sort((a, b) => String(b.sentAt || '').localeCompare(String(a.sentAt || '')));
+  const n = parseInt(limit, 10);
+  if (n && items.length > n) items = items.slice(0, n);
+  res.json({
+    ok: true, count: items.length, receipts: items,
+    summary: { sent: items.length, delivered: items.filter((x) => x.deliveredAt).length, read: items.filter((x) => x.readAt).length }
+  });
 });
 
 /* ── Transport: weekly roster · targeted batch comms · ID-card attendance ────
