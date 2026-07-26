@@ -18227,8 +18227,11 @@ function __kvOnReady(fn) {
     const items = OM_LAWS.map(function (law, i) {
       let ok;
       if (law.key === 'aadhaarKyc') ok = !!rec.aadhaarVerified && (rec.pan ? !!rec.panVerified : true);
-      else if (law.key === 'appointmentLetter') ok = !!(rec.employment && (rec.employment.posId || rec.employment.workorder));
-      else if (law.key === 'inductionSafety') ok = !!rec.ppeAckAt;
+      /* appointment letter is met once the appointment/offer/employment-contract
+         document is uploaded for this worker (or a position/work-order tags it) */
+      else if (law.key === 'appointmentLetter') ok = obHasDocType(rec, /appointment|offer letter|employment contract/i) || !!(rec.employment && (rec.employment.posId || rec.employment.workorder));
+      /* induction & safety is met once induction is completed (or PPE briefing ack) */
+      else if (law.key === 'inductionSafety') ok = !!rec.ppeAckAt || obJourneyStage(rec) === 'complete';
       // UAN/EPFO seeded → the worker must actually have a UAN on record (12-digit).
       else if (law.key === 'uanEpfo') ok = String(rec.uan || '').replace(/\D/g, '').length >= 10;
       // ESIC registered → must have an ESI/IP number; contractor must not be in ESIC breach.
@@ -18240,6 +18243,40 @@ function __kvOnReady(fn) {
     const score = items.reduce(function (s, it) { return s + (it.ok ? it.weight : 0); }, 0);
     const criticalsOk = items.filter(function (it) { return it.severity === 'critical'; }).every(function (it) { return it.ok; });
     return { score: score, status: (criticalsOk && score >= 80) ? 'compliant' : 'non-compliant', items: items, contractor: ct, aadhaarVerified: !!rec.aadhaarVerified };
+  }
+
+  /* a worker's uploaded documents (client cache, keyed by backendId or id) */
+  function obDocsFor(rec) {
+    if (!rec || typeof OB_DOCS === 'undefined') return [];
+    return (OB_DOCS[rec.backendId] || OB_DOCS[rec.id] || []);
+  }
+  function obHasDocType(rec, re) {
+    return obDocsFor(rec).some(function (d) { return re.test(String(d.docType || '') + ' ' + String(d.name || '')); });
+  }
+  /* Compliance-tab HTML for a worker — extracted so the pane can be re-rendered
+     in place when a document is uploaded (which raises the score). */
+  function obComplianceHtml(rec) {
+    var c = obWorkerCompliance(rec);
+    var itemsHtml = c.items.map(function (it) {
+      var ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
+      var sev = '<span class="pill ' + (it.severity === 'critical' ? 'red' : it.severity === 'high' ? 'amber' : 'outline') + ' tiny">' + it.severity + '</span>';
+      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="width:18px;text-align:center">' + ico + '</div>' +
+        '<div style="flex:1"><div style="font-size:0.85rem"><strong>' + it.label + '</strong> ' + sev + ' <span class="tiny" style="color:' + (it.ok ? 'var(--green-dk)' : 'var(--red-dk)') + '">· ' + (it.ok ? 'compliant' : 'not met') + '</span></div>' +
+        '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div></div></div>';
+    }).join('');
+    var ctLink = c.contractor
+      ? '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Linked contractor <span class="cap-recent-link" onclick="ctOpenContractor(\'' + c.contractor.id + '\')"><strong>' + c.contractor.name + '</strong></span> · compliance score ' + c.contractor.score + '/100 — click to drill into the contractor. ESIC / PF status flows from the contractor master.</div>'
+      : '';
+    return '<div class="g2" style="gap:10px;margin-bottom:12px">' +
+        '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
+      '</div>' +
+      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) + ctLink;
+  }
+  /* Re-render the open capture modal's Compliance pane in place (no flash), so an
+     uploaded document immediately raises the visible score + checklist. */
+  function obRefreshCompliancePane(rec) {
+    var pane = document.querySelector('.kvtab-pane[data-pane="compliance"]');
+    if (pane && rec) pane.innerHTML = obComplianceHtml(rec);
   }
 
   /* ── onboarding journey stage + timeline ─────────────────────────────────
@@ -18530,6 +18567,7 @@ function __kvOnReady(fn) {
     const rec = CAP_STATE.recent[i];
     if (!rec) return;
     const docKey = rec.backendId || rec.id;
+    OB_OPEN_CAPTURE = { key: docKey, rec: rec, i: i };   /* for doc-driven compliance refresh */
     const a = rec.address || {};
     const e = rec.employment || {};
     const ppe = rec.ppe || {};
@@ -18607,21 +18645,7 @@ function __kvOnReady(fn) {
       '<div class="tiny muted" style="margin-top:4px">Choose <strong>Other</strong> to name a custom document (appointment order, agreement, etc.).</div>' +
       '<div id="ob-docs-list" class="tiny muted" style="margin-top:12px">Loading documents…</div>';
     const c = obWorkerCompliance(rec);
-    const itemsHtml = c.items.map(function (it) {
-      const ico = it.ok ? '<span style="color:var(--green-dk);font-weight:700">✓</span>' : '<span style="color:var(--red-dk);font-weight:700">✕</span>';
-      const sev = '<span class="pill ' + (it.severity === 'critical' ? 'red' : it.severity === 'high' ? 'amber' : 'outline') + ' tiny">' + it.severity + '</span>';
-      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="width:18px;text-align:center">' + ico + '</div>' +
-        '<div style="flex:1"><div style="font-size:0.85rem"><strong>' + it.label + '</strong> ' + sev + ' <span class="tiny" style="color:' + (it.ok ? 'var(--green-dk)' : 'var(--red-dk)') + '">· ' + (it.ok ? 'compliant' : 'not met') + '</span></div>' +
-        '<div class="tiny muted" style="margin-top:2px">' + it.law + '</div></div></div>';
-    }).join('');
-    const ctLink = c.contractor
-      ? '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Linked contractor <span class="cap-recent-link" onclick="ctOpenContractor(\'' + c.contractor.id + '\')"><strong>' + c.contractor.name + '</strong></span> · compliance score ' + c.contractor.score + '/100 — click to drill into the contractor. ESIC / PF status flows from the contractor master.</div>'
-      : '';
-    const compliance =
-      '<div class="g2" style="gap:10px;margin-bottom:12px">' +
-        '<div class="kpi"><div class="kpi-eye">Compliance score</div><div class="kpi-val" style="color:' + omComplyColor(c.score) + '">' + c.score + '<small>/100</small></div></div>' +
-      '</div>' +
-      '<div class="card-h-title" style="font-size:0.9rem;margin-bottom:2px">Statutory checklist · current Indian labour law</div>' + kv2col(itemsHtml) + ctLink;
+    const compliance = obComplianceHtml(rec);
     /* ── verification & induction (journey timeline + HR actions) ──
        Verification, moving to induction and completing training are HR-only
        actions. A contractor sees the same tab read-only with the current
@@ -18777,6 +18801,7 @@ function __kvOnReady(fn) {
 
   /* ── worker documents · upload / list / view / delete (stored in DB) ───── */
   let OB_DOCS = {};
+  var OB_OPEN_CAPTURE = null;   /* { key, rec, i } of the capture modal on screen */
   function obLoadDocs(workerKey) {
     const host = document.getElementById('ob-docs-list');
     if (!host) return;
@@ -18785,6 +18810,11 @@ function __kvOnReady(fn) {
       .then(function (j) {
         const docs = (j && j.documents) || [];
         OB_DOCS[workerKey] = docs;
+        /* an uploaded document can raise this worker's compliance score — if the
+           capture modal is open for them, refresh the Compliance pane in place */
+        if (OB_OPEN_CAPTURE && OB_OPEN_CAPTURE.key === workerKey && typeof obRefreshCompliancePane === 'function') {
+          obRefreshCompliancePane(OB_OPEN_CAPTURE.rec);
+        }
         if (!docs.length) { host.innerHTML = '<div class="tiny muted">No documents uploaded yet.</div>'; return; }
         host.innerHTML = docs.map(function (d) {
           return '<div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:0.82rem">' +
