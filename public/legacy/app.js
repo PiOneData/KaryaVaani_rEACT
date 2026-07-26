@@ -160,13 +160,10 @@ function __kvOnReady(fn) {
     if (user.role === 'employee') {
       document.body.classList.add('role-employee');
       if (typeof empSetWorker === 'function') {
-        /* prefer a real OM-roster associate so the login worker is consistent
-           with the employee details table; ignore a stale demo linkedId that
-           isn't in the roster. */
-        var _wid = user.linkedId;
-        var _real = (typeof empRosterDefault === 'function') ? empRosterDefault() : null;
-        if (!_wid || String(_wid).indexOf('OMC') !== 0) _wid = _real || _wid;
-        empSetWorker(_wid);
+        /* Show the REAL onboarded worker (synthesized from their onboarding
+           capture); fall back to the demo roster default only when the login has
+           no onboarding record. */
+        empSetWorker((typeof empEnsureLoginWorker === 'function') ? empEnsureLoginWorker(user) : user.linkedId);
       }
       nav('emp-home', kvNavEl('emp-home'));
     } else if (user.role === 'contractor') {
@@ -3517,7 +3514,9 @@ function __kvOnReady(fn) {
     if (!host) return;
     if (ctIsOM(c)) { renderOmMappingPane(c, host); return; }
     VW_STATE.contractor = c.name;
-    VW_STATE.sortCol = 'name'; VW_STATE.sortDir = 1;
+    /* default the deployed list to newest-onboarded first, so freshly onboarded
+       workers appear at the top immediately (no manual re-sort needed) */
+    VW_STATE.sortCol = 'onboardedAt'; VW_STATE.sortDir = -1;
     VW_STATE.filters = { category: '', esic: '', migrant: '' };
     var safeCt = String(c.name).replace(/'/g, "\\'");
     host.innerHTML =
@@ -11590,6 +11589,35 @@ function __kvOnReady(fn) {
     return pick || (CHAT_CONTACTS[0] && CHAT_CONTACTS[0].id);
   }
 
+  /* For a REAL logged-in worker (an onboarded employee), synthesize a chat
+     contact from their onboarding capture so the worker home shows THEIR details
+     — not the demo roster default (E Pavithra). Returns the contact id to
+     activate, or the roster default when there is no onboarding record. */
+  function empEnsureLoginWorker(user) {
+    user = user || window.__KVUSER || {};
+    if (user.role !== 'employee') return null;
+    var caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    var rec = null;
+    if (user.linkedId) rec = caps.find(function (r) { return r.backendId === user.linkedId || r.id === user.linkedId; });
+    if (!rec && user.name) rec = caps.find(function (r) { return r.name && String(r.name).toLowerCase() === String(user.name).toLowerCase(); });
+    if (!rec) return (typeof empRosterDefault === 'function' ? empRosterDefault() : null) || user.linkedId || null;
+    if (typeof CHAT_CONTACTS !== 'undefined') {
+      var contact = {
+        id: rec.id, name: rec.name, role: rec.designation || rec.category || 'Worker',
+        zone: (rec.employment && rec.employment.dept) || rec.department || '—',
+        dept: (rec.employment && rec.employment.dept) || rec.department || '—',
+        sup: rec.manager || '—', type: rec.type === 'direct' ? 'Direct' : 'Contract',
+        contractor: (rec.employment && rec.employment.contractor) || (rec.type === 'direct' ? 'Daikin' : '—'),
+        lang: (typeof obLangNameToCode === 'function' ? obLangNameToCode(rec.lang) : 'EN'),
+        phone: rec.mobile ? ('••• ••• ' + String(rec.mobile).replace(/\D/g, '').slice(-4)) : '',
+        _cap: rec
+      };
+      var existing = CHAT_CONTACTS.find(function (c) { return c.id === rec.id; });
+      if (existing) Object.assign(existing, contact); else CHAT_CONTACTS.unshift(contact);
+    }
+    return rec.id;
+  }
+
   function empSetWorker(id) {
     EMP_ACTIVE = id;
     /* sync the chat module so any action originating from the embedded
@@ -11803,6 +11831,13 @@ function __kvOnReady(fn) {
       }).join('');
     }
     if (!EMP_ACTIVE) EMP_ACTIVE = empDefaultWorker();
+    /* A real worker login always shows THEIR record. Self-correcting: once the
+       onboarding capture has loaded this resolves to the actual worker instead
+       of the demo roster default. */
+    if (window.__KVUSER && window.__KVUSER.role === 'employee' && typeof empEnsureLoginWorker === 'function') {
+      var _lw = empEnsureLoginWorker(window.__KVUSER);
+      if (_lw) EMP_ACTIVE = _lw;
+    }
     if (sel) sel.value = EMP_ACTIVE;
 
     const c = CHAT_CONTACTS.find(function (x) { return x.id === EMP_ACTIVE; });
@@ -18821,6 +18856,9 @@ function __kvOnReady(fn) {
         if (loaded.length) { CAP_STATE.recent = CAP_STATE.recent.concat(loaded); capRenderRecent(); }
         obRenderDirectory();
         if (typeof obTrackRender === 'function') obTrackRender();
+        /* a worker who is already signed in should now resolve to their real
+           onboarding record (captures just loaded) rather than the demo default */
+        if (window.__KVUSER && window.__KVUSER.role === 'employee' && typeof empRender === 'function') empRender();
       })
       .catch(function () {});
   }
