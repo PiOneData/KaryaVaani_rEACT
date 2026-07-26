@@ -1093,6 +1093,20 @@ app.post('/api/whatsapp/send-template', async (req, res) => {
       body: JSON.stringify(body)
     });
     logComm({ channel: 'whatsapp', kind: 'template', to: recips, recipients: recips.length, template: body.template, status: waStatus(json), provider: json && json.provider });
+    /* Onboarding template (re)sent → clear the auto-welcome dedup for these
+       recipients, so tapping Yes fires the welcome voice for THIS onboarding.
+       The marker is otherwise permanent per number and would block every repeat
+       onboarding / re-test after the first. */
+    if (/onboard/i.test(String(body.template || ''))) {
+      const store = readStore();
+      const sent = store && store.data && store.data.autoWelcomeSent;
+      if (sent) {
+        recips.forEach((r) => {
+          const d = String(r).replace(/\D/g, '').slice(-10);
+          if (d && sent[d]) { delete sent[d]; try { dbDel('autoWelcomeSent', d); } catch (e) {} }
+        });
+      }
+    }
     res.status(status).json(json);
   } catch (err) {
     logComm({ channel: 'whatsapp', kind: 'template', to: recips, recipients: recips.length, template: body.template, status: 'failed', error: err.message });
