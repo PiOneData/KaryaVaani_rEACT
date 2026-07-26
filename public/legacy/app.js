@@ -15354,9 +15354,8 @@ function __kvOnReady(fn) {
     if (r.mobile.replace(/\D/g, '').length < 10) return false;
     if (r.aadhaar.replace(/\D/g, '').length !== 12) return false;
     if (!r.gender) return false;
-    /* route is not collected here — HR assigns it after upload — so it is not a
-       gate on import readiness */
-    if (r.gender === 'Female' && r.shift === 'Night' && !r.nightConsent) return false;
+    /* Route is assigned by HR after upload, and night-shift consent is collected
+       later from the worker detail (Send on WhatsApp) — neither gates import. */
     return true;
   }
   function capRowIssue(r) {
@@ -15364,7 +15363,6 @@ function __kvOnReady(fn) {
     if (r.mobile.replace(/\D/g, '').length < 10) return 'Mobile < 10 digits';
     if (r.aadhaar.replace(/\D/g, '').length !== 12) return 'Aadhaar not 12 digits';
     if (!r.gender) return 'Gender not set';
-    if (r.gender === 'Female' && r.shift === 'Night' && !r.nightConsent) return 'Night consent needed';
     return '';
   }
 
@@ -15415,21 +15413,11 @@ function __kvOnReady(fn) {
           : '<span class="pill red tiny" title="' + issue + '">' + issue + '</span>') + '</td>' +
       '</tr>';
     }).join('');
-    /* female night-shift consent (OSHC Rule 83) */
-    var femNight = rows.filter(function (r) { return r.gender === 'Female' && r.shift === 'Night'; });
+    /* Night-shift consent is no longer collected at import — everyone imports
+       irrespective; consent is captured later from the female worker's detail
+       (Send on WhatsApp). Hide the old import-time consent prompt. */
     var consentEl = document.getElementById('cap-bulk-consent');
-    if (consentEl) {
-      if (femNight.length) {
-        var allConsented = femNight.every(function (r) { return r.nightConsent; });
-        consentEl.style.display = 'flex';
-        consentEl.innerHTML =
-          '<label class="cap-check" style="display:inline-flex;align-items:center;gap:8px;font-size:0.8rem">' +
-            '<input type="checkbox"' + (allConsented ? ' checked' : '') + ' onchange="capBulkConsentAll(this.checked)"> ' +
-            '<span>⚠ <strong>' + femNight.length + '</strong> female worker' + (femNight.length === 1 ? '' : 's') +
-            ' on night shift — capture OSHC Rule 83 transport consent + base login before onboarding.</span>' +
-          '</label>';
-      } else { consentEl.style.display = 'none'; consentEl.innerHTML = ''; }
-    }
+    if (consentEl) { consentEl.style.display = 'none'; consentEl.innerHTML = ''; }
     var btn = document.getElementById('cap-bulk-send');
     if (btn) { btn.disabled = valid === 0; btn.textContent = valid ? ('Start onboarding · ' + valid + ' worker' + (valid === 1 ? '' : 's')) : 'Start onboarding'; }
     var statusEl = document.getElementById('cap-bulk-status');
@@ -18495,16 +18483,17 @@ function __kvOnReady(fn) {
       kvKV('PPE fitment appointment', rec.fitmentAppt ? '<span class="pill blue tiny">' + rec.fitmentAppt + '</span>' : '<span class="pill outline tiny">Not scheduled</span>') +
       (rec.gender === 'Female'
         ? kvKV('Night-shift consent · OSHC R.83',
-            (typeof rec.nightShiftConsent === 'boolean'
-              ? (rec.nightShiftConsent
-                  ? '<span class="pill green tiny">Consented' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>'
-                  : '<span class="pill amber tiny">Declined' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>')
-              : '<span class="pill amber tiny">Pending</span>') +
-            /* Night-shift females who haven't consented yet get a WhatsApp
-               consent-form action (for now it records consent → Consented). */
-            ((/night/i.test(rec.shift || '') && rec.nightShiftConsent !== true)
-              ? ' <button class="btn primary" style="padding:3px 9px;font-size:0.7rem" onclick="obSendConsentForm(' + i + ')">Send consent form on WhatsApp</button>'
-              : '')) +
+            (/night/i.test(rec.shift || '')
+              /* Night-shift females: consent applies. Show status + a
+                 'Send on WhatsApp' action until they've consented. */
+              ? ((rec.nightShiftConsent === true
+                    ? '<span class="pill green tiny">Consented' + (rec.nightConsentAt ? ' · ' + fmtD(rec.nightConsentAt) : '') + '</span>'
+                    : '<span class="pill amber tiny">Pending</span>') +
+                 (rec.nightShiftConsent !== true
+                    ? ' <button class="btn primary" style="padding:3px 9px;font-size:0.7rem" onclick="obSendConsentForm(' + i + ')">Send on WhatsApp</button>'
+                    : ''))
+              /* General / other shift females: not applicable. */
+              : '<span class="pill outline tiny">NA</span>')) +
           (rec.nightConsentComment
             ? kvKV('Consent comment', '<span style="white-space:pre-wrap">' + String(rec.nightConsentComment).replace(/</g, '&lt;') + '</span>')
             : '')
