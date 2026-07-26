@@ -13415,6 +13415,39 @@ function __kvOnReady(fn) {
   }
   /* collect / confirm consent for one worker (operator or HR action). Sends a
      WhatsApp consent request and records the consent. */
+  /* DEMO: push the approved transport-schedule template + a voice note in each
+     worker's own language to everyone newly onboarded (captured in Onboarding
+     with a mobile). The template always sends; the voice note is a session
+     message, so it lands for workers whose 24h window is open (i.e. who replied
+     to the onboarding template). */
+  function trSendScheduleToNewOnboards() {
+    var news = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : [])
+      .filter(function (r) { return r.mobile; });
+    if (!news.length) { toast('No newly onboarded workers with a mobile number yet', 'amber'); return; }
+    news = news.slice(0, 15);   /* cap for the demo */
+    var when = (typeof kvTplFutureDate === 'function') ? kvTplFutureDate(21) : '';
+    var body = (typeof VB_PRESETS !== 'undefined' && VB_PRESETS.transport && VB_PRESETS.transport.body) ||
+      'The company transport schedule has been updated. Check your pickup point and timing on the notice board or the Karya Vaani app. Be at your pickup point 5 minutes early — buses do not wait beyond the scheduled minute.';
+    var langCode = function (l) { return (typeof obLangNameToCode === 'function') ? obLangNameToCode(l) : 'EN'; };
+    toast('Sending transport schedule to ' + news.length + ' newly onboarded worker(s)…', 'blue');
+    var sent = 0;
+    news.forEach(function (r) {
+      if (!window.KVWhatsApp) return;
+      /* 1 · approved transport-schedule template */
+      window.KVWhatsApp.sendTemplate(r.mobile, 'tamil_transport_schedule_weekly_plan', 'ta',
+        (typeof kvBodyComp === 'function') ? kvBodyComp([when]) : [{ type: 'body', parameters: [{ type: 'text', text: when }] }]);
+      /* 2 · voice note in the worker's onboarding language */
+      fetch((window.__KV_API_BASE || '') + '/api/whatsapp/send-voice', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: r.mobile, text: body, lang: langCode(r.lang), provider: 'sarvam', caption: 'Transport schedule update' })
+      }).catch(function () {});
+      sent++;
+    });
+    if (typeof kvNotify === 'function') kvNotify('Transport schedule sent', sent + ' newly onboarded worker(s) · approved template + voice in their language', 'success');
+    toast('✓ Transport schedule + voice sent to ' + sent + ' newly onboarded worker(s)', 'green');
+  }
+  window.trSendScheduleToNewOnboards = trSendScheduleToNewOnboards;
+
   function trCollectConsent(code) {
     const a = trRoster().find(function (x) { return x.code === code; });
     if (!a) return;

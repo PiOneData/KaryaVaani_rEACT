@@ -80,6 +80,7 @@ export default function SecTransport() {
             <div className="routes-hd">
               <span className="rhd-title" id="tr-routes-title">Routes</span>
               <span className="rhd-count">Daikin Sricity · AP corridor</span>
+              <button className="btn tiny" style={{ marginLeft: "auto" }} onClick={() => { window.trSendScheduleToNewOnboards() }} title="Send the approved transport-schedule template + a voice note in each worker's language to everyone newly onboarded">🚌 Send schedule to newly onboarded</button>
             </div>
             <div className="route-grid" id="tr-route-grid" />
 
