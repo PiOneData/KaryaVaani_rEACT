@@ -13430,21 +13430,26 @@ function __kvOnReady(fn) {
       'The company transport schedule has been updated. Check your pickup point and timing on the notice board or the Karya Vaani app. Be at your pickup point 5 minutes early — buses do not wait beyond the scheduled minute.';
     var langCode = function (l) { return (typeof obLangNameToCode === 'function') ? obLangNameToCode(l) : 'EN'; };
     toast('Sending transport schedule to ' + news.length + ' newly onboarded worker(s)…', 'blue');
-    var sent = 0;
+    var sent = 0; var langsUsed = {};
     news.forEach(function (r) {
       if (!window.KVWhatsApp) return;
-      /* 1 · approved transport-schedule template */
+      /* 1 · the ONLY approved transport template (Tamil) — sent to every new
+         onboard for the demo, regardless of their language */
       window.KVWhatsApp.sendTemplate(r.mobile, 'tamil_transport_schedule_weekly_plan', 'ta',
         (typeof kvBodyComp === 'function') ? kvBodyComp([when]) : [{ type: 'body', parameters: [{ type: 'text', text: when }] }]);
-      /* 2 · voice note in the worker's onboarding language */
+      /* 2 · voice note STRICTLY in THIS worker's own onboarding language */
+      var lc = langCode(r.lang);
+      var lname = (typeof LANGUAGES !== 'undefined' && (LANGUAGES.find(function (x) { return x.code === lc; }) || {}).name) || (r.lang || lc);
+      langsUsed[lname] = (langsUsed[lname] || 0) + 1;
       fetch((window.__KV_API_BASE || '') + '/api/whatsapp/send-voice', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: r.mobile, text: body, lang: langCode(r.lang), provider: 'sarvam', caption: 'Transport schedule update' })
+        body: JSON.stringify({ to: r.mobile, text: body, lang: lc, provider: 'sarvam', caption: 'Transport schedule update · ' + lname })
       }).catch(function () {});
       sent++;
     });
-    if (typeof kvNotify === 'function') kvNotify('Transport schedule sent', sent + ' newly onboarded worker(s) · approved template + voice in their language', 'success');
-    toast('✓ Transport schedule + voice sent to ' + sent + ' newly onboarded worker(s)', 'green');
+    var langSummary = Object.keys(langsUsed).map(function (k) { return langsUsed[k] + ' ' + k; }).join(', ');
+    if (typeof kvNotify === 'function') kvNotify('Transport schedule sent', sent + ' newly onboarded worker(s) · Tamil template + voice per language (' + langSummary + ')', 'success');
+    toast('✓ Transport schedule sent to ' + sent + ' worker(s) · voice per language: ' + langSummary, 'green');
   }
   window.trSendScheduleToNewOnboards = trSendScheduleToNewOnboards;
 
