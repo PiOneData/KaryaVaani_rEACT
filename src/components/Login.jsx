@@ -3,13 +3,6 @@
    Worker / Labourer (their personal home). */
 import { useState } from 'react';
 
-const DEMO = [
-  { username: 'hr',         password: 'hr@daikin',         label: 'HR / Site Manager', sub: 'Full compliance workspace', accent: 'var(--indigo)' },
-  { username: 'contractor', password: 'contractor@daikin', label: 'Agency', sub: 'Your agency’s compliance home', accent: 'var(--amber-dk)' },
-  { username: 'worker',     password: 'worker@daikin',     label: 'Worker / Labourer', sub: 'Your personal worker home', accent: 'var(--green-dk)' },
-  { username: 'operator',   password: 'operator@daikin',   label: 'Transport Operator', sub: 'Your routes · consent & boarding', accent: '#2880A8' },
-];
-
 const api = () => (window.__KV_API_BASE || '');
 
 export default function Login({ onLogin }) {
@@ -51,8 +44,6 @@ export default function Login({ onLogin }) {
     } catch { setErr('Cannot reach the server. Check your connection.'); }
     finally { setBusy(false); }
   }
-
-  function quick(acc) { setUsername(acc.username); setPassword(acc.password); submit(acc.username, acc.password); }
 
   async function sendCode() {
     if (!username.trim()) { setErr('Enter your username.'); return; }
@@ -105,18 +96,6 @@ export default function Login({ onLogin }) {
               </button>
             </form>
             <button className="login-link" onClick={() => reset('forgot')} disabled={busy}>Forgot password?</button>
-
-            <div className="login-demo-h">Demo accounts · one click to enter</div>
-            <div className="login-demo">
-              {DEMO.map((a) => (
-                <button key={a.username} className="login-demo-btn" onClick={() => quick(a)} disabled={busy}
-                  style={{ borderLeftColor: a.accent }}>
-                  <span className="login-demo-role">{a.label}</span>
-                  <span className="login-demo-sub">{a.sub}</span>
-                  <span className="login-demo-cred">{a.username} · {a.password}</span>
-                </button>
-              ))}
-            </div>
           </>
         )}
 

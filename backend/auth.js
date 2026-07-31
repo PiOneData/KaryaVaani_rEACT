@@ -27,16 +27,16 @@ function verifyPassword(plain, stored) {
    worker for the labourer, a real contractor firm for the vendor) so the home
    shows genuine data. `admin` sees the full application. */
 const DEMO_ACCOUNTS = [
-  { username: 'hr',         password: 'hr@daikin',         role: 'admin',
+  { username: 'hr',         password: 'HrKv-7Rn2Qx',       role: 'admin',
     name: 'Priya Menon',    title: 'Site HR Manager',      linkedType: 'admin',
     email: 'hr@karyavaani.demo' },
-  { username: 'worker',     password: 'worker@daikin',     role: 'employee',
+  { username: 'worker',     password: 'WrkrKv-9Pl3Vd',     role: 'employee',
     name: '',               title: 'Worker / Labourer',    linkedType: 'employee',
     email: 'worker@karyavaani.demo' },
-  { username: 'contractor', password: 'contractor@daikin', role: 'contractor',
+  { username: 'contractor', password: 'AgncyKv-4Tm7Sk',    role: 'contractor',
     name: '',               title: 'Agency',  linkedType: 'contractor',
     email: 'contractor@karyavaani.demo' },
-  { username: 'operator',   password: 'operator@daikin',   role: 'operator',
+  { username: 'operator',   password: 'OpsKv-6Bt5Jw',      role: 'operator',
     name: 'Sri Balaji Travels', title: 'Transport Operator', linkedType: 'operator',
     email: 'operator@karyavaani.demo' }
 ];

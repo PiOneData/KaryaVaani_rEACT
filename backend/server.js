@@ -1840,6 +1840,11 @@ function ensureDemoUsers() {
   const nowIso = new Date().toISOString();
   const seeded = [];
 
+  /* non-secret fingerprint of the seed password, so a credential change in
+     DEMO_ACCOUNTS re-applies to already-seeded accounts on the next boot
+     (without it, `ensureDemoUsers` only sets the password on first create). */
+  const pwFp = (p) => crypto.createHash('sha256').update('kvseed:' + String(p)).digest('hex').slice(0, 16);
+
   DEMO_ACCOUNTS.forEach((a) => {
     let u = byName[a.username];
     let touched = false;
@@ -1847,9 +1852,12 @@ function ensureDemoUsers() {
       u = {
         username: a.username, role: a.role, title: a.title, email: a.email || '',
         name: a.name, linkedType: a.linkedType, linkedId: '', linkedName: '',
-        passwordHash: hashPassword(a.password), createdAt: nowIso
+        passwordHash: hashPassword(a.password), pwSeedFp: pwFp(a.password), createdAt: nowIso
       };
       store.data.users.push(u); byName[a.username] = u; seeded.push(a.username); touched = true;
+    } else if (u.pwSeedFp !== pwFp(a.password)) {
+      /* the seed credential changed — reset this account's password to match. */
+      u.passwordHash = hashPassword(a.password); u.pwSeedFp = pwFp(a.password); touched = true;
     }
     /* (re)sync the persona linkage on every startup so an updated worker/firm
        mapping takes effect for already-created users too. */
