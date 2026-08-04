@@ -339,6 +339,24 @@ app.post('/api/onboarding-captures', (req, res) => {
   // a generated one if none was supplied). This is what persists onboarding.
   let capture;
   const idx = p.id ? list.findIndex(c => c.id === p.id) : -1;
+
+  /* CR-8 · CLRA licence ceiling — a hard block, enforced here as well as in the
+     UI so no client path (single capture, bulk import, API) can deploy a
+     contract worker beyond the contractor's licensed headcount. Only applies to
+     a NEW contract worker; patches to an existing record pass through. */
+  if (idx === -1 && (p.type === 'contract') && p.employment && p.employment.contractor) {
+    const state = licenceState(store, p.employment.contractor);
+    if (state && state.blocked) {
+      return res.status(409).json({
+        ok: false, code: 'CLRA_CEILING',
+        error: 'CLRA licence ceiling reached for ' + state.contractorName + ' — ' + state.used +
+               ' of ' + state.max + ' licensed workers already deployed. Onboarding beyond the licensed ' +
+               'headcount is a Contract Labour violation and the principal employer carries joint liability. ' +
+               'The agency must have its licence amended before this worker can be onboarded.',
+        licence: state
+      });
+    }
+  }
   if (idx !== -1) {
     // Partial updates (verify/induction patches) may omit aadhaar — keep the
     // stored last-4 rather than nulling it when this request didn't carry one.
@@ -1804,6 +1822,686 @@ app.post('/api/transport/event', (req, res) => {
   res.json({ ok: true, event: ev });
 });
 
+/* ════════════════════════════════════════════════════════════════════════════
+   COMPLIANCE CHANGE REQUESTS · CR-3 / CR-6 / CR-7 / CR-8 / CR-9
+   Shared helpers first, then one block of endpoints per change request.
+
+   Authorisation model: the demo login has no bearer token, so the caller states
+   who it is (actorRole / actorName, or the x-kv-role header) and every action
+   that a Labour-Code obligation reserves to the principal employer's HR is
+   gated here as well as in the UI. Nothing an agency posts can write an HR-only
+   field — an agency submits, HR verifies.
+   ════════════════════════════════════════════════════════════════════════ */
+function actorOf(req) {
+  const b = req.body || {};
+  return {
+    role: String(b.actorRole || req.get('x-kv-role') || '').toLowerCase(),
+    name: String(b.actorName || req.get('x-kv-actor') || '').trim() || 'Unknown user'
+  };
+}
+function isHR(req) { const r = actorOf(req).role; return r === 'admin' || r === 'hr'; }
+function requireHR(req, res) {
+  if (isHR(req)) return true;
+  res.status(403).json({
+    ok: false, code: 'HR_ONLY',
+    error: 'Only the principal employer’s HR can perform this action.'
+  });
+  return false;
+}
+function newId(prefix) {
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function storeOr503(res) {
+  const store = readStore();
+  if (!store || !store.data) { res.status(503).json({ ok: false, error: 'Service starting — try again in a moment.' }); return null; }
+  return store;
+}
+
+/* HR inbox — an agency-raised item HR (and only HR) can action. */
+function pushHrNotification(store, entry) {
+  store.data.hrNotifications = store.data.hrNotifications || [];
+  const rec = Object.assign({ id: newId('hrn'), at: new Date().toISOString(), read: false }, entry);
+  store.data.hrNotifications.push(rec);
+  dbPut('hrNotifications', rec.id, rec);
+  while (store.data.hrNotifications.length > 500) {
+    const old = store.data.hrNotifications.shift();
+    if (old && old.id) dbDel('hrNotifications', old.id);
+  }
+  return rec;
+}
+
+app.get('/api/hr-notifications', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.hrNotifications || []).slice().reverse();
+  if (req.query.unread === '1') list = list.filter((n) => !n.read);
+  res.json({ ok: true, notifications: list.slice(0, 200) });
+});
+app.post('/api/hr-notifications/:id/read', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const n = (store.data.hrNotifications || []).find((x) => x.id === req.params.id);
+  if (!n) return res.status(404).json({ ok: false, error: 'notification not found' });
+  n.read = true; n.readAt = new Date().toISOString(); n.readBy = actorOf(req).name;
+  dbPut('hrNotifications', n.id, n);
+  res.json({ ok: true, notification: n });
+});
+
+/* ── CR-8 · CLRA licence ceiling ────────────────────────────────────────────
+   OSHC Rules 86-90: a contractor licence names a maximum authorised deployment
+   headcount. That ceiling is a statutory limit and is enforced as a hard block.
+   Daikin's commercial "contracted headcount" is a SEPARATE, non-statutory
+   number — it is tracked here too but only ever raises an advisory alert.
+   ──────────────────────────────────────────────────────────────────────── */
+function findContractor(store, idOrName) {
+  const key = String(idOrName || '').trim().toLowerCase();
+  if (!key) return null;
+  return (store.data.contractors || []).find(
+    (c) => String(c.id).toLowerCase() === key || String(c.name).trim().toLowerCase() === key
+  ) || null;
+}
+/* Workers onboarded through the platform who still occupy a licence slot.
+   Exited / inactive workers release their slot — the ceiling applies to the
+   ACTUAL deployed headcount, not to everyone ever registered. */
+function onboardedUnder(store, contractorName) {
+  const key = String(contractorName || '').trim().toLowerCase();
+  return (store.data.onboardingCaptures || []).filter((c) => {
+    if ((c.type || 'direct') !== 'contract') return false;
+    if (String((c.employment || {}).contractor || '').trim().toLowerCase() !== key) return false;
+    const st = c.workStatus || 'active';
+    return st !== 'exited' && st !== 'inactive';
+  });
+}
+function licenceState(store, idOrName) {
+  const c = findContractor(store, idOrName);
+  if (!c) return null;
+  const lic = c.clraLicence || {};
+  const base = Number(c.deployed || 0);              // roster already on site
+  const onboarded = onboardedUnder(store, c.name).length;
+  const used = base + onboarded;
+  const max = Number(lic.maxHeadcount || 0) || null;
+  const commercial = Number(c.commercialHeadcount || 0) || null;
+  return {
+    contractorId: c.id, contractorName: c.name,
+    licenceNo: lic.number || '', validTill: lic.validTill || '', authority: lic.authority || '',
+    max, base, onboarded, used,
+    headroom: max === null ? null : (max - used),
+    blocked: max !== null && used >= max,
+    commercial,
+    commercialHeadroom: commercial === null ? null : (commercial - used),
+    commercialExceeded: commercial !== null && used >= commercial
+  };
+}
+app.get('/api/contractors/:id/licence', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const state = licenceState(store, req.params.id);
+  if (!state) return res.status(404).json({ ok: false, error: 'contractor not found' });
+  res.json({ ok: true, licence: state });
+});
+app.get('/api/contractor-licences', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const rows = (store.data.contractors || []).map((c) => licenceState(store, c.id)).filter(Boolean);
+  res.json({ ok: true, licences: rows });
+});
+/* HR maintains the licence ceiling — an agency must never be able to raise the
+   number that limits it. */
+app.post('/api/contractors/:id/licence', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const c = findContractor(store, req.params.id);
+  if (!c) return res.status(404).json({ ok: false, error: 'contractor not found' });
+  const p = req.body || {};
+  const maxHeadcount = p.maxHeadcount === '' || p.maxHeadcount == null ? null : Number(p.maxHeadcount);
+  if (maxHeadcount !== null && (!Number.isFinite(maxHeadcount) || maxHeadcount < 0)) {
+    return res.status(400).json({ ok: false, error: 'maxHeadcount must be a non-negative number' });
+  }
+  c.clraLicence = Object.assign({}, c.clraLicence, {
+    number: p.number != null ? String(p.number) : (c.clraLicence || {}).number || '',
+    authority: p.authority != null ? String(p.authority) : (c.clraLicence || {}).authority || '',
+    validTill: p.validTill != null ? String(p.validTill) : (c.clraLicence || {}).validTill || '',
+    maxHeadcount: maxHeadcount,
+    updatedAt: new Date().toISOString(), updatedBy: actorOf(req).name
+  });
+  if (p.commercialHeadcount !== undefined) {
+    const cm = p.commercialHeadcount === '' || p.commercialHeadcount == null ? null : Number(p.commercialHeadcount);
+    c.commercialHeadcount = Number.isFinite(cm) ? cm : null;
+  }
+  dbPut('contractors', c.id, c);
+  res.json({ ok: true, licence: licenceState(store, c.id) });
+});
+
+/* ── CR-6 · EPF / ESIC payment capture + HR verification ───────────────────
+   The agency submits what it paid, for which month, against which challan and
+   for how many workers. HR reconciles the challan headcount against the ACTUAL
+   deployed headcount the platform knows about, and records the verification
+   (Full Paid / Partially Paid / Not Paid). Only the verification block converts
+   an administrative submission into a compliance record, so only HR writes it.
+   ──────────────────────────────────────────────────────────────────────── */
+const PAY_VERDICTS = ['full', 'partial', 'none'];
+
+app.get('/api/statutory-payments', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.statutoryPayments || []).slice();
+  if (req.query.contractor) {
+    const k = String(req.query.contractor).trim().toLowerCase();
+    list = list.filter((p) => String(p.contractorName || '').trim().toLowerCase() === k || String(p.contractorId || '').toLowerCase() === k);
+  }
+  if (req.query.month) list = list.filter((p) => p.month === req.query.month);
+  list.sort((a, b) => String(b.month).localeCompare(String(a.month)));
+  res.json({ ok: true, payments: list });
+});
+
+app.post('/api/statutory-payments', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const p = req.body || {};
+  const actor = actorOf(req);
+  if (!p.contractor && !p.contractorId) return res.status(400).json({ ok: false, error: 'contractor is required' });
+  if (!/^\d{4}-\d{2}$/.test(String(p.month || ''))) return res.status(400).json({ ok: false, error: 'month must be YYYY-MM' });
+  const c = findContractor(store, p.contractorId || p.contractor);
+  if (!c) return res.status(404).json({ ok: false, error: 'contractor not found' });
+  /* an agency may only submit for itself */
+  if (!isHR(req) && actor.role === 'contractor' && p.actorContractor &&
+      String(p.actorContractor).trim().toLowerCase() !== String(c.name).trim().toLowerCase()) {
+    return res.status(403).json({ ok: false, error: 'An agency can only submit its own EPF/ESIC payments.' });
+  }
+  store.data.statutoryPayments = store.data.statutoryPayments || [];
+  const list = store.data.statutoryPayments;
+  const nowIso = new Date().toISOString();
+  const nnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const idx = list.findIndex((x) => x.contractorId === c.id && x.month === p.month);
+  const submission = {
+    contractorId: c.id,
+    contractorName: c.name,
+    month: String(p.month),
+    /* headcount the AGENCY says it paid for, and the headcount printed on the
+       challan — these are deliberately separate fields from the platform's
+       deployed headcount so the reconciliation has three independent numbers. */
+    declaredHeadcount: nnum(p.declaredHeadcount),
+    challanHeadcount: nnum(p.challanHeadcount),
+    epfAmount: nnum(p.epfAmount),
+    esicAmount: nnum(p.esicAmount),
+    epfChallanNo: String(p.epfChallanNo || ''),
+    epfTrrn: String(p.epfTrrn || ''),
+    esicChallanNo: String(p.esicChallanNo || ''),
+    esicCrn: String(p.esicCrn || ''),
+    wageBill: nnum(p.wageBill),
+    paidOn: String(p.paidOn || ''),
+    note: String(p.note || ''),
+    submittedBy: actor.name,
+    submittedRole: actor.role || 'contractor',
+    submittedAt: nowIso,
+    /* the deployed headcount the platform itself observed at submission time —
+       stamped here so the reconciliation can never be re-based later */
+    platformDeployed: licenceState(store, c.id).used
+  };
+  let rec;
+  if (idx !== -1) {
+    /* a resubmission re-opens the verification: a changed amount must be
+       re-verified, otherwise stale HR sign-off would cover new numbers. */
+    const prev = list[idx];
+    const changed = ['epfAmount', 'esicAmount', 'challanHeadcount', 'declaredHeadcount', 'epfChallanNo', 'esicChallanNo']
+      .some((k) => String(prev[k] || '') !== String(submission[k] || ''));
+    rec = Object.assign({}, prev, submission, {
+      id: prev.id,
+      verification: changed ? null : (prev.verification || null),
+      reopenedAt: changed ? nowIso : prev.reopenedAt || null,
+      history: (prev.history || []).concat([{ at: nowIso, by: actor.name, epfAmount: prev.epfAmount, esicAmount: prev.esicAmount, challanHeadcount: prev.challanHeadcount }])
+    });
+    list[idx] = rec;
+  } else {
+    rec = Object.assign({ id: newId('sp'), verification: null, history: [] }, submission);
+    list.push(rec);
+  }
+  dbPut('statutoryPayments', rec.id, rec);
+  if (!isHR(req)) {
+    pushHrNotification(store, {
+      kind: 'epf-esic-submission', severity: 'info',
+      title: 'EPF/ESIC payment submitted · ' + c.name,
+      body: c.name + ' submitted EPF ₹' + rec.epfAmount.toLocaleString('en-IN') + ' and ESIC ₹' +
+            rec.esicAmount.toLocaleString('en-IN') + ' for ' + rec.month + ' against ' + rec.challanHeadcount +
+            ' workers on the challan. Awaiting HR verification.',
+      contractorId: c.id, contractorName: c.name, ref: rec.id, by: actor.name
+    });
+  }
+  res.json({ ok: true, payment: rec });
+});
+
+app.post('/api/statutory-payments/:id/verify', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const rec = (store.data.statutoryPayments || []).find((x) => x.id === req.params.id);
+  if (!rec) return res.status(404).json({ ok: false, error: 'payment record not found' });
+  const p = req.body || {};
+  if (PAY_VERDICTS.indexOf(String(p.status)) === -1) {
+    return res.status(400).json({ ok: false, error: 'status must be one of full | partial | none' });
+  }
+  const actor = actorOf(req);
+  const deployedNow = licenceState(store, rec.contractorId);
+  rec.verification = {
+    status: String(p.status),
+    note: String(p.note || ''),
+    /* the deployed headcount HR reconciled against — the element that makes
+       this a compliance record rather than an administrative one */
+    reconciledDeployed: Number(p.reconciledDeployed != null ? p.reconciledDeployed : (deployedNow ? deployedNow.used : rec.platformDeployed)) || 0,
+    challanHeadcount: rec.challanHeadcount,
+    shortfallWorkers: Math.max(0, (Number(p.reconciledDeployed != null ? p.reconciledDeployed : (deployedNow ? deployedNow.used : rec.platformDeployed)) || 0) - Number(rec.challanHeadcount || 0)),
+    by: actor.name, at: new Date().toISOString()
+  };
+  rec.verifiedAt = rec.verification.at;
+  dbPut('statutoryPayments', rec.id, rec);
+  res.json({ ok: true, payment: rec });
+});
+
+/* ── Worker employment status (Active / Inactive / … / Exited) ──────────────
+   The status drives access. An agency can REQUEST a change; only HR can make
+   one, and every transition is appended to an immutable event log.
+   ──────────────────────────────────────────────────────────────────────── */
+const WORK_STATUSES = ['active', 'inactive', 'notice', 'suspended', 'exited'];
+
+function findCapture(store, id) {
+  const list = store.data.onboardingCaptures || [];
+  return list.find((c) => c.id === id || c.workerId === id) || null;
+}
+function logStatusEvent(store, entry) {
+  store.data.workerStatusEvents = store.data.workerStatusEvents || [];
+  const rec = Object.assign({ id: newId('wse'), at: new Date().toISOString() }, entry);
+  store.data.workerStatusEvents.push(rec);
+  dbPut('workerStatusEvents', rec.id, rec);
+  return rec;
+}
+app.get('/api/worker-status-events', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.workerStatusEvents || []).slice();
+  if (req.query.workerId) list = list.filter((e) => e.workerId === req.query.workerId);
+  res.json({ ok: true, events: list.reverse().slice(0, 500) });
+});
+
+app.post('/api/worker-status', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const p = req.body || {};
+  const rec = findCapture(store, p.workerId);
+  if (!rec) return res.status(404).json({ ok: false, error: 'worker not found' });
+  if (WORK_STATUSES.indexOf(String(p.status)) === -1) {
+    return res.status(400).json({ ok: false, error: 'status must be one of ' + WORK_STATUSES.join(' | ') });
+  }
+  if (String(p.status) === 'exited') {
+    return res.status(400).json({ ok: false, code: 'USE_EXIT', error: 'Use the exit workflow (/api/worker-exit) so the access-revocation and data-disposition records are produced.' });
+  }
+  const actor = actorOf(req);
+  const from = rec.workStatus || 'active';
+  rec.workStatus = String(p.status);
+  rec.workStatusReason = String(p.reason || '');
+  rec.workStatusAt = new Date().toISOString();
+  rec.workStatusBy = actor.name;
+  rec.statusRequest = null;             // an HR decision closes any open request
+  rec.updatedAt = rec.workStatusAt;
+  dbPut('onboardingCaptures', rec.id, rec);
+  const ev = logStatusEvent(store, {
+    workerId: rec.id, workerName: rec.name, from, to: rec.workStatus,
+    reason: rec.workStatusReason, by: actor.name, byRole: 'HR', source: 'hr-change'
+  });
+  res.json({ ok: true, capture: rec, event: ev });
+});
+
+/* An agency raises a request; HR is notified and decides. Nothing changes yet. */
+app.post('/api/worker-status/request', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const p = req.body || {};
+  const rec = findCapture(store, p.workerId);
+  if (!rec) return res.status(404).json({ ok: false, error: 'worker not found' });
+  if (WORK_STATUSES.indexOf(String(p.status)) === -1) {
+    return res.status(400).json({ ok: false, error: 'status must be one of ' + WORK_STATUSES.join(' | ') });
+  }
+  const actor = actorOf(req);
+  const from = rec.workStatus || 'active';
+  const request = {
+    id: newId('sr'), from, to: String(p.status), reason: String(p.reason || ''),
+    by: actor.name, byRole: actor.role || 'contractor', at: new Date().toISOString(), state: 'pending'
+  };
+  rec.statusRequest = request;
+  rec.updatedAt = request.at;
+  dbPut('onboardingCaptures', rec.id, rec);
+  logStatusEvent(store, {
+    workerId: rec.id, workerName: rec.name, from, to: request.to, reason: request.reason,
+    by: actor.name, byRole: request.byRole, source: 'agency-request', requestId: request.id
+  });
+  pushHrNotification(store, {
+    kind: 'status-change-request', severity: 'warn',
+    title: 'Status change requested · ' + rec.name,
+    body: (actor.name || 'The agency') + ' requested ' + rec.name + ' (' + rec.id + ') move from ' +
+          from + ' to ' + request.to + (request.reason ? ' — ' + request.reason : '') +
+          '. Only HR can apply this change.',
+    workerId: rec.id, workerName: rec.name,
+    contractorName: (rec.employment || {}).contractor || '', ref: request.id, by: actor.name
+  });
+  res.json({ ok: true, request, capture: rec });
+});
+
+/* HR approves or rejects an agency request. Approving applies the status. */
+app.post('/api/worker-status/request/:id/resolve', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const list = store.data.onboardingCaptures || [];
+  const rec = list.find((c) => c.statusRequest && c.statusRequest.id === req.params.id);
+  if (!rec) return res.status(404).json({ ok: false, error: 'request not found or already resolved' });
+  const decision = String((req.body || {}).decision || '').toLowerCase();
+  if (decision !== 'approve' && decision !== 'reject') {
+    return res.status(400).json({ ok: false, error: 'decision must be approve | reject' });
+  }
+  const actor = actorOf(req);
+  const request = rec.statusRequest;
+  const nowIso = new Date().toISOString();
+  if (decision === 'approve' && request.to === 'exited') {
+    return res.status(400).json({ ok: false, code: 'USE_EXIT', error: 'Approving an exit must go through the exit workflow so the DPDP disposition record is produced.' });
+  }
+  if (decision === 'approve') {
+    rec.workStatus = request.to;
+    rec.workStatusReason = request.reason;
+    rec.workStatusAt = nowIso;
+    rec.workStatusBy = actor.name;
+  }
+  rec.statusRequest = null;
+  rec.updatedAt = nowIso;
+  dbPut('onboardingCaptures', rec.id, rec);
+  const ev = logStatusEvent(store, {
+    workerId: rec.id, workerName: rec.name, from: request.from,
+    to: decision === 'approve' ? request.to : request.from,
+    reason: (decision === 'approve' ? 'Approved agency request' : 'Rejected agency request') +
+            (req.body.note ? ' — ' + req.body.note : ''),
+    by: actor.name, byRole: 'HR', source: 'hr-' + decision, requestId: request.id
+  });
+  /* close the matching HR-inbox item */
+  (store.data.hrNotifications || []).forEach((n) => {
+    if (n.ref === request.id && !n.read) { n.read = true; n.readAt = nowIso; n.readBy = actor.name; dbPut('hrNotifications', n.id, n); }
+  });
+  res.json({ ok: true, capture: rec, decision, event: ev });
+});
+
+/* ── CR-9 · exit = access revocation + statutory data disposition ───────────
+   DPDP 2023 makes continued processing without a purpose unlawful, so exit
+   produces TWO records: what access was cut and when, and what data is kept
+   (under which statute, for how long) versus deleted / anonymised.
+   ──────────────────────────────────────────────────────────────────────── */
+const DISPOSITION_SCHEDULE = [
+  { key: 'attendance',  label: 'Attendance & wage register',                 action: 'retain',    years: 5,
+    basis: 'Code on Wages 2019 · s.50 r/w Rules — wage & attendance records retained 5 years' },
+  { key: 'epfEsic',     label: 'EPF / ESIC contribution records & challans', action: 'retain',    years: 7,
+    basis: 'EPF Scheme 1952 para 36 / ESIC Regulations — contribution records retained 7 years' },
+  { key: 'appointment', label: 'Appointment letter & employment contract',   action: 'retain',    years: 5,
+    basis: 'Code on Wages 2019 · appointment-letter mandate — retained for the statutory period' },
+  { key: 'safety',      label: 'Induction, PPE issue & safety training records', action: 'retain', years: 3,
+    basis: 'OSH & Working Conditions Code 2020 — training and accident records' },
+  { key: 'idProof',     label: 'Identity documents (Aadhaar eKYC artefact, PAN scan)', action: 'delete', days: 30,
+    basis: 'DPDP 2023 · s.8(7) — erase once the purpose (verification) is served' },
+  { key: 'biometric',   label: 'Biometric templates & worker photograph',    action: 'delete',    days: 30,
+    basis: 'DPDP 2023 · s.8(7) — no residual purpose after exit' },
+  { key: 'health',      label: 'Medical fitness & health data',              action: 'delete',    days: 30,
+    basis: 'DPDP 2023 · s.8(7) — sensitive data, no residual purpose' },
+  { key: 'consent',     label: 'Consent-linked data (night-shift transport consent, boarding log)', action: 'anonymise', days: 30,
+    basis: 'DPDP 2023 · purpose limitation — retained in aggregate for OSHC R.83 evidence, de-identified' },
+  { key: 'contact',     label: 'WhatsApp / mobile number & chat threads',    action: 'delete',    days: 30,
+    basis: 'DPDP 2023 · s.8(7) — communication channel closed with employment' }
+];
+function dispositionFor(lastWorkingDay) {
+  const base = lastWorkingDay ? new Date(lastWorkingDay) : new Date();
+  const anchor = isNaN(base.getTime()) ? new Date() : base;
+  return DISPOSITION_SCHEDULE.map((d) => {
+    const until = new Date(anchor);
+    if (d.years) until.setFullYear(until.getFullYear() + d.years);
+    else until.setDate(until.getDate() + (d.days || 30));
+    return Object.assign({}, d, { until: until.toISOString().slice(0, 10) });
+  });
+}
+app.get('/api/exit-records', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.exitRecords || []).slice().reverse();
+  if (req.query.workerId) list = list.filter((r) => r.workerId === req.query.workerId);
+  res.json({ ok: true, exits: list, schedule: DISPOSITION_SCHEDULE });
+});
+app.post('/api/worker-exit', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const p = req.body || {};
+  const rec = findCapture(store, p.workerId);
+  if (!rec) return res.status(404).json({ ok: false, error: 'worker not found' });
+  const actor = actorOf(req);
+  const nowIso = new Date().toISOString();
+  const lastDay = String(p.lastWorkingDay || '').slice(0, 10) || nowIso.slice(0, 10);
+
+  /* 1 · access revocation — immediate, and the login is actually disabled */
+  const revocation = {
+    at: nowIso, by: actor.name,
+    channels: ['Karya Vaani worker login', 'WhatsApp worker broadcast list', 'Transport boarding roster', 'Plant gate ID card'],
+    loginUsername: rec.loginUsername || null,
+    loginDisabled: false
+  };
+  if (rec.loginUsername) {
+    const u = (store.data.users || []).find((x) => x.username === rec.loginUsername);
+    if (u) {
+      u.disabled = true; u.disabledAt = nowIso; u.disabledBy = actor.name; u.disabledReason = 'Worker exit · DPDP access revocation';
+      persistUser(store, u);
+      revocation.loginDisabled = true;
+    }
+  }
+
+  /* 2 · statutory data-disposition record — the artefact a Data Protection
+     Board would ask for: what was kept, under which obligation, for how long. */
+  const disposition = dispositionFor(lastDay);
+  const exitRec = {
+    id: newId('exit'),
+    workerId: rec.id, workerName: rec.name, workerCode: rec.workerId || rec.id,
+    type: rec.type || 'contract',
+    contractor: (rec.employment || {}).contractor || (rec.type === 'direct' ? 'Daikin (direct)' : ''),
+    reason: String(p.reason || 'Not stated'),
+    note: String(p.note || ''),
+    lastWorkingDay: lastDay,
+    revocation, disposition,
+    createdAt: nowIso, createdBy: actor.name
+  };
+  store.data.exitRecords = store.data.exitRecords || [];
+  store.data.exitRecords.push(exitRec);
+  dbPut('exitRecords', exitRec.id, exitRec);
+
+  const from = rec.workStatus || 'active';
+  rec.workStatus = 'exited';
+  rec.workStatusReason = exitRec.reason;
+  rec.workStatusAt = nowIso;
+  rec.workStatusBy = actor.name;
+  rec.statusRequest = null;
+  rec.accessRevokedAt = nowIso;
+  rec.exitRecordId = exitRec.id;
+  rec.lastWorkingDay = lastDay;
+  rec.updatedAt = nowIso;
+  dbPut('onboardingCaptures', rec.id, rec);
+  logStatusEvent(store, {
+    workerId: rec.id, workerName: rec.name, from, to: 'exited', reason: exitRec.reason,
+    by: actor.name, byRole: 'HR', source: 'exit', exitRecordId: exitRec.id
+  });
+  res.json({ ok: true, exit: exitRec, capture: rec });
+});
+
+/* ── CR-3 · transport route assignment log (append-only) ────────────────────
+   Route numbers are persistent identifiers, so a re-assignment must never
+   overwrite history: a past boarding or night-shift consent record stays
+   traceable to the route the worker was actually on at the time.
+   ──────────────────────────────────────────────────────────────────────── */
+app.get('/api/transport/route-assignments', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.routeAssignments || []).slice();
+  if (req.query.worker) list = list.filter((r) => r.workerId === req.query.worker || r.workerCode === req.query.worker);
+  if (req.query.routeNo) list = list.filter((r) => r.toRouteNo === req.query.routeNo || r.fromRouteNo === req.query.routeNo);
+  res.json({ ok: true, assignments: list.slice(-500).reverse() });
+});
+app.post('/api/transport/route-assignment', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const p = req.body || {};
+  if (!p.workerId && !p.workerCode) return res.status(400).json({ ok: false, error: 'workerId or workerCode is required' });
+  const actor = actorOf(req);
+  const rec = {
+    id: newId('ra'),
+    workerId: p.workerId || p.workerCode, workerCode: p.workerCode || p.workerId, workerName: p.workerName || '',
+    fromRouteNo: p.fromRouteNo || '', fromRoute: p.fromRoute || '',
+    toRouteNo: p.toRouteNo || '', toRoute: p.toRoute || '',
+    shift: p.shift || '', reason: p.reason || '',
+    by: actor.name, byRole: actor.role || 'hr', at: new Date().toISOString()
+  };
+  store.data.routeAssignments = store.data.routeAssignments || [];
+  store.data.routeAssignments.push(rec);
+  dbPut('routeAssignments', rec.id, rec);
+  res.json({ ok: true, assignment: rec });
+});
+
+/* ── CR-7 · monthly OT / LOP / variable-allowance log ───────────────────────
+   Overtime at 125% of the ordinary wage rate is a Code on Wages obligation and
+   is computed here (never free-typed). Loss of Pay and variable allowances are
+   operational payroll administration — logged in the same monthly register
+   because the Code on Wages 5-year retention window covers the register, not
+   because either is itself a statutory obligation.
+   ──────────────────────────────────────────────────────────────────────── */
+const ESIC_WAGE_CEILING = 21000;      // ₹/month — ESIC coverage threshold
+const OT_MULTIPLIER = 1.25;           // overtime paid at 125% of the ordinary wage rate
+const STANDARD_DAYS = 26;
+const STANDARD_HOURS = 8;
+
+function computePayrollRow(p) {
+  const n = (v) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+  const baseWage = n(p.baseWage);
+  const otHours = n(p.otHours);
+  const lopDays = n(p.lopDays);
+  const allowances = Array.isArray(p.allowances)
+    ? p.allowances.filter((a) => a && a.label).map((a) => ({ label: String(a.label), amount: n(a.amount) }))
+    : [];
+  const dailyRate = baseWage / STANDARD_DAYS;
+  const ordinaryHourly = dailyRate / STANDARD_HOURS;
+  const otHourly = ordinaryHourly * OT_MULTIPLIER;
+  const otAmount = Math.round(otHourly * otHours);
+  const lopAmount = Math.round(dailyRate * lopDays);
+  const allowanceTotal = allowances.reduce((s, a) => s + a.amount, 0);
+  const grossWages = Math.round(baseWage + otAmount + allowanceTotal - lopAmount);
+  /* ESIC coverage follows the monthly WAGES actually payable, so overtime can
+     push a worker over the ceiling and change their contribution status. */
+  const esicBefore = baseWage <= ESIC_WAGE_CEILING;
+  const esicAfter = grossWages <= ESIC_WAGE_CEILING;
+  return {
+    baseWage, otHours, lopDays, allowances,
+    dailyRate: Math.round(dailyRate * 100) / 100,
+    ordinaryHourly: Math.round(ordinaryHourly * 100) / 100,
+    otHourly: Math.round(otHourly * 100) / 100,
+    otMultiplier: OT_MULTIPLIER,
+    otAmount, lopAmount, allowanceTotal, grossWages,
+    esicCeiling: ESIC_WAGE_CEILING,
+    esicCoveredOnBase: esicBefore,
+    esicCoveredOnGross: esicAfter,
+    /* the flag HR must act on: covered on base pay, pushed over by OT */
+    esicCeilingCrossed: esicBefore && !esicAfter,
+    esicEmployee: esicAfter ? Math.round(grossWages * 0.0075) : 0,
+    esicEmployer: esicAfter ? Math.round(grossWages * 0.0325) : 0,
+    epfEmployee: Math.round(Math.min(baseWage, 15000) * 0.12),
+    epfEmployer: Math.round(Math.min(baseWage, 15000) * 0.13)
+  };
+}
+
+app.get('/api/payroll/monthly', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.payrollMonths || []).slice();
+  if (req.query.month) list = list.filter((r) => r.month === req.query.month);
+  if (req.query.worker) list = list.filter((r) => r.workerId === req.query.worker || r.workerCode === req.query.worker);
+  if (req.query.contractor) {
+    const k = String(req.query.contractor).trim().toLowerCase();
+    list = list.filter((r) => String(r.contractor || '').trim().toLowerCase() === k);
+  }
+  const months = Array.from(new Set((store.data.payrollMonths || []).map((r) => r.month))).sort().reverse();
+  res.json({ ok: true, rows: list, months, ceiling: ESIC_WAGE_CEILING, otMultiplier: OT_MULTIPLIER });
+});
+
+app.post('/api/payroll/monthly', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const p = req.body || {};
+  if (!p.workerCode && !p.workerId) return res.status(400).json({ ok: false, error: 'workerCode is required' });
+  if (!/^\d{4}-\d{2}$/.test(String(p.month || ''))) return res.status(400).json({ ok: false, error: 'month must be YYYY-MM' });
+  const actor = actorOf(req);
+  const nowIso = new Date().toISOString();
+  const computed = computePayrollRow(p);
+  store.data.payrollMonths = store.data.payrollMonths || [];
+  const list = store.data.payrollMonths;
+  const code = String(p.workerCode || p.workerId);
+  const idx = list.findIndex((r) => String(r.workerCode) === code && r.month === p.month);
+  const row = Object.assign({
+    id: idx !== -1 ? list[idx].id : newId('pay'),
+    month: String(p.month),
+    workerCode: code, workerId: p.workerId || code, workerName: String(p.workerName || ''),
+    workerType: p.workerType || 'contract',
+    contractor: String(p.contractor || ''),
+    department: String(p.department || ''),
+    category: String(p.category || ''),
+    note: String(p.note || ''),
+    /* the register is a statutory record — keep who wrote each revision */
+    updatedBy: actor.name, updatedAt: nowIso,
+    createdAt: idx !== -1 ? list[idx].createdAt : nowIso,
+    retainUntil: String(p.month) + ' + 5 years (Code on Wages record retention)'
+  }, computed);
+  if (idx !== -1) list[idx] = row; else list.push(row);
+  dbPut('payrollMonths', row.id, row);
+  res.json({ ok: true, row });
+});
+
+app.delete('/api/payroll/monthly/:id', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const list = store.data.payrollMonths || [];
+  const idx = list.findIndex((r) => r.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'row not found' });
+  list.splice(idx, 1);
+  dbDel('payrollMonths', req.params.id);
+  res.json({ ok: true });
+});
+
+/* Backfill the fields the compliance change requests introduced onto stores
+   that were seeded before them, so an already-running deployment gets the
+   licence ceiling and the persistent route numbers without a re-seed.
+   Idempotent: only ever fills a missing value, never overwrites one HR set. */
+function ensureComplianceDefaults() {
+  const store = readStore();
+  if (!store || !store.data) return;
+
+  /* CR-8 · a CLRA licence ceiling per contractor, plus the separate commercial
+     contracted headcount. The licence is applied for in round numbers above the
+     deployment; the commercial number is the agreed supply level. */
+  (store.data.contractors || []).forEach((c) => {
+    let touched = false;
+    if (!c.clraLicence || c.clraLicence.maxHeadcount == null) {
+      const deployed = Number(c.deployed || 0);
+      c.clraLicence = Object.assign({
+        number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
+        authority: 'Licensing Officer · Sricity, Andhra Pradesh',
+        validTill: (c.clra && c.clra.expiresOn) || '',
+        maxHeadcount: Math.max(deployed + 1, Math.ceil((deployed + 1) / 25) * 25)
+      }, c.clraLicence || {});
+      touched = true;
+    }
+    if (c.commercialHeadcount == null) {
+      c.commercialHeadcount = Math.ceil((Number(c.deployed || 0) + 1) / 10) * 10;
+      touched = true;
+    }
+    if (touched) dbPut('contractors', c.id, c);
+  });
+
+  /* CR-3 · a unique, persistent route number on every transport route. */
+  const routes = store.data.routes || [];
+  const taken = {};
+  routes.forEach((r) => { if (r.routeNo) taken[r.routeNo] = 1; });
+  routes.forEach((r, i) => {
+    if (r.routeNo) return;
+    let n = i + 1, candidate;
+    do { candidate = 'RT-' + String(n).padStart(2, '0'); n++; } while (taken[candidate]);
+    taken[candidate] = 1;
+    r.routeNo = candidate;
+    r.routeNoAssignedAt = r.routeNoAssignedAt || new Date().toISOString();
+    dbPut('routes', r.code || r.bus, r);
+  });
+}
+
 /* ── Role-based login ──────────────────────────────────────────────────────
    Three demo accounts (HR/site manager · contractor · worker). Seeded into the
    `users` collection on boot, with each non-admin account linked to a real
@@ -1974,6 +2672,16 @@ app.post('/api/login', (req, res) => {
   if (!u || !verifyPassword(password, u.passwordHash)) {
     return res.status(401).json({ ok: false, error: 'Invalid username or password.' });
   }
+  /* CR-9 · access revoked on exit. The account keeps existing (the statutory
+     records behind it must survive) but it can no longer sign in. */
+  if (u.disabled) {
+    return res.status(403).json({
+      ok: false, code: 'ACCESS_REVOKED',
+      error: 'This account’s access was revoked on ' +
+        (u.disabledAt ? new Date(u.disabledAt).toLocaleDateString('en-IN') : 'exit') +
+        '. Contact Plant HR if this is an error.'
+    });
+  }
   res.json({ ok: true, user: publicUser(u) });
 });
 
@@ -1983,6 +2691,7 @@ const PORT = process.env.PORT || 4000;
    file store inside initDb() if the DB is unreachable, so this never blocks boot. */
 Promise.resolve(initDb())
   .then(() => { try { ensureDemoUsers(); } catch (e) { console.error('[auth] demo user seed failed:', e.message); } })
+  .then(() => { try { ensureComplianceDefaults(); } catch (e) { console.error('[compliance] default backfill failed:', e.message); } })
   .catch((err) => console.error('Store init error:', err.message))
   .finally(() => {
     app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));

@@ -222,6 +222,42 @@ export default function SecCtHome() {
             <div id="ct-id-list" />
           </div>
           {' '}
+          {/*  CR-8 · deployment ceilings — the statutory CLRA licence limit and the
+               commercial contracted headcount, read-only for the agency  */}
+          {' '}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Deployment ceilings</div>
+                {' '}
+                <div className="card-h-sub">
+                  Your CLRA licensed headcount is a statutory limit and is enforced — onboarding stops at it.
+                  The contracted headcount is commercial and advisory only.
+                </div>
+              </div>
+            </div>
+            {' '}
+            <div id="ct-licence-host" style={{ marginTop: "8px" }} />
+          </div>
+          {' '}
+          {/*  CR-6 · EPF / ESIC payment submission — the agency submits amounts
+               paid per deployed worker; Daikin HR verifies against the challan  */}
+          {' '}
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">EPF / ESIC payments</div>
+                {' '}
+                <div className="card-h-sub">
+                  Submit what you paid each month, with the challan and the headcount it covers.
+                  Daikin HR reconciles it against your actual deployed headcount and records the verification.
+                </div>
+              </div>
+            </div>
+            {' '}
+            <div id="ct-epf-host" style={{ marginTop: "8px" }} className="tiny muted">Loading EPF / ESIC submissions…</div>
+          </div>
+          {' '}
           {/*  compliance documents — the agency uploads its statutory documents  */}
           {' '}
           <div className="card">

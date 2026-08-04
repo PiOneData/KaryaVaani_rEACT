@@ -36,6 +36,12 @@ export default function SecOnboarding() {
         </div>
       </div>
       {' '}
+      {/*  ─── HR inbox · agency-raised requests only HR can action
+           (worker status changes, EPF/ESIC verification). Rendered by the
+           legacy layer and empty for non-HR sessions. ───  */}
+      {' '}
+      <div id="kv-hr-inbox" />
+      {' '}
       {/*  ─── verification status dashboard summary ───  */}
       {' '}
       <div id="vdash-alert-host" />
@@ -205,6 +211,10 @@ export default function SecOnboarding() {
               <option value="contract">Contract</option>
               <option value="direct">Direct</option>
             </select>
+            {' '}
+            {/* Employment-status filter — populated by the legacy layer so the
+                option list stays in one place (KV_WORK_STATUS). */}
+            <span id="obt-status-filter" />
           </div>
           {' '}
           <table className="t" id="obt-grid">
@@ -216,6 +226,7 @@ export default function SecOnboarding() {
                 <th>Route</th>
                 <th>Gender / shift</th>
                 <th>Aadhaar</th>
+                <th>Employment status</th>
                 <th>Onboarding stage</th>
                 <th style={{ textAlign: "right" }}>Action</th>
               </tr>
@@ -830,6 +841,12 @@ export default function SecOnboarding() {
                     <label className="field-l">CLRA licence reference</label>
                     <input className="input" id="cap-clra" placeholder="Pulled from work order" readOnly />
                   </div>
+                  {' '}
+                  {/* CR-8 · live CLRA licence headroom for the selected vendor.
+                      The statutory ceiling blocks onboarding; the commercial
+                      contracted headcount only raises an advisory alert. */}
+                  <div className="field cap-only-contract" id="cap-licence-note"
+                    style={{ display: "none", gridColumn: "1 / -1" }} />
                   {' '}
                   <div className="field">
                     <label className="field-l">

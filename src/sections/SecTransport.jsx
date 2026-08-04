@@ -170,6 +170,43 @@ export default function SecTransport() {
         </div>
       </div>
 
+      {/* ─────────────────────────────────────────────────────────────────
+          CR-3 · route identity. Every route carries a unique, persistent
+          route number, and a worker's re-assignment is appended with a
+          timestamp rather than overwritten — otherwise a past boarding or
+          night-shift consent record could not be traced to the route it was
+          captured on.
+          ───────────────────────────────────────────────────────────────── */}
+      <div className="card" style={{ marginTop: "18px" }}>
+        <div className="card-h">
+          <div>
+            <div className="card-h-title">Route identity &amp; assignment log</div>
+            <div className="card-h-sub">
+              Route numbers are unique and persistent — boarding, attendance and OSHC Rule 83 consent records point at
+              them. Re-assignments are appended, never overwritten.
+            </div>
+          </div>
+          <span className="pill outline tiny" id="tr-routelog-count">—</span>
+        </div>
+        <div id="tr-routeno-check" style={{ margin: "4px 0 12px" }} />
+        <div style={{ overflowX: "auto" }}>
+          <table className="t">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Worker</th>
+                <th>From route</th>
+                <th>To route</th>
+                <th>Shift</th>
+                <th>Changed by</th>
+              </tr>
+            </thead>
+            <tbody id="tr-routelog-body" />
+          </table>
+        </div>
+        <div id="tr-routelog-pagination" className="om-pagination" />
+      </div>
+
       <div className="sos-alert" id="tr-sos-alert">
         <span className="sa-icon">🚨</span>
         <div className="sa-text"><strong style={{ color: "var(--ember)" }}>SOS protocol activated</strong><br />Control tower · Plant security · AP 181 · Vehicle pin · Evidence log sealed.</div>

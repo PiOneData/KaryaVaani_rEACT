@@ -48,7 +48,11 @@ function buildRoutes(names) {
   const mins = (t) => String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
   return names.map((nm, i) => {
     const b = 'B' + (i + 1), base = 5 * 60 + 40 + (i % 6) * 5, gate = (i % 3) + 1;
-    return { bus: b, code: b, colour: palette[i % palette.length],
+    /* CR-3 · routeNo is the unique, persistent identifier for the route. It is
+       what boarding, attendance and night-shift consent records point at, so it
+       is assigned once and never reused — the bus code (B1…) can be re-allocated
+       to a different route, routeNo cannot. */
+    return { bus: b, code: b, routeNo: 'RT-' + String(i + 1).padStart(2, '0'), colour: palette[i % palette.length],
       route: 'Route ' + (i + 1) + ' · ' + nm, zone: zones[i % zones.length],
       morning: { board: mins(base), plant: '06:45' }, general: { board: mins(base + 120), plant: '08:45' }, drop: '15:45',
       stops: [ { name: nm + ' Bus Stand', t: mins(base) }, { name: nm + ' Junction', t: mins(base + 13) },
@@ -101,6 +105,33 @@ function main() {
 
   const demo = readJson('demo_seed.json');
   sources.demo = 'data/demo_seed.json';
+
+  /* CR-3 · guarantee a unique routeNo even when routes come from the committed
+     seed file (which predates the field). */
+  const usedRouteNos = {};
+  (routes || []).forEach((r, i) => {
+    let no = r.routeNo;
+    if (!no || usedRouteNos[no]) {
+      let n = i + 1;
+      do { no = 'RT-' + String(n).padStart(2, '0'); n++; } while (usedRouteNos[no]);
+    }
+    usedRouteNos[no] = 1;
+    r.routeNo = no;
+  });
+
+  /* CR-8 · the CLRA licence ceiling is a statutory limit and is tracked as its
+     own field; commercialHeadcount is Daikin's commercial supply agreement and
+     is deliberately kept separate (advisory only, never a compliance block). */
+  (demo.contractors || []).forEach((c) => {
+    const deployed = num(c.deployed);
+    c.clraLicence = Object.assign({
+      number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
+      authority: 'Licensing Officer · Sricity, Andhra Pradesh',
+      validTill: (c.clra && c.clra.expiresOn) || '',
+      maxHeadcount: Math.max(deployed + 1, Math.ceil((deployed + 1) / 25) * 25)
+    }, c.clraLicence || {});
+    if (c.commercialHeadcount == null) c.commercialHeadcount = Math.ceil((deployed + 1) / 10) * 10;
+  });
 
   const data = Object.assign({ omMapping, routes, vendors }, demo);
   const counts = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? v.length : typeof v]));

@@ -27,6 +27,7 @@ function __kvOnReady(fn) {
     vendor:              'grp-verticals',
     ohs:                 'grp-verticals',
     compliance:          'grp-verticals',
+    wages:               'grp-verticals',
     'vaani-broadcast':   'grp-engines',
     chat:                'grp-engines',
     transport:           'grp-engines',
@@ -52,7 +53,7 @@ function __kvOnReady(fn) {
     dashboard: 'dashboard', diagnostic: 'labour-code-readiness', architecture: 'architecture',
     'karya-nirnay': 'karya-nirnay', recruitment: 'recruitment', onboarding: 'onboarding',
     induction: 'induction', appointment: 'appointment-order', vendor: 'vendor-compliance',
-    ohs: 'workplace-safety', compliance: 'compliance', 'vaani-broadcast': 'vaani-broadcast',
+    ohs: 'workplace-safety', compliance: 'compliance', wages: 'wage-register', 'vaani-broadcast': 'vaani-broadcast',
     chat: 'chat', transport: 'transport', lms: 'knowledge-center', analytics: 'analytics',
     rules: 'rule-library', locale: 'localization', audit: 'audit-trail', handoff: 'api-handoff',
     directory: 'worker-directory', ctdirectory: 'contractor-directory',
@@ -3209,6 +3210,9 @@ function __kvOnReady(fn) {
       case 'pfRank':     return CT_RECON_RANK[c.pf.state];
       case 'liab':       return c.liability.statutoryMid + c.liability.operationalDays * c.liability.operationalPerDay + c.liability.customerAudit + c.liability.contractValueRisk;
       case 'openTasks':  return CT_TASKS.filter(t => t.ctId === c.id && t.severity !== 'closed').length;
+      /* CR-8 · sort by how close the agency is to its licensed ceiling; an
+         agency with no ceiling on record sorts last (nothing to enforce yet) */
+      case 'licence':    { const st = ctLicenceState(c); return (!st || st.max === null) ? 99999 : st.headroom; }
     }
   }
 
@@ -3261,7 +3265,7 @@ function __kvOnReady(fn) {
     const colLabel = {
       name: 'Contractor', deployed: 'Deployed', score: 'Score',
       clraRank: 'CLRA', esicRank: 'ESIC', pfRank: 'PF',
-      liab: 'Joint liability', openTasks: 'Open tasks'
+      liab: 'Joint liability', openTasks: 'Open tasks', licence: 'Licence headroom'
     };
     const matchTxt = q
       ? (rows.length + ' of ' + CONTRACTORS.length + ' match "' + CT_QUERY + '" · ')
@@ -3272,7 +3276,7 @@ function __kvOnReady(fn) {
     const body = document.getElementById('ct-grid-body');
     body.innerHTML = '';
     if (rows.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" class="search-empty">No contractor matches <span class="mono">"' + CT_QUERY + '"</span></td></tr>';
+      body.innerHTML = '<tr><td colspan="9" class="search-empty">No contractor matches <span class="mono">"' + CT_QUERY + '"</span></td></tr>';
       return;
     }
     rows.forEach(c => {
@@ -3280,12 +3284,16 @@ function __kvOnReady(fn) {
       const openTasks = CT_TASKS.filter(t => t.ctId === c.id && t.severity !== 'closed').length;
       const sCol = colorForScore(c.score);
       const sTxt = colorForScoreText(c.score);
+      /* CR-8 · statutory licence headroom, shown next to (never merged with)
+         the commercial contracted headcount */
+      const lic = ctLicenceState(c);
       const tr = document.createElement('tr');
       tr.className = 'ct-row' + (SELECTED_CT === c.id ? ' selected' : '');
       tr.onclick = () => openCtDrill(c.id);
       tr.innerHTML =
         '<td><span class="t-strong">' + c.name + '</span><div class="t-mute">' + c.area + '</div></td>' +
         '<td class="t-strong mono">' + c.deployed + '</td>' +
+        '<td>' + ctLicencePill(lic) + '<div style="margin-top:3px">' + ctCommercialPill(lic) + '</div></td>' +
         '<td><div class="row-gap"><span class="t-strong" style="color:' + sTxt + '">' + c.score + '</span>' +
           '<div class="bar thin" style="width:60px"><span style="width:' + c.score + '%;background:' + sCol + '"></span></div></div></td>' +
         '<td><span class="pill ' + c.clra.cls + '">' + c.clra.label + '</span></td>' +
@@ -3341,6 +3349,8 @@ function __kvOnReady(fn) {
     renderCtPaneLiability(c);
     renderCtPaneDocs(c);
     renderCtPaneComms(c);
+    /* CR-6 · EPF / ESIC payment submissions + HR verification for this agency */
+    if (document.getElementById('ct-pane-epf')) epfRenderInto('ct-pane-epf', c.id);
 
     /* reset to overview tab */
     document.querySelectorAll('#ct-drill .sd-drill-tab').forEach((t, i) => t.classList.toggle('on', i === 0));
@@ -3405,6 +3415,41 @@ function __kvOnReady(fn) {
             '<div class="sd-mini-v">' + c.avgPay + '</div>' +
             '<div class="sd-mini-s">' + c.womenWorkers + ' women · ' + c.migrantWorkers + ' migrant</div></div>';
     html += '</div>';
+
+    /* ── CR-8 · deployment ceilings. Two different numbers, never merged:
+       the CLRA licensed headcount is statutory and blocks onboarding; the
+       commercial contracted headcount is a supply agreement and only advises. */
+    var lic = ctLicenceState(c);
+    if (lic) {
+      html += '<div class="card-h" style="padding:0;margin-top:18px">' +
+              '<div><div class="card-h-title" style="font-size:0.85rem">Deployment ceilings</div>' +
+              '<div class="card-h-sub">Statutory licence limit and the commercial supply agreement — tracked separately</div></div>' +
+              (kvIsHR() ? '<button class="btn tiny" onclick="ctOpenLicenceEditor(\'' + kvEsc(c.id) + '\')">Edit licence</button>' : '<span class="tiny muted">HR maintains the licence</span>') +
+              '</div>';
+      html += '<div class="sd-mini-grid" style="margin-top:8px">' +
+        '<div class="sd-mini"><div class="sd-mini-eye">CLRA licensed headcount · statutory</div>' +
+          '<div class="sd-mini-v">' + (lic.max === null ? '—' : lic.max) + '</div>' +
+          '<div class="sd-mini-s">' + kvEsc(lic.licenceNo || 'no licence number on record') + (lic.validTill ? ' · to ' + kvEsc(lic.validTill) : '') + '</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Deployed against the licence</div>' +
+          '<div class="sd-mini-v">' + lic.used + '</div>' +
+          '<div class="sd-mini-s">' + lic.base + ' on roster + ' + lic.onboarded + ' onboarded here</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Statutory headroom</div>' +
+          '<div class="sd-mini-v" style="font-size:1rem">' + ctLicencePill(lic) + '</div>' +
+          '<div class="sd-mini-s">' + (lic.blocked ? 'Onboarding is blocked — OSHC Rules 86-90' : 'Enforced as a hard block on onboarding') + '</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Contracted headcount · commercial</div>' +
+          '<div class="sd-mini-v" style="font-size:1rem">' + ctCommercialPill(lic) + '</div>' +
+          '<div class="sd-mini-s">Commercial agreement · advisory only, never blocks</div></div>' +
+      '</div>';
+      if (lic.blocked) {
+        html += '<div class="note red" style="margin-top:10px;font-size:0.76rem"><strong>At the CLRA licence ceiling.</strong> ' +
+          'No further worker can be onboarded under ' + kvEsc(c.name) + ' until the licence is amended. Deploying past the licensed ' +
+          'headcount is a Contract Labour violation and the principal employer permitting it carries joint liability.</div>';
+      } else if (lic.commercialExceeded) {
+        html += '<div class="note amber" style="margin-top:10px;font-size:0.76rem"><strong>Commercial alert — not a compliance breach.</strong> ' +
+          'Deployment is ' + (lic.used - lic.commercial) + ' above the contracted headcount of ' + lic.commercial +
+          '. Within the CLRA licence, so onboarding continues; review the commercial agreement.</div>';
+      }
+    }
 
     html += '<div class="card-h" style="padding:0;margin-top:18px">' +
             '<div class="card-h-title" style="font-size:0.85rem">Sub-score breakdown · 6 dimensions</div>' +
@@ -3517,7 +3562,7 @@ function __kvOnReady(fn) {
     /* default the deployed list to newest-onboarded first, so freshly onboarded
        workers appear at the top immediately (no manual re-sort needed) */
     VW_STATE.sortCol = 'onboardedAt'; VW_STATE.sortDir = -1;
-    VW_STATE.filters = { category: '', esic: '', migrant: '' };
+    VW_STATE.filters = { category: '', esic: '', migrant: '', workStatus: '' };
     var safeCt = String(c.name).replace(/'/g, "\\'");
     host.innerHTML =
       '<div class="card-h" style="padding:0;margin-bottom:10px;align-items:flex-start">' +
@@ -3531,7 +3576,8 @@ function __kvOnReady(fn) {
       '<div id="ctw-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>' +
       '<div style="overflow-x:auto"><table class="t"><thead><tr>' +
         vwHeader('name', 'Worker') + vwHeader('code', 'Code') + vwHeader('category', 'Category') +
-        vwHeader('designation', 'Designation') + vwHeader('esicStatus', 'ESIC') + vwHeader('clraStatus', 'CLRA') +
+        vwHeader('designation', 'Designation') + '<th>Employment status</th>' +
+        vwHeader('esicStatus', 'ESIC') + vwHeader('clraStatus', 'CLRA') +
         vwHeader('compliancePct', 'Compliance') + vwHeader('onboardedAt', 'Onboarded') + '<th>Details</th>' +
       '</tr></thead><tbody id="ctw-body"></tbody></table></div>' +
       '<div id="ctw-pagination" class="om-pg"></div>' +
@@ -3584,6 +3630,14 @@ function __kvOnReady(fn) {
         '<option value="">All workers</option>' +
         '<option value="yes"' + (f.migrant === 'yes' ? ' selected' : '') + '>Migrant only</option>' +
         '<option value="no"' + (f.migrant === 'no' ? ' selected' : '') + '>Non-migrant</option>' +
+      '</select>' +
+      /* employment status — the same badge vocabulary as every other grid */
+      '<select class="sel" style="max-width:190px;font-size:0.78rem" onchange="vwSetFilter(\'workStatus\',this.value)">' +
+        '<option value="">All employment statuses</option>' +
+        KV_WORK_STATUS.map(function (s) {
+          return '<option value="' + s.key + '"' + (f.workStatus === s.key ? ' selected' : '') + '>' + s.label + '</option>';
+        }).join('') +
+        '<option value="pending-request"' + (f.workStatus === 'pending-request' ? ' selected' : '') + '>⧗ Awaiting HR decision</option>' +
       '</select>';
   }
   function vwIsMigrant(w) {
@@ -3611,7 +3665,7 @@ function __kvOnReady(fn) {
           esicStatus: r.esi ? 'active' : 'pending',
           clraStatus: (r.employment && r.employment.clra) ? 'active' : '—',
           compliancePct: comp ? comp.score : null, migrant: r.migrant,
-          onboardedAt: r.createdAt || r.updatedAt || '', _onboarded: true, _ci: x.i
+          onboardedAt: r.createdAt || r.updatedAt || '', _onboarded: true, _ci: x.i, _rec: r
         };
       });
     var all = onboardedRows.concat(VW_STATE.workers.slice());
@@ -3620,6 +3674,12 @@ function __kvOnReady(fn) {
       if (f.esic && String(w.esicStatus || '') !== f.esic) return false;
       if (f.migrant === 'yes' && !vwIsMigrant(w)) return false;
       if (f.migrant === 'no' && vwIsMigrant(w)) return false;
+      /* only platform-onboarded rows carry an employment status; the imported
+         vendor roster has none, so a status filter necessarily excludes it */
+      if (f.workStatus) {
+        if (!w._rec) return false;
+        if (!kvStatusMatches(w._rec, f.workStatus)) return false;
+      }
       return true;
     });
     var filtered = (rows.length !== all.length);
@@ -3634,8 +3694,8 @@ function __kvOnReady(fn) {
       return 0;
     });
     KVTABLE.set({
-      key: 'ctw', tbody: 'ctw-body', pager: 'ctw-pagination', pageSize: 12, cols: 9, rows: rows,
-      text: function (w) { return [w.name, w.code, w.category, w.designation, w.department, w.esicStatus, w.clraStatus, w._onboarded ? 'onboarded' : ''].join(' '); },
+      key: 'ctw', tbody: 'ctw-body', pager: 'ctw-pagination', pageSize: 12, cols: 10, rows: rows,
+      text: function (w) { return [w.name, w.code, w.category, w.designation, w.department, w.esicStatus, w.clraStatus, w._onboarded ? 'onboarded' : '', w._rec ? kvStatusMeta(kvStatusOf(w._rec)).label : ''].join(' '); },
       empty: 'No imported workers for this contractor yet — click “Import vendor data”.',
       row: function (w) {
         var click = w._onboarded ? ('obOpenCapture(' + w._ci + ')') : ('vwWorkerDetail(\'' + String(w.id).replace(/'/g, "\\'") + '\')');
@@ -3645,6 +3705,8 @@ function __kvOnReady(fn) {
           '<td class="mono tiny">' + vwEsc(w.code || '—') + '</td>' +
           '<td>' + vwEsc(w.category || '—') + '</td>' +
           '<td>' + vwEsc(w.designation || '—') + '</td>' +
+          '<td' + (w._onboarded ? ' onclick="event.stopPropagation();kvOpenStatus(' + w._ci + ')" title="Open employment status &amp; access"' : '') + '>' +
+            (w._rec ? kvStatusPill(w._rec) : '<span class="pill outline tiny" title="Imported vendor roster — status is tracked once the worker is onboarded through the platform">Vendor roster</span>') + '</td>' +
           '<td>' + vwStatusPill(w.esicStatus) + '</td>' +
           '<td>' + vwStatusPill(w.clraStatus) + '</td>' +
           '<td>' + vwCompliance(w.compliancePct) + '</td>' +
@@ -4503,6 +4565,8 @@ function __kvOnReady(fn) {
   /* ── download contractors workbook ── */
   function downloadContractors() {
     const headers = ['Contractor ID', 'Name', 'Area', 'Workers deployed', 'Score',
+                     'CLRA licence no', 'CLRA licensed max (statutory)', 'Deployed vs licence',
+                     'Licence headroom', 'Contracted headcount (commercial)',
                      'CLRA status', 'CLRA expires', 'ESIC reconcile', 'PF reconcile',
                      'Open tasks', 'Statutory penalty (mid) ₹L', 'Operational disruption ₹L',
                      'Customer audit ₹L', 'Contract value at risk ₹L', 'Joint liability total ₹L',
@@ -4511,8 +4575,16 @@ function __kvOnReady(fn) {
       const ops = Math.round(c.liability.operationalDays * c.liability.operationalPerDay);
       const total = liabilityTotal(c);
       const open = CT_TASKS.filter(t => t.ctId === c.id && t.severity !== 'closed').length;
+      /* the statutory ceiling and the commercial number stay in separate
+         columns in the export too — merging them would produce compliance
+         evidence that does not match the statutory obligation */
+      const lic = ctLicenceState(c) || {};
       return [
         c.id, c.name, c.area, c.deployed, c.score,
+        (c.clraLicence && c.clraLicence.number) || '—',
+        lic.max == null ? '—' : lic.max, lic.used == null ? '—' : lic.used,
+        lic.headroom == null ? '—' : lic.headroom,
+        lic.commercial == null ? '—' : lic.commercial,
         c.clra.label, c.clra.expiresOn, c.esic.label, c.pf.label,
         open,
         c.liability.statutoryMid, ops,
@@ -12600,6 +12672,28 @@ function __kvOnReady(fn) {
     /* IDENTITY */
     ctRenderIdentity(c);
     if (typeof ctRenderDocs === 'function') ctRenderDocs(c);
+    /* CR-6 · the agency's own EPF/ESIC submission surface, with HR's verdict */
+    if (document.getElementById('ct-epf-host')) epfRenderInto('ct-epf-host', c.id);
+    /* CR-8 · the agency sees its statutory ceiling and its commercial position,
+       clearly separated — it can read both but change neither */
+    var licHost = document.getElementById('ct-licence-host');
+    if (licHost) {
+      var st = ctLicenceState(c);
+      licHost.innerHTML = st ? (
+        '<div class="g2" style="gap:10px 14px">' +
+          '<div class="kpi"><div class="kpi-eye">CLRA licensed headcount · statutory</div>' +
+            '<div class="kpi-val" style="font-size:1.05rem">' + (st.max === null ? '—' : st.used + ' / ' + st.max) + '</div>' +
+            '<div class="kpi-sub">' + kvEsc(st.licenceNo || 'licence number not on record') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '</div></div>' +
+          '<div class="kpi"><div class="kpi-eye">Contracted headcount · commercial</div>' +
+            '<div class="kpi-val" style="font-size:1.05rem">' + (st.commercial === null ? '—' : st.used + ' / ' + st.commercial) + '</div>' +
+            '<div class="kpi-sub">Commercial agreement · advisory, never blocks onboarding</div></div>' +
+        '</div>' +
+        '<div style="margin-top:8px">' + ctLicencePill(st) + ' ' + ctCommercialPill(st) + '</div>' +
+        (st.blocked
+          ? '<div class="note red" style="margin-top:8px;font-size:0.76rem">You are at your CLRA licensed headcount. Further onboarding is blocked until the licence is amended — send the amended licence to Plant HR.</div>'
+          : '<div class="tiny muted" style="margin-top:8px">The licensed ceiling is maintained by Plant HR from your CLRA licence. Send an amended licence to have it raised.</div>')
+      ) : '';
+    }
 
     /* CHAT */
     ctChatRender();
@@ -13159,7 +13253,8 @@ function __kvOnReady(fn) {
           '<span class="tr-bus-dot">' + r.code + '</span>Stood down</span></td>';
       }).join('');
       return '<tr>' +
-        '<td><span class="t-strong">' + r.route + '</span><div class="t-mute">' + r.zone + '</div></td>' +
+        '<td><span class="t-strong">' + r.route + '</span>' +
+          '<div class="t-mute"><span class="mono">' + trRouteNo(r) + '</span> · ' + r.zone + '</div></td>' +
         cells +
         '<td style="text-align:right"><span class="mono t-strong">' + dep.board + '</span>' +
         '<div class="t-mute">plant ' + dep.plant + '</div></td>' +
@@ -13183,7 +13278,9 @@ function __kvOnReady(fn) {
         '<div class="tr-route-h" style="background:' + r.colour + '">' +
           '<span class="tr-route-badge">' + r.code + '</span>' +
           '<div><div class="tr-route-name">' + r.route + '</div>' +
-          '<div class="tr-route-sub">Serves ' + r.zone + '</div></div>' +
+          /* CR-3 · the persistent route number every boarding, attendance and
+             OSHC R.83 consent record points at */
+          '<div class="tr-route-sub"><span class="mono">' + trRouteNo(r) + '</span> · serves ' + r.zone + '</div></div>' +
         '</div>' +
         '<div class="tr-route-body">' +
           '<div class="tr-times">' +
@@ -13342,7 +13439,9 @@ function __kvOnReady(fn) {
     const nightConsent = (gender === 'F' && shift === 'night') ? (((h >>> 20) % 100) < 80 ? 'yes' : 'pending') : 'na';
     return {
       code: w.code, name: w.name, dept: w.department || '—', desig: w.designation || '',
-      locality: town, route: route.code, routeName: route.route, pickup: pickup, pickupIdx: pickupIdx,
+      /* routeNo is the identifier the boarding + consent records are keyed to;
+         route (the bus code) can be re-allocated, routeNo cannot */
+      locality: town, route: route.code, routeNo: trRouteNo(route), routeName: route.route, pickup: pickup, pickupIdx: pickupIdx,
       shift: shift, mobile: mobile, board: (route[shift] && route[shift].board) || '',
       type: type, gender: gender, plate: plate, agency: agency,
       operator: operator, nightConsent: nightConsent
@@ -15086,6 +15185,9 @@ function __kvOnReady(fn) {
     const ack = document.getElementById('cap-ppe-ack');
     mark('cap-st-ppe', !!(capVal('cap-uniform') && capVal('cap-shoe') && ack && ack.checked));
     mark('cap-st-confirm', false);  /* confirmation happens after the link is sent */
+    /* CR-8 · keep the CLRA licence headroom visible while the form is filled in,
+       so the block never arrives as a surprise at submit time */
+    if (typeof capLicenceSync === 'function') capLicenceSync();
   }
 
   /* ── save single profile → send confirmation link ── */
@@ -15112,6 +15214,13 @@ function __kvOnReady(fn) {
     }
     if (CAP_STATE.type === 'contract' && !capVal('cap-contractor')) {
       toast('Select the vendor / contractor for this worker', 'red'); return;
+    }
+    /* CR-8 · hard block on the CLRA licensed headcount. Checked here and again
+       on the server, so no path can deploy past the licence. */
+    if (CAP_STATE.type === 'contract' && typeof capLicenceAllows === 'function' &&
+        !capLicenceAllows(capVal('cap-contractor'), 1)) {
+      if (typeof capLicenceSync === 'function') capLicenceSync();
+      return;
     }
     const ack = document.getElementById('cap-ppe-ack');
     if (!ack || !ack.checked) { toast('Confirm the PPE briefing acknowledgement', 'red'); return; }
@@ -15269,7 +15378,9 @@ function __kvOnReady(fn) {
   /* allowed transport routes (from the system route list) for the route dropdown */
   function capRouteOptions() {
     return (typeof TR_ROUTES !== 'undefined' ? TR_ROUTES : []).map(function (r) {
-      return { code: r.code || r.bus, label: r.route || (r.code || r.bus) };
+      /* routeNo rides along so a picker can show the persistent identifier the
+         boarding and consent records are keyed to (CR-3) */
+      return { code: r.code || r.bus, routeNo: trRouteNo(r), label: r.route || (r.code || r.bus) };
     });
   }
   /* match a free-text route cell to an allowed route; '' if unknown */
@@ -15525,6 +15636,24 @@ function __kvOnReady(fn) {
     var scope = kvOnboardScope();
     var firmEl = document.getElementById('cap-bulk-contractor');
     var chosen = firmEl ? firmEl.value : '';
+    /* CR-8 · the licence ceiling applies to the batch as a whole — importing 40
+       workers against 12 remaining licensed slots is the same violation as
+       onboarding them one at a time, so the whole batch is checked first. */
+    var byFirm = {};
+    valid.forEach(function (r) {
+      var f = r.contractor || chosen || scope || '';
+      if (f) byFirm[f] = (byFirm[f] || 0) + 1;
+    });
+    var blockedFirm = Object.keys(byFirm).find(function (f) { return !capLicenceAllows(f, byFirm[f]); });
+    if (blockedFirm) {
+      var st = ctLicenceState(blockedFirm);
+      var statusEl0 = document.getElementById('cap-bulk-status');
+      if (statusEl0 && st) statusEl0.innerHTML =
+        '<div class="note red" style="font-size:0.76rem"><strong>Import blocked · CLRA licence ceiling.</strong> ' +
+        kvEsc(blockedFirm) + ' is licensed for ' + st.max + ' workers and has ' + st.used + ' deployed — this batch adds ' +
+        byFirm[blockedFirm] + '. Split the batch or have the agency\'s licence amended first.</div>';
+      return;
+    }
     valid.forEach(function (r) {
       var contractor = r.contractor || chosen || scope || '';
       var type = contractor ? 'contract' : r.type;
@@ -16021,11 +16150,19 @@ function __kvOnReady(fn) {
   /* filter (search + department) then sort the full roster */
   function omFiltered() {
     const q = OM_QUERY.trim().toLowerCase();
+    /* employment-status filter — only platform-onboarded workers carry a status,
+       so selecting one necessarily narrows to those records */
+    const stFilter = kvFilterValue('om-filter-status');
     let rows = allWorkersRoster().filter(function (r) {
       if (OM_DEPT !== 'all' && r.dept !== OM_DEPT) return false;
+      if (stFilter) {
+        if (!r._rec) return false;
+        if (!kvStatusMatches(r._rec, stFilter)) return false;
+      }
       if (!q) return true;
       return (r.code + ' ' + r.name + ' ' + r.desig + ' ' + r.dept + ' ' +
-              r.mgr + ' ' + r.mgrCode + ' ' + r.uan + ' ' + r.esi + ' ' + r.lang + ' ' + (r.contractor || ''))
+              r.mgr + ' ' + r.mgrCode + ' ' + r.uan + ' ' + r.esi + ' ' + r.lang + ' ' + (r.contractor || '') + ' ' +
+              (r._rec ? kvStatusMeta(kvStatusOf(r._rec)).label : ''))
               .toLowerCase().indexOf(q) > -1;
     });
     const get = OM_COLS[OM_SORT.col];
@@ -16042,10 +16179,15 @@ function __kvOnReady(fn) {
 
   /* export the (filtered) OM Manpower roster to Excel */
   function omExport() {
-    const headers = ['Associate code', 'Name', 'Designation', 'Department',
-                     'Reporting manager', 'Manager code', 'UAN no', 'ESI no', 'Language'];
+    const headers = ['Associate code', 'Name', 'Contractor', 'Designation', 'Department',
+                     'Reporting manager', 'Manager code', 'UAN no', 'ESI no', 'Language',
+                     'Employment status', 'Status changed on', 'Status changed by'];
     const rows = omFiltered().map(function (r) {
-      return [r.code, r.name, r.desig, r.dept, r.mgr, r.mgrCode, r.uan, r.esi, r.lang];
+      const rec = r._rec;
+      return [r.code, r.name, r.contractor || '—', r.desig, r.dept, r.mgr, r.mgrCode, r.uan, r.esi, r.lang,
+              rec ? kvStatusMeta(kvStatusOf(rec)).label : 'Roster (not onboarded here)',
+              rec && rec.workStatusAt ? kvDateShort(rec.workStatusAt) : '—',
+              (rec && rec.workStatusBy) || '—'];
     });
     if (!rows.length) { toast('No associates to export', 'amber'); return; }
     downloadWorkbook('OM Manpower mapping', headers, rows,
@@ -16062,6 +16204,11 @@ function __kvOnReady(fn) {
   function omRender() {
     const body = document.getElementById('om-grid-body');
     if (!body) return;
+    const stHost = document.getElementById('om-status-filter');
+    if (stHost && !stHost.dataset.filled) {
+      stHost.innerHTML = kvStatusFilterHtml('om-filter-status', '', 'omRender()');
+      stHost.dataset.filled = '1';
+    }
     const rows  = omFiltered();
     const total = rows.length;
     const pages = Math.max(1, Math.ceil(total / OM_PER_PAGE));
@@ -16099,6 +16246,11 @@ function __kvOnReady(fn) {
         '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + idCell('UAN', r.uan) + '</td>' +
         '<td style="font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">' + idCell('ESI', r.esi) + '</td>' +
         '<td><span class="pill outline">' + (r.lang || '—') + '</span></td>' +
+        /* employment status — the same badge as every other worker surface;
+           only workers onboarded through the platform carry one */
+        '<td' + (r._onboarded ? ' onclick="event.stopPropagation();kvOpenStatus(' + r._ci + ')" title="Open employment status &amp; access"' : '') + '>' +
+          (r._rec ? kvStatusPill(r._rec)
+                  : '<span class="pill outline tiny" title="Master-roster associate — employment status is tracked for workers onboarded through the platform">Roster</span>') + '</td>' +
         '<td>' + compCell + '</td>' +
       '</tr>';
     }).join('');
@@ -18404,9 +18556,18 @@ function __kvOnReady(fn) {
   function obSetWorkerRoute(i, val) {
     if (!obRequireHR()) return;
     var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var prev = rec.route || '';
+    if (String(prev) === String(val || '')) return;
     obPersistRec(rec, { route: val || null });
+    /* CR-3 · append the re-assignment with a timestamp instead of overwriting,
+       so a boarding or night-shift consent record captured on the previous
+       route stays traceable to that route. */
+    if (typeof trLogRouteChange === 'function') trLogRouteChange(rec, prev, val || '');
     obRefreshOnboardViews(); obRefreshTransport();
-    toast('Route updated for ' + rec.name + (val ? ' · ' + val : ''), 'green');
+    if (typeof initRouteChangeLog === 'function' && document.getElementById('tr-routelog-body')) initRouteChangeLog();
+    var to = (typeof trRouteByAny === 'function') ? trRouteByAny(val) : null;
+    toast('Route updated for ' + rec.name + (val ? ' · ' + (to ? trRouteNo(to) + ' ' : '') + val : ' · removed') +
+          ' · change logged', 'green');
   }
   function obSetWorkerShift(i, val) {
     if (!obRequireHR()) return;
@@ -18509,9 +18670,11 @@ function __kvOnReady(fn) {
     var body = document.getElementById('obt-body');
     if (!body) return;
     var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
-    var list = (CAP_STATE.recent || []).filter(function (r) {
+    /* index into CAP_STATE.recent is captured before any filtering, so the row
+       actions keep addressing the right record however the list is narrowed */
+    var list = (CAP_STATE.recent || []).map(function (r, i) { return { r: r, i: i }; }).filter(function (x) {
       if (!scope) return true;
-      return String((r.employment && r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
+      return String((x.r.employment && x.r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
     });
     /* filter by contractor (HR only — a contractor is already scoped to one
        firm) and by worker type */
@@ -18522,7 +18685,7 @@ function __kvOnReady(fn) {
       else {
         ctSel.style.display = '';
         var firms = {};
-        list.forEach(function (r) { var n = (r.employment && r.employment.contractor) || ''; if (n) firms[n] = 1; });
+        list.forEach(function (x) { var n = (x.r.employment && x.r.employment.contractor) || ''; if (n) firms[n] = 1; });
         var cur = ctSel.value;
         var opts = Object.keys(firms).sort();
         ctSel.innerHTML = '<option value="">All contractors</option>' +
@@ -18531,24 +18694,36 @@ function __kvOnReady(fn) {
     }
     var ctVal = (ctSel && ctSel.style.display !== 'none') ? ctSel.value : '';
     var tyVal = tySel ? tySel.value : '';
-    if (ctVal) list = list.filter(function (r) { return ((r.employment && r.employment.contractor) || '') === ctVal; });
-    if (tyVal) list = list.filter(function (r) { return (r.type || 'direct') === tyVal; });
+    if (ctVal) list = list.filter(function (x) { return ((x.r.employment && x.r.employment.contractor) || '') === ctVal; });
+    if (tyVal) list = list.filter(function (x) { return (x.r.type || 'direct') === tyVal; });
+    /* employment-status filter — the badge every other surface shows */
+    var stHost = document.getElementById('obt-status-filter');
+    if (stHost && !stHost.dataset.filled) {
+      stHost.innerHTML = kvStatusFilterHtml('obt-filter-status', '', 'obTrackRender()');
+      stHost.dataset.filled = '1';
+    }
+    var stVal = kvFilterValue('obt-filter-status');
+    if (stVal) list = list.filter(function (x) { return kvStatusMatches(x.r, stVal); });
     var titleEl = document.getElementById('obt-scope');
     if (titleEl) titleEl.textContent = scope ? ('Employees onboarded under ' + scope) : 'All onboarded employees · every contractor';
     var nr = document.getElementById('obt-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
     if (typeof KVTABLE === 'undefined') return;
     KVTABLE.set({
       key: 'obt', tbody: 'obt-body', count: 'obt-count', noun: 'employee',
-      pageSize: 12, cols: 8, rows: list.map(function (r, i) { return { r: r, i: i }; }),
-      text: function (x) { return (x.r.id || '') + ' ' + (x.r.name || '') + ' ' + (x.r.route || '') + ' ' + (x.r.gender || '') + ' ' + obStageLabel(x.r) + ' ' + ((x.r.employment && x.r.employment.contractor) || ''); },
+      pageSize: 12, cols: 9, rows: list,
+      text: function (x) { return (x.r.id || '') + ' ' + (x.r.name || '') + ' ' + (x.r.route || '') + ' ' + (x.r.gender || '') + ' ' + obStageLabel(x.r) + ' ' + kvStatusMeta(kvStatusOf(x.r)).label + ' ' + ((x.r.employment && x.r.employment.contractor) || ''); },
       row: function (x) {
         var r = x.r, i = x.i;
+        /* the route shows its persistent route number (CR-3) so the row can be
+           matched to a boarding / consent record */
+        var ro = (typeof trRouteByAny === 'function') ? trRouteByAny(r.route) : null;
         return '<tr style="cursor:pointer" onclick="obOpenCapture(' + i + ')">' +
           '<td class="t-strong">' + r.id + '</td><td>' + r.name + '</td>' +
           '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
-          '<td class="tiny">' + (r.route || '—') + '</td>' +
+          '<td class="tiny">' + (ro ? '<span class="mono">' + trRouteNo(ro) + '</span> · ' + r.route : (r.route || '—')) + '</td>' +
           '<td class="tiny">' + (r.gender || '—') + (r.shift ? ' · ' + r.shift : '') + '</td>' +
           '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓ Aadhaar</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+          '<td onclick="event.stopPropagation();kvOpenStatus(' + i + ')" title="Open employment status &amp; access">' + kvStatusPill(r) + '</td>' +
           '<td>' + obStagePill(r) + '</td>' +
           '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
             '<button class="btn" onclick="obOpenCapture(' + i + ')">Open</button></td>' +
@@ -18761,8 +18936,8 @@ function __kvOnReady(fn) {
         '<div class="field"><label class="field-l">Route</label>' +
           (obIsHR()
             ? '<select class="sel" onchange="obSetWorkerRoute(' + i + ',this.value)"><option value="">— none —</option>' +
-                trRouteOpts.map(function (o) { return '<option value="' + o.label.replace(/"/g, '&quot;') + '"' + (o.label === rec.route ? ' selected' : '') + '>' + o.label + '</option>'; }).join('') + '</select>'
-            : '<div class="input" style="background:#f8fafc">' + (rec.route || '—') + '</div>') +
+                trRouteOpts.map(function (o) { return '<option value="' + o.label.replace(/"/g, '&quot;') + '"' + (o.label === rec.route ? ' selected' : '') + '>' + o.routeNo + ' · ' + o.label + '</option>'; }).join('') + '</select>'
+            : '<div class="input" style="background:#f8fafc">' + (rec.route ? (function () { var rr = trRouteByAny(rec.route); return (rr ? trRouteNo(rr) + ' · ' : '') + rec.route; })() : '—') + '</div>') +
         '</div>' +
         '<div class="field"><label class="field-l">Shift</label>' +
           (obIsHR()
@@ -18779,11 +18954,12 @@ function __kvOnReady(fn) {
         })() + '.</div>' : '');
     kvTabModal({
       eyebrow: 'Onboarding · ' + rec.id + ' · ' + (rec.type === 'direct' ? 'direct' : 'contract') + ' · ' + obStageLabel(rec),
-      title: rec.name + ' · ' + rec.category,
+      title: rec.name + ' · ' + rec.category + ' &nbsp;' + kvStatusPill(rec),
       active: activeTab || undefined,
       tabs: [
-        { id: 'general', label: 'General information', html: general + trEd },
+        { id: 'general', label: 'General information', html: general + trEd + trRouteHistoryHtml(rec) },
         { id: 'journey', label: 'Verification & induction', html: journey },
+        { id: 'status', label: 'Status & access', html: kvStatusPanelHtml(rec, i) },
         { id: 'ident', label: 'Identification', html: identification },
         { id: 'documents', label: 'Documents', html: documents },
         { id: 'compliance', label: 'Compliance', html: compliance }
@@ -18797,6 +18973,7 @@ function __kvOnReady(fn) {
         '<button class="btn" onclick="omCloseModal()">Close</button></div>'
     });
     obLoadDocs(docKey);   // fill the documents list once the modal DOM exists
+    kvLoadStatusHistory(rec);   // status & access tab · immutable change log
   }
 
   /* ── worker documents · upload / list / view / delete (stored in DB) ───── */
@@ -18991,15 +19168,26 @@ function __kvOnReady(fn) {
     if (!body) return;
     /* a logged-in contractor sees only the workers they onboarded */
     const scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
-    const list = (CAP_STATE.recent || []).filter(function (r) {
+    /* Pair every record with its index in CAP_STATE.recent BEFORE filtering —
+       the row actions (open / edit / delete / status) address that array, so a
+       filtered list must not renumber them. */
+    let list = (CAP_STATE.recent || []).map(function (r, i) { return { r: r, i: i }; }).filter(function (x) {
       if (!scope) return true;
-      return String((r.employment && r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
+      return String((x.r.employment && x.r.employment.contractor) || '').toLowerCase() === String(scope).toLowerCase();
     });
+    /* employment-status filter (Active / Inactive / … / awaiting HR) */
+    const fHost = document.getElementById('ob-status-filter');
+    if (fHost && !fHost.dataset.filled) {
+      fHost.innerHTML = kvStatusFilterHtml('ob-filter-status', '', 'obRenderDirectory()');
+      fHost.dataset.filled = '1';
+    }
+    const stFilter = kvFilterValue('ob-filter-status');
+    if (stFilter) list = list.filter(function (x) { return kvStatusMatches(x.r, stFilter); });
     const nr = document.getElementById('ob-noresults'); if (nr) nr.style.display = list.length ? 'none' : 'block';
     KVTABLE.set({
       key: 'ob', tbody: 'ob-grid-body', count: 'ob-count', noun: 'onboarded',
-      pageSize: 12, cols: 9, rows: list.map(function (r, i) { return { r: r, i: i }; }),
-      text: function (x) { return (x.r.id || '') + ' ' + (x.r.name || '') + ' ' + (x.r.type || '') + ' ' + (x.r.category || '') + ' ' + ((x.r.employment && x.r.employment.contractor) || '') + ' ' + (x.r.status || ''); },
+      pageSize: 12, cols: 10, rows: list,
+      text: function (x) { return (x.r.id || '') + ' ' + (x.r.name || '') + ' ' + (x.r.type || '') + ' ' + (x.r.category || '') + ' ' + ((x.r.employment && x.r.employment.contractor) || '') + ' ' + (x.r.status || '') + ' ' + kvStatusMeta(kvStatusOf(x.r)).label; },
       row: function (x) {
         const r = x.r, i = x.i;
         const c = obWorkerCompliance(r);
@@ -19011,6 +19199,7 @@ function __kvOnReady(fn) {
           '<td><span class="pill ' + (r.type === 'direct' ? 'green' : 'amber') + ' tiny">' + (r.type === 'direct' ? 'Direct' : 'Contract') + '</span></td>' +
           '<td>' + (r.category || '—') + '</td><td>' + link + '</td>' +
           '<td>' + (r.aadhaarVerified ? '<span class="pill green tiny">✓</span>' : '<span class="pill red tiny">pending</span>') + '</td>' +
+          '<td onclick="event.stopPropagation();kvOpenStatus(' + i + ')" title="Open employment status &amp; access">' + kvStatusPill(r) + '</td>' +
           '<td>' + obStagePill(r) + '</td>' +
           '<td><span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + ' · ' + (c.status === 'compliant' ? 'Compliant' : 'Non-compliant') + '</span></td>' +
           '<td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">' +
@@ -19021,9 +19210,23 @@ function __kvOnReady(fn) {
     });
   }
 
-  /* delete a captured worker (DB + session) */
+  /* Delete a captured worker (DB + session).
+     Deleting is NOT how a worker leaves: an exit has to produce the access
+     revocation and the statutory data-disposition record (CR-9), and several of
+     the categories on that record carry a 5-7 year statutory retention. So
+     deletion is HR-only and is steered into the exit workflow while the worker
+     is still active — it stays available for correcting a mis-keyed record. */
   function obDeleteCapture(i) {
     const r = CAP_STATE.recent[i]; if (!r) return;
+    if (typeof kvHrOnly === 'function' && !kvHrOnly('Only HR can remove a worker record. Raise a status change request instead.')) return;
+    const st = (typeof kvStatusOf === 'function') ? kvStatusOf(r) : 'active';
+    if (st !== 'exited') {
+      const msg = r.name + ' has not been exited. Deleting the record destroys attendance, wage and EPF/ESIC ' +
+        'history that the Code on Wages (5 years) and the EPF/ESIC regulations (7 years) require you to retain, ' +
+        'and leaves no DPDP data-disposition record.\n\nUse the exit workflow instead?\n\n' +
+        'OK = open the exit workflow · Cancel = continue to delete (only for a mis-keyed record).';
+      if (window.confirm(msg)) { if (typeof kvOpenExit === 'function') kvOpenExit(i); return; }
+    }
     if (!window.confirm('Remove ' + r.name + ' (' + r.id + ') from onboarded employees?')) return;
     const finish = function () {
       CAP_STATE.recent.splice(i, 1);
@@ -19326,3 +19529,1579 @@ function __kvOnReady(fn) {
   }
   __kvOnReady(initCommsAnalytics);
 
+
+  /* ════════════════════════════════════════════════════════════════════════
+     COMPLIANCE CHANGE REQUESTS · shared layer
+     CR-3 route identity · CR-6 EPF/ESIC verification · CR-7 wage register ·
+     CR-8 CLRA licence ceiling · CR-9 exit, revocation & data disposition.
+
+     One rule runs through all of them: an agency SUBMITS or REQUESTS, the
+     principal employer's HR VERIFIES or DECIDES. Every HR-only action is
+     gated here and again on the server, and everything an agency does that
+     HR must act on lands in the HR inbox.
+     ════════════════════════════════════════════════════════════════════════ */
+  function kvApi(path) { return (window.__KV_API_BASE || '') + path; }
+  function kvUser() { return window.__KVUSER || {}; }
+  function kvIsHR() { return kvUser().role === 'admin'; }
+  function kvIsAgency() { return kvUser().role === 'contractor'; }
+  function kvActorName() { return kvUser().name || kvUser().username || 'Unknown user'; }
+  /* the firm a signed-in agency user acts for */
+  function kvAgencyFirm() { var u = kvUser(); return u.linkedName || (u.role === 'contractor' ? u.name : '') || ''; }
+  function kvHrOnly(msg) {
+    if (kvIsHR()) return true;
+    toast(msg || 'Only HR can do this — raise a request to HR instead.', 'red');
+    return false;
+  }
+  /* every write carries who is acting, so the server can refuse HR-only writes */
+  function kvJson(path, method, body) {
+    var opts = {
+      method: method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-kv-role': kvUser().role || '',
+        'x-kv-actor': kvActorName()
+      }
+    };
+    if (body) opts.body = JSON.stringify(Object.assign({ actorRole: kvUser().role || '', actorName: kvActorName() }, body));
+    return fetch(kvApi(path), opts).then(function (r) {
+      return r.json().catch(function () { return { ok: false, error: 'Unexpected response from the server' }; });
+    });
+  }
+  function kvEsc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function kvMoney(n) { n = Number(n || 0); return '₹' + Math.round(n).toLocaleString('en-IN'); }
+  function kvNum(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+  function kvDateShort(v) {
+    if (!v) return '—';
+    var d = new Date(String(v).length === 10 ? v + 'T00:00:00' : v);
+    return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function kvDateTime(v) {
+    if (!v) return '—';
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? String(v) : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  var KV_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function kvMonthLabel(m) {
+    var p = String(m || '').split('-');
+    if (p.length !== 2) return String(m || '—');
+    return (KV_MONTH_NAMES[Number(p[1]) - 1] || p[1]) + ' ' + p[0];
+  }
+  function kvThisMonth() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function kvPrevMonth(m) {
+    var p = String(m || kvThisMonth()).split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, 1);
+    d.setMonth(d.getMonth() - 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  /* last 12 months, newest first — the month picker every register uses */
+  function kvMonthOptions(sel, count) {
+    var out = [], m = kvThisMonth();
+    for (var i = 0; i < (count || 12); i++) { out.push(m); m = kvPrevMonth(m); }
+    return out.map(function (x) {
+      return '<option value="' + x + '"' + (x === sel ? ' selected' : '') + '>' + kvMonthLabel(x) + '</option>';
+    }).join('');
+  }
+
+  /* ── HR inbox ───────────────────────────────────────────────────────────
+     Anything an agency raises that only HR can action. Rendered as a card on
+     the Onboarding page and mirrored into the top-bar bell for HR sessions. */
+  var KV_INBOX = { items: [], seen: {} };
+  function kvLoadHrInbox(quiet) {
+    if (!kvIsHR()) { kvRenderHrInbox(); return Promise.resolve([]); }
+    return kvJson('/api/hr-notifications').then(function (j) {
+      KV_INBOX.items = (j && j.notifications) || [];
+      /* push anything new onto the top-bar notification feed once */
+      if (!quiet) {
+        KV_INBOX.items.filter(function (n) { return !n.read && !KV_INBOX.seen[n.id]; }).slice(0, 8).forEach(function (n) {
+          KV_INBOX.seen[n.id] = 1;
+          if (typeof kvNotify === 'function') kvNotify(n.title, n.body, n.severity === 'warn' ? 'warn' : 'info');
+        });
+      }
+      kvRenderHrInbox();
+      return KV_INBOX.items;
+    }).catch(function () { return []; });
+  }
+  function kvRenderHrInbox() {
+    var host = document.getElementById('kv-hr-inbox');
+    if (!host) return;
+    if (!kvIsHR()) { host.innerHTML = ''; return; }
+    var open = KV_INBOX.items.filter(function (n) { return !n.read; });
+    if (!open.length) {
+      host.innerHTML =
+        '<div class="card" style="margin-bottom:14px">' +
+          '<div class="card-h" style="padding:0"><div><div class="card-h-title">HR inbox · agency requests</div>' +
+          '<div class="card-h-sub">Nothing awaiting an HR decision. Status changes, exits and EPF/ESIC verification are HR-only — agencies raise them here.</div></div>' +
+          '<span class="pill green tiny">Clear</span></div>' +
+        '</div>';
+      return;
+    }
+    host.innerHTML =
+      '<div class="card" style="margin-bottom:14px;border-left:3px solid var(--amber)">' +
+        '<div class="card-h" style="padding:0"><div><div class="card-h-title">HR inbox · ' + open.length + ' item' + (open.length === 1 ? '' : 's') + ' awaiting HR</div>' +
+        '<div class="card-h-sub">Raised by contractor agencies. Only HR can apply a worker status change or verify an EPF/ESIC payment.</div></div>' +
+        '<button class="btn tiny" onclick="kvLoadHrInbox()">Refresh</button></div>' +
+        '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">' +
+        open.slice(0, 12).map(function (n) {
+          var act = '';
+          if (n.kind === 'status-change-request' && n.workerId) {
+            act = '<button class="btn primary tiny" onclick="kvOpenStatusByWorkerId(\'' + kvEsc(n.workerId) + '\')">Review</button>';
+          } else if (n.kind === 'epf-esic-submission' && n.contractorId) {
+            act = '<button class="btn primary tiny" onclick="epfOpenForContractor(\'' + kvEsc(n.contractorId) + '\')">Verify</button>';
+          }
+          return '<div class="row-between" style="gap:12px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff">' +
+            '<div><div style="font-size:0.84rem;font-weight:600">' + kvEsc(n.title) + '</div>' +
+            '<div class="tiny muted" style="margin-top:2px">' + kvEsc(n.body) + '</div>' +
+            '<div class="tiny muted" style="margin-top:3px">' + kvDateTime(n.at) + '</div></div>' +
+            '<div style="display:flex;gap:6px;flex-shrink:0;align-items:center">' + act +
+            '<button class="btn tiny" onclick="kvDismissInbox(\'' + kvEsc(n.id) + '\')">Dismiss</button></div>' +
+          '</div>';
+        }).join('') +
+        '</div>' +
+      '</div>';
+  }
+  function kvDismissInbox(id) {
+    if (!kvHrOnly()) return;
+    kvJson('/api/hr-notifications/' + encodeURIComponent(id) + '/read', 'POST', {}).then(function () { kvLoadHrInbox(true); });
+  }
+  function initHrInbox() { kvLoadHrInbox(); }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     WORKER EMPLOYMENT STATUS · the badge that drives access
+     Active / Inactive / On notice / Suspended / Exited. HR is the only role
+     that can change it; an agency raises a request and HR is notified.
+     ════════════════════════════════════════════════════════════════════════ */
+  var KV_WORK_STATUS = [
+    { key: 'active',    label: 'Active',    cls: 'green',   desc: 'Deployed and working · platform access on' },
+    { key: 'inactive',  label: 'Inactive',  cls: 'outline', desc: 'Not currently deployed · access suspended, records retained, licence slot released' },
+    { key: 'notice',    label: 'On notice', cls: 'amber',   desc: 'Serving notice · run the exit workflow on the last working day' },
+    { key: 'suspended', label: 'Suspended', cls: 'red',     desc: 'Access blocked pending enquiry · still on the licence' },
+    { key: 'exited',    label: 'Exited',    cls: 'red',     desc: 'Access revoked · DPDP data-disposition record produced' }
+  ];
+  function kvStatusOf(rec) { return (rec && rec.workStatus) || 'active'; }
+  function kvStatusMeta(key) {
+    return KV_WORK_STATUS.find(function (s) { return s.key === key; }) || KV_WORK_STATUS[0];
+  }
+  /* the badge itself — used by every grid so one worker reads the same
+     everywhere. Adds a chip when an agency request is waiting on HR. */
+  function kvStatusPill(rec) {
+    var m = kvStatusMeta(kvStatusOf(rec));
+    var html = '<span class="pill ' + m.cls + ' tiny" title="' + kvEsc(m.desc) + '">' + m.label + '</span>';
+    if (rec && rec.statusRequest && rec.statusRequest.state === 'pending') {
+      html += ' <span class="pill amber tiny" title="' + kvEsc((rec.statusRequest.by || 'Agency') + ' requested ' + kvStatusMeta(rec.statusRequest.to).label + ' — awaiting HR') + '">⧗ HR decision</span>';
+    }
+    return html;
+  }
+  function kvStatusFilterHtml(id, cur, onchange) {
+    return '<select class="sel" id="' + id + '" style="max-width:180px" onchange="' + onchange + '">' +
+      '<option value="">All statuses</option>' +
+      KV_WORK_STATUS.map(function (s) {
+        return '<option value="' + s.key + '"' + (s.key === cur ? ' selected' : '') + '>' + s.label + '</option>';
+      }).join('') +
+      '<option value="pending-request"' + (cur === 'pending-request' ? ' selected' : '') + '>⧗ Awaiting HR decision</option>' +
+    '</select>';
+  }
+  function kvStatusMatches(rec, filter) {
+    if (!filter) return true;
+    if (filter === 'pending-request') return !!(rec && rec.statusRequest && rec.statusRequest.state === 'pending');
+    return kvStatusOf(rec) === filter;
+  }
+  function kvFilterValue(id) {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function kvCaptureIndexById(workerId) {
+    var list = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === workerId || list[i].backendId === workerId) return i;
+    }
+    return -1;
+  }
+  function kvOpenStatusByWorkerId(workerId) {
+    var i = kvCaptureIndexById(workerId);
+    if (i < 0) { toast('That worker record is not loaded in this session', 'red'); return; }
+    kvOpenStatus(i);
+  }
+
+  /* status & access panel — the HTML lives inside the worker modal tab and is
+     also usable stand-alone from the HR inbox. */
+  function kvStatusPanelHtml(rec, i) {
+    var cur = kvStatusOf(rec);
+    var m = kvStatusMeta(cur);
+    var isHR = kvIsHR();
+    var req = (rec.statusRequest && rec.statusRequest.state === 'pending') ? rec.statusRequest : null;
+    var html = '';
+
+    html += '<div class="g2" style="gap:10px 14px;margin-bottom:12px">' +
+      '<div class="kpi"><div class="kpi-eye">Employment status</div>' +
+        '<div class="kpi-val" style="font-size:1rem">' + kvStatusPill(rec) + '</div>' +
+        '<div class="kpi-sub">' + kvEsc(m.desc) + '</div></div>' +
+      '<div class="kpi"><div class="kpi-eye">Platform access</div>' +
+        '<div class="kpi-val" style="font-size:1rem">' +
+          (rec.accessRevokedAt
+            ? '<span class="pill red tiny">Revoked</span>'
+            : (cur === 'suspended' || cur === 'inactive'
+                ? '<span class="pill amber tiny">Suspended</span>'
+                : '<span class="pill green tiny">Active</span>')) +
+        '</div>' +
+        '<div class="kpi-sub">' + (rec.accessRevokedAt ? 'Revoked ' + kvDateTime(rec.accessRevokedAt) : (rec.loginUsername ? 'Login ' + kvEsc(rec.loginUsername) : 'No worker login provisioned')) + '</div></div>' +
+    '</div>';
+
+    html += '<div class="cap-hint" style="margin:0 0 10px">Set by <strong>' + kvEsc(rec.workStatusBy || '—') + '</strong>' +
+      (rec.workStatusAt ? ' on ' + kvDateTime(rec.workStatusAt) : '') +
+      (rec.workStatusReason ? ' · ' + kvEsc(rec.workStatusReason) : '') + '</div>';
+
+    /* pending agency request — HR decides, agency waits */
+    if (req) {
+      html += '<div class="note amber" style="margin-bottom:12px;font-size:0.78rem">' +
+        '<strong>' + kvEsc(req.by) + '</strong> (agency) requested a change from <strong>' + kvStatusMeta(req.from).label +
+        '</strong> to <strong>' + kvStatusMeta(req.to).label + '</strong> on ' + kvDateTime(req.at) +
+        (req.reason ? '<br>Reason: ' + kvEsc(req.reason) : '') +
+        (isHR
+          ? '<div style="margin-top:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+              '<input class="input" id="kv-st-decision-note" placeholder="Note for the audit trail (optional)" style="max-width:280px">' +
+              '<button class="btn primary" onclick="kvResolveStatusRequest(' + i + ',\'approve\')">Approve &amp; apply</button>' +
+              '<button class="btn danger" onclick="kvResolveStatusRequest(' + i + ',\'reject\')">Reject</button>' +
+            '</div>'
+          : '<div class="tiny" style="margin-top:6px">Awaiting a decision from Plant HR — an agency cannot apply a status change.</div>') +
+      '</div>';
+    }
+
+    if (cur === 'exited') {
+      html += '<div class="note green" style="margin-bottom:12px;font-size:0.78rem">This worker has exited. Access was revoked' +
+        (rec.accessRevokedAt ? ' on ' + kvDateTime(rec.accessRevokedAt) : '') +
+        ' and a statutory data-disposition record was produced' +
+        (rec.exitRecordId ? ' · <span class="cap-recent-link" onclick="kvOpenExitRecord(\'' + kvEsc(rec.exitRecordId) + '\')">open the exit record</span>' : '') + '.</div>';
+    } else if (isHR) {
+      /* HR: change the status directly */
+      var opts = KV_WORK_STATUS.filter(function (s) { return s.key !== 'exited'; }).map(function (s) {
+        return '<option value="' + s.key + '"' + (s.key === cur ? ' selected' : '') + '>' + s.label + '</option>';
+      }).join('');
+      html += '<div class="card-h-title" style="font-size:0.85rem;margin:6px 0 4px">Change status (HR)</div>' +
+        '<div class="cap-hint" style="margin:0 0 8px">Only the principal employer\'s HR can move a worker between statuses. Every change is written to an immutable event log.</div>' +
+        '<div class="g3" style="gap:10px 14px;align-items:end">' +
+          '<div class="field"><label class="field-l">New status</label><select class="sel" id="kv-st-new">' + opts + '</select></div>' +
+          '<div class="field"><label class="field-l">Reason</label><input class="input" id="kv-st-reason" placeholder="e.g. Redeployed to another site"></div>' +
+          '<div class="field"><label class="field-l">&nbsp;</label><button class="btn primary" onclick="kvApplyStatus(' + i + ')">Apply status</button></div>' +
+        '</div>' +
+        '<div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">' +
+          '<div class="card-h-title" style="font-size:0.85rem">Exit &amp; access revocation · DPDP</div>' +
+          '<div class="cap-hint" style="margin:4px 0 8px">Exiting a worker revokes platform access immediately and produces the statutory data-disposition record — what is retained, under which obligation, for how long, and what is deleted or anonymised.</div>' +
+          '<button class="btn danger" onclick="kvOpenExit(' + i + ')">Start exit workflow →</button>' +
+        '</div>';
+    } else {
+      /* agency: request only */
+      var reqOpts = KV_WORK_STATUS.filter(function (s) { return s.key !== cur; }).map(function (s) {
+        return '<option value="' + s.key + '">' + s.label + '</option>';
+      }).join('');
+      html += '<div class="card-h-title" style="font-size:0.85rem;margin:6px 0 4px">Request a status change</div>' +
+        '<div class="note indigo" style="margin:0 0 8px;font-size:0.74rem">Worker status and platform access are controlled by Plant HR. Submit a request and HR is notified immediately — nothing changes until HR approves.</div>' +
+        (req ? '<div class="tiny muted">A request is already pending with HR.</div>' :
+        '<div class="g3" style="gap:10px 14px;align-items:end">' +
+          '<div class="field"><label class="field-l">Requested status</label><select class="sel" id="kv-st-req">' + reqOpts + '</select></div>' +
+          '<div class="field"><label class="field-l">Reason</label><input class="input" id="kv-st-req-reason" placeholder="e.g. Worker absconding since 12 Jul"></div>' +
+          '<div class="field"><label class="field-l">&nbsp;</label><button class="btn primary" onclick="kvRequestStatus(' + i + ')">Send request to HR</button></div>' +
+        '</div>');
+    }
+
+    html += '<div class="card-h-title" style="font-size:0.85rem;margin:18px 0 4px">Status history</div>' +
+      '<div id="kv-st-history" class="tiny muted">Loading history…</div>';
+    return html;
+  }
+
+  function kvLoadStatusHistory(rec) {
+    var host = document.getElementById('kv-st-history');
+    if (!host) return;
+    kvJson('/api/worker-status-events?workerId=' + encodeURIComponent(rec.backendId || rec.id)).then(function (j) {
+      var evs = (j && j.events) || [];
+      var host2 = document.getElementById('kv-st-history');
+      if (!host2) return;
+      if (!evs.length) { host2.innerHTML = '<div class="tiny muted">No status change recorded — the worker has been Active since onboarding.</div>'; return; }
+      host2.innerHTML = '<table class="t"><thead><tr><th>When</th><th>Change</th><th>By</th><th>Source</th><th>Reason</th></tr></thead><tbody>' +
+        evs.map(function (e) {
+          return '<tr><td class="tiny">' + kvDateTime(e.at) + '</td>' +
+            '<td>' + kvStatusMeta(e.from).label + ' → <strong>' + kvStatusMeta(e.to).label + '</strong></td>' +
+            '<td class="tiny">' + kvEsc(e.by || '—') + (e.byRole ? ' <span class="muted">· ' + kvEsc(e.byRole) + '</span>' : '') + '</td>' +
+            '<td class="tiny">' + kvEsc(e.source || '—') + '</td>' +
+            '<td class="tiny">' + kvEsc(e.reason || '—') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }).catch(function () {
+      var h = document.getElementById('kv-st-history');
+      if (h) h.innerHTML = '<div class="tiny muted">History unavailable — the backend is not reachable.</div>';
+    });
+  }
+
+  /* stand-alone status modal (from a grid badge or the HR inbox) */
+  function kvOpenStatus(i) {
+    var rec = CAP_STATE.recent[i];
+    if (!rec) return;
+    kvTabModal({
+      eyebrow: 'Employment status &amp; access · ' + kvEsc(rec.id),
+      title: kvEsc(rec.name),
+      tabs: [{ id: 'status', label: 'Status &amp; access', html: kvStatusPanelHtml(rec, i) }],
+      footer: '<div class="modal-footer-left"><span class="tiny muted">Status changes are HR-only · every change is logged</span></div>' +
+              '<div class="modal-footer-right"><button class="btn" onclick="obOpenCapture(' + i + ')">Open full record</button>' +
+              '<button class="btn" onclick="omCloseModal()">Close</button></div>',
+      width: 920
+    });
+    kvLoadStatusHistory(rec);
+  }
+
+  function kvApplyStatus(i) {
+    if (!kvHrOnly('Only HR can change a worker’s status.')) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var next = (document.getElementById('kv-st-new') || {}).value;
+    var reason = ((document.getElementById('kv-st-reason') || {}).value || '').trim();
+    if (!next) return;
+    if (next === kvStatusOf(rec)) { toast('That is already the current status', 'amber'); return; }
+    if (!reason) { toast('Record a reason — it is part of the audit trail', 'red'); return; }
+    kvJson('/api/worker-status', 'POST', { workerId: rec.backendId || rec.id, status: next, reason: reason })
+      .then(function (j) {
+        if (!j || !j.ok) { toast((j && j.error) || 'Status change failed', 'red'); return; }
+        Object.assign(rec, {
+          workStatus: j.capture.workStatus, workStatusAt: j.capture.workStatusAt,
+          workStatusBy: j.capture.workStatusBy, workStatusReason: j.capture.workStatusReason,
+          statusRequest: null
+        });
+        obRefreshOnboardViews();
+        toast(rec.name + ' is now ' + kvStatusMeta(next).label, 'green');
+        kvOpenStatus(i);
+      })
+      .catch(function (e) { toast('Status change failed: ' + e.message, 'red'); });
+  }
+
+  function kvRequestStatus(i) {
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var next = (document.getElementById('kv-st-req') || {}).value;
+    var reason = ((document.getElementById('kv-st-req-reason') || {}).value || '').trim();
+    if (!next) return;
+    if (!reason) { toast('Give HR a reason for the requested change', 'red'); return; }
+    kvJson('/api/worker-status/request', 'POST', { workerId: rec.backendId || rec.id, status: next, reason: reason })
+      .then(function (j) {
+        if (!j || !j.ok) { toast((j && j.error) || 'Request failed', 'red'); return; }
+        rec.statusRequest = j.request;
+        obRefreshOnboardViews();
+        toast('Request sent to Plant HR — you will see the badge update once HR decides', 'green');
+        kvOpenStatus(i);
+      })
+      .catch(function (e) { toast('Request failed: ' + e.message, 'red'); });
+  }
+
+  function kvResolveStatusRequest(i, decision) {
+    if (!kvHrOnly('Only HR can decide a status change request.')) return;
+    var rec = CAP_STATE.recent[i]; if (!rec || !rec.statusRequest) return;
+    var note = ((document.getElementById('kv-st-decision-note') || {}).value || '').trim();
+    kvJson('/api/worker-status/request/' + encodeURIComponent(rec.statusRequest.id) + '/resolve', 'POST', { decision: decision, note: note })
+      .then(function (j) {
+        if (!j || !j.ok) { toast((j && j.error) || 'Could not record the decision', 'red'); return; }
+        Object.assign(rec, {
+          workStatus: j.capture.workStatus, workStatusAt: j.capture.workStatusAt,
+          workStatusBy: j.capture.workStatusBy, workStatusReason: j.capture.workStatusReason,
+          statusRequest: null
+        });
+        obRefreshOnboardViews();
+        kvLoadHrInbox(true);
+        toast('Request ' + (decision === 'approve' ? 'approved and applied' : 'rejected') + ' · ' + rec.name, 'green');
+        kvOpenStatus(i);
+      })
+      .catch(function (e) { toast('Could not record the decision: ' + e.message, 'red'); });
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CR-9 · EXIT: ACCESS REVOCATION + STATUTORY DATA DISPOSITION
+     Revocation is the immediate security action. The compliance obligation is
+     what happens to the data afterwards, so an exit always produces both: a
+     revocation record AND a disposition record naming, per data category,
+     whether it is retained (under which statute, for how long) or deleted /
+     anonymised. The disposition record is the artefact a Data Protection Board
+     would ask to see.
+     ════════════════════════════════════════════════════════════════════════ */
+  var KV_EXIT_REASONS = ['Resignation', 'Contract / work order ended', 'Termination', 'Absconding', 'Retirement', 'Redeployed to another principal employer'];
+  /* mirrors the server-side schedule so the preview is identical to the record */
+  var KV_DISPOSITION = [
+    { key: 'attendance',  label: 'Attendance & wage register',                 action: 'retain',    years: 5, basis: 'Code on Wages 2019 · s.50 r/w Rules — wage & attendance records retained 5 years' },
+    { key: 'epfEsic',     label: 'EPF / ESIC contribution records & challans', action: 'retain',    years: 7, basis: 'EPF Scheme 1952 para 36 / ESIC Regulations — contribution records retained 7 years' },
+    { key: 'appointment', label: 'Appointment letter & employment contract',   action: 'retain',    years: 5, basis: 'Code on Wages 2019 · appointment-letter mandate — retained for the statutory period' },
+    { key: 'safety',      label: 'Induction, PPE issue & safety training records', action: 'retain', years: 3, basis: 'OSH & Working Conditions Code 2020 — training and accident records' },
+    { key: 'idProof',     label: 'Identity documents (Aadhaar eKYC artefact, PAN scan)', action: 'delete', days: 30, basis: 'DPDP 2023 · s.8(7) — erase once the purpose (verification) is served' },
+    { key: 'biometric',   label: 'Biometric templates & worker photograph',    action: 'delete',    days: 30, basis: 'DPDP 2023 · s.8(7) — no residual purpose after exit' },
+    { key: 'health',      label: 'Medical fitness & health data',              action: 'delete',    days: 30, basis: 'DPDP 2023 · s.8(7) — sensitive data, no residual purpose' },
+    { key: 'consent',     label: 'Consent-linked data (night-shift consent, boarding log)', action: 'anonymise', days: 30, basis: 'DPDP 2023 · purpose limitation — kept de-identified as OSHC R.83 evidence' },
+    { key: 'contact',     label: 'WhatsApp / mobile number & chat threads',    action: 'delete',    days: 30, basis: 'DPDP 2023 · s.8(7) — communication channel closes with employment' }
+  ];
+  function kvDispositionPreview(lastDay) {
+    var base = lastDay ? new Date(lastDay) : new Date();
+    if (isNaN(base.getTime())) base = new Date();
+    return KV_DISPOSITION.map(function (d) {
+      var until = new Date(base);
+      if (d.years) until.setFullYear(until.getFullYear() + d.years);
+      else until.setDate(until.getDate() + (d.days || 30));
+      return Object.assign({}, d, { until: until.toISOString().slice(0, 10) });
+    });
+  }
+  function kvDispositionActionPill(a) {
+    var cls = a === 'retain' ? 'green' : a === 'anonymise' ? 'amber' : 'red';
+    var label = a === 'retain' ? 'Retain' : a === 'anonymise' ? 'Anonymise' : 'Delete';
+    return '<span class="pill ' + cls + ' tiny">' + label + '</span>';
+  }
+  function kvDispositionTable(rows) {
+    return '<table class="t"><thead><tr><th>Data category</th><th>Disposition</th><th>Until</th><th>Statutory basis</th></tr></thead><tbody>' +
+      rows.map(function (d) {
+        return '<tr><td class="t-strong">' + kvEsc(d.label) + '</td>' +
+          '<td>' + kvDispositionActionPill(d.action) + '</td>' +
+          '<td class="mono tiny">' + kvDateShort(d.until) + '</td>' +
+          '<td class="tiny muted">' + kvEsc(d.basis) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function kvOpenExit(i) {
+    if (!kvHrOnly('Only HR can exit a worker and revoke their access.')) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    if (kvStatusOf(rec) === 'exited') { kvOpenExitRecord(rec.exitRecordId); return; }
+    var today = new Date().toISOString().slice(0, 10);
+    var preview = kvDispositionPreview(today);
+    var body =
+      '<div class="note red" style="margin-bottom:12px;font-size:0.78rem">' +
+        'Exiting <strong>' + kvEsc(rec.name) + '</strong> (' + kvEsc(rec.id) + ') revokes platform access <strong>immediately</strong> ' +
+        'and writes the DPDP data-disposition record. This cannot be undone from this screen.' +
+      '</div>' +
+      '<div class="g3" style="gap:10px 14px">' +
+        '<div class="field"><label class="field-l">Last working day</label><input class="input" type="date" id="kv-exit-lwd" value="' + today + '" onchange="kvExitRefreshPreview()"></div>' +
+        '<div class="field"><label class="field-l">Reason</label><select class="sel" id="kv-exit-reason">' +
+          KV_EXIT_REASONS.map(function (r) { return '<option>' + r + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="field-l">Note (audit trail)</label><input class="input" id="kv-exit-note" placeholder="Optional"></div>' +
+      '</div>' +
+      '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 4px">1 · Access revocation — immediate</div>' +
+      '<div class="cap-hint" style="margin:0 0 8px">Every channel that could reach this worker\'s personal data is cut at the same moment.</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+        ['Karya Vaani worker login' + (rec.loginUsername ? ' (' + kvEsc(rec.loginUsername) + ')' : ' — none provisioned'),
+         'WhatsApp worker broadcast list', 'Transport boarding roster', 'Plant gate ID card']
+          .map(function (c) { return '<span class="pill outline tiny">✕ ' + c + '</span>'; }).join('') +
+      '</div>' +
+      '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 4px">2 · Statutory data disposition</div>' +
+      '<div class="cap-hint" style="margin:0 0 8px">CR-9 as written covers revocation only. What a Data Protection Board actually examines is this: which records are kept, under which statutory obligation and for how long, and which are deleted or anonymised.</div>' +
+      '<div id="kv-exit-preview">' + kvDispositionTable(preview) + '</div>';
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Exit workflow · DPDP 2023 · HR only</span>' +
+        '<span class="modal-h-title">' + kvEsc(rec.name) + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' + body + '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Produces an access-revocation record and a data-disposition record</span></div>' +
+        '<div class="modal-footer-right"><button class="btn danger" onclick="kvConfirmExit(' + i + ')">Revoke access &amp; record disposition</button>' +
+        '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>',
+      980
+    );
+  }
+  function kvExitRefreshPreview() {
+    var lwd = (document.getElementById('kv-exit-lwd') || {}).value;
+    var host = document.getElementById('kv-exit-preview');
+    if (host) host.innerHTML = kvDispositionTable(kvDispositionPreview(lwd));
+  }
+  function kvConfirmExit(i) {
+    if (!kvHrOnly('Only HR can exit a worker.')) return;
+    var rec = CAP_STATE.recent[i]; if (!rec) return;
+    var lwd = (document.getElementById('kv-exit-lwd') || {}).value;
+    var reason = (document.getElementById('kv-exit-reason') || {}).value;
+    var note = ((document.getElementById('kv-exit-note') || {}).value || '').trim();
+    if (!window.confirm('Revoke access for ' + rec.name + ' and record the data disposition? This is immediate.')) return;
+    kvJson('/api/worker-exit', 'POST', { workerId: rec.backendId || rec.id, lastWorkingDay: lwd, reason: reason, note: note })
+      .then(function (j) {
+        if (!j || !j.ok) { toast((j && j.error) || 'Exit failed', 'red'); return; }
+        Object.assign(rec, {
+          workStatus: 'exited', workStatusAt: j.capture.workStatusAt, workStatusBy: j.capture.workStatusBy,
+          workStatusReason: j.capture.workStatusReason, accessRevokedAt: j.capture.accessRevokedAt,
+          exitRecordId: j.capture.exitRecordId, lastWorkingDay: j.capture.lastWorkingDay, statusRequest: null
+        });
+        obRefreshOnboardViews();
+        if (typeof kvRenderExitRegister === 'function') kvRenderExitRegister();
+        toast('Access revoked · disposition record created for ' + rec.name, 'green');
+        if (typeof kvNotify === 'function') {
+          kvNotify('Access revoked · ' + rec.name,
+            'Platform access revoked and the DPDP data-disposition record was written' +
+            (j.exit && j.exit.revocation && j.exit.revocation.loginDisabled ? ' · worker login disabled' : ''), 'warn');
+        }
+        kvOpenExitRecord(j.exit.id, j.exit);
+      })
+      .catch(function (e) { toast('Exit failed: ' + e.message, 'red'); });
+  }
+
+  /* the exit record itself — revocation + disposition, printable */
+  function kvRenderExitRecord(x) {
+    var rev = x.revocation || {};
+    return kv2col(
+      kvKV('Worker', kvEsc(x.workerName) + ' · ' + kvEsc(x.workerId)) +
+      kvKV('Employer', kvEsc(x.contractor || (x.type === 'direct' ? 'Daikin (direct)' : '—'))) +
+      kvKV('Last working day', kvDateShort(x.lastWorkingDay)) +
+      kvKV('Exit reason', kvEsc(x.reason)) +
+      kvKV('Recorded by', kvEsc(x.createdBy) + ' · ' + kvDateTime(x.createdAt)) +
+      kvKV('Exit record ID', '<span class="mono">' + kvEsc(x.id) + '</span>')
+    ) +
+    '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 4px">Access revocation record</div>' +
+    kvKV('Revoked at', kvDateTime(rev.at)) +
+    kvKV('Revoked by', kvEsc(rev.by)) +
+    kvKV('Worker login', rev.loginUsername
+      ? kvEsc(rev.loginUsername) + ' · ' + (rev.loginDisabled ? '<span class="pill red tiny">disabled</span>' : '<span class="pill amber tiny">not found</span>')
+      : '<span class="pill outline tiny">none provisioned</span>') +
+    kvKV('Channels cut', (rev.channels || []).map(function (c) { return '<span class="pill outline tiny">' + kvEsc(c) + '</span>'; }).join(' ')) +
+    '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 4px">Statutory data-disposition record</div>' +
+    '<div class="cap-hint" style="margin:0 0 8px">What was kept, under which statutory obligation, for how long — and what was deleted or anonymised.</div>' +
+    kvDispositionTable(x.disposition || []) +
+    (x.note ? '<div class="note indigo" style="margin-top:10px;font-size:0.76rem">' + kvEsc(x.note) + '</div>' : '');
+  }
+  function kvOpenExitRecord(id, preloaded) {
+    if (!id && !preloaded) { toast('No exit record on this worker', 'red'); return; }
+    var show = function (x) {
+      if (!x) { toast('Exit record not found', 'red'); return; }
+      omModal(
+        '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Exit record · DPDP 2023 · access revocation + data disposition</span>' +
+          '<span class="modal-h-title">' + kvEsc(x.workerName) + '</span></div>' +
+          '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+        '<div class="modal-body">' + kvRenderExitRecord(x) + '</div>' +
+        '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Audit evidence · retained with the worker record</span></div>' +
+          '<div class="modal-footer-right"><button class="btn" onclick="kvDownloadExitRecord(\'' + kvEsc(x.id) + '\')">Download (Excel)</button>' +
+          '<button class="btn" onclick="omCloseModal()">Close</button></div></div>',
+        980
+      );
+    };
+    if (preloaded) { KV_EXITS.rows = KV_EXITS.rows.concat([preloaded]); show(preloaded); return; }
+    var have = KV_EXITS.rows.find(function (r) { return r.id === id; });
+    if (have) { show(have); return; }
+    kvJson('/api/exit-records').then(function (j) {
+      KV_EXITS.rows = (j && j.exits) || [];
+      show(KV_EXITS.rows.find(function (r) { return r.id === id; }));
+    });
+  }
+  function kvDownloadExitRecord(id) {
+    var x = KV_EXITS.rows.find(function (r) { return r.id === id; });
+    if (!x) { toast('Exit record not loaded', 'red'); return; }
+    var headers = ['Data category', 'Disposition', 'Retain / erase until', 'Statutory basis'];
+    var rows = (x.disposition || []).map(function (d) { return [d.label, d.action, d.until, d.basis]; });
+    rows.unshift(['— ACCESS REVOKED —', x.revocation ? x.revocation.at : '', x.revocation ? x.revocation.by : '', (x.revocation && x.revocation.channels || []).join('; ')]);
+    rows.unshift(['WORKER', x.workerName + ' (' + x.workerId + ')', 'Last working day ' + x.lastWorkingDay, 'Reason: ' + x.reason]);
+    downloadWorkbook('Exit record', headers, rows, 'karya-vaani_exit-record_' + x.workerId + '_' + todayStamp() + '.xlsx');
+  }
+
+  /* exit register — the DPDP evidence list on the Statutory posture page */
+  var KV_EXITS = { rows: [], filter: '' };
+  function kvRenderExitRegister() {
+    var host = document.getElementById('exit-register-body');
+    if (!host) return;
+    var rows = KV_EXITS.rows.slice();
+    var kpi = document.getElementById('exit-register-kpis');
+    if (kpi) {
+      var revoked = rows.filter(function (r) { return r.revocation && r.revocation.loginDisabled; }).length;
+      var pendingDelete = 0, today = new Date().toISOString().slice(0, 10);
+      rows.forEach(function (r) {
+        (r.disposition || []).forEach(function (d) { if (d.action !== 'retain' && d.until >= today) pendingDelete++; });
+      });
+      kpi.innerHTML =
+        '<div class="kpi"><div class="kpi-eye">Exits recorded</div><div class="kpi-val">' + rows.length + '</div><div class="kpi-sub">each with a disposition record</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Logins disabled</div><div class="kpi-val" style="color:var(--green-dk)">' + revoked + '</div><div class="kpi-sub">access revoked on exit</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Erasures scheduled</div><div class="kpi-val" style="color:var(--amber-dk)">' + pendingDelete + '</div><div class="kpi-sub">categories due for delete / anonymise</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Retention classes</div><div class="kpi-val">' + KV_DISPOSITION.filter(function (d) { return d.action === 'retain'; }).length + '</div><div class="kpi-sub">statutory holds applied per exit</div></div>';
+    }
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="6" class="tiny muted" style="padding:14px">No exits recorded yet. Exiting a worker from their record produces the access-revocation and data-disposition pair here.</td></tr>';
+      var pg = document.getElementById('exit-register-pagination'); if (pg) pg.innerHTML = '';
+      return;
+    }
+    KVTABLE.set({
+      key: 'exitreg', tbody: 'exit-register-body', pager: 'exit-register-pagination', pageSize: 8, cols: 6, rows: rows,
+      text: function (x) { return [x.workerName, x.workerId, x.contractor, x.reason, x.createdBy].join(' '); },
+      row: function (x) {
+        var del = (x.disposition || []).filter(function (d) { return d.action !== 'retain'; }).length;
+        var keep = (x.disposition || []).filter(function (d) { return d.action === 'retain'; }).length;
+        return '<tr style="cursor:pointer" onclick="kvOpenExitRecord(\'' + kvEsc(x.id) + '\')">' +
+          '<td class="t-strong">' + kvEsc(x.workerName) + '<div class="t-mute">' + kvEsc(x.workerId) + '</div></td>' +
+          '<td class="tiny">' + kvEsc(x.contractor || '—') + '</td>' +
+          '<td class="tiny">' + kvEsc(x.reason) + '</td>' +
+          '<td class="tiny">' + kvDateShort(x.lastWorkingDay) + '</td>' +
+          '<td>' + (x.revocation && x.revocation.loginDisabled
+            ? '<span class="pill red tiny">Access revoked</span>'
+            : '<span class="pill amber tiny">Revoked · no login</span>') + '</td>' +
+          '<td class="tiny"><span class="pill green tiny">' + keep + ' retained</span> <span class="pill outline tiny">' + del + ' erased / anonymised</span></td>' +
+        '</tr>';
+      }
+    });
+  }
+  function initExitRegister() {
+    if (!document.getElementById('exit-register-body')) return;
+    kvJson('/api/exit-records').then(function (j) {
+      KV_EXITS.rows = (j && j.exits) || [];
+      kvRenderExitRegister();
+    }).catch(function () { kvRenderExitRegister(); });
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CR-8 · CLRA LICENCE CEILING — a hard block on onboarding
+     OSHC Rules 86-90: the contractor's licence names a maximum authorised
+     deployment headcount. Deploying past it is a Contract Labour violation and
+     the principal employer permitting it carries joint liability, so the
+     platform refuses the onboarding outright.
+
+     Daikin's commercial "contracted headcount" is a SEPARATE, non-statutory
+     number. It is tracked in its own field and only ever raises an advisory
+     alert — merging the two would produce compliance-labelled evidence that
+     does not correspond to a statutory obligation.
+     ════════════════════════════════════════════════════════════════════════ */
+  function ctByName(name) {
+    var key = String(name || '').trim().toLowerCase();
+    if (!key) return null;
+    var list = (typeof CONTRACTORS !== 'undefined' && CONTRACTORS.length) ? CONTRACTORS : ((window.__KVDATA && window.__KVDATA.contractors) || []);
+    return list.find(function (c) { return String(c.name).trim().toLowerCase() === key || String(c.id).toLowerCase() === key; }) || null;
+  }
+  /* workers onboarded through the platform that still occupy a licence slot —
+     exited and inactive workers release theirs, because the ceiling applies to
+     the ACTUAL deployed headcount. */
+  function ctOnboardedActive(contractorName) {
+    var key = String(contractorName || '').trim().toLowerCase();
+    return (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []).filter(function (r) {
+      if ((r.type || 'direct') !== 'contract') return false;
+      if (String((r.employment || {}).contractor || '').trim().toLowerCase() !== key) return false;
+      var st = kvStatusOf(r);
+      return st !== 'exited' && st !== 'inactive';
+    });
+  }
+  function ctLicenceState(cOrName) {
+    var c = (cOrName && cOrName.id) ? cOrName : ctByName(cOrName);
+    if (!c) return null;
+    var lic = c.clraLicence || {};
+    var base = kvNum(c.deployed);
+    var onboarded = ctOnboardedActive(c.name).length;
+    var used = base + onboarded;
+    var max = kvNum(lic.maxHeadcount) || null;
+    var commercial = kvNum(c.commercialHeadcount) || null;
+    return {
+      contractor: c, contractorId: c.id, contractorName: c.name,
+      licenceNo: lic.number || '', validTill: lic.validTill || '', authority: lic.authority || '',
+      max: max, base: base, onboarded: onboarded, used: used,
+      headroom: max === null ? null : (max - used),
+      blocked: max !== null && used >= max,
+      nearLimit: max !== null && (max - used) > 0 && (max - used) <= Math.max(3, Math.round(max * 0.05)),
+      commercial: commercial,
+      commercialHeadroom: commercial === null ? null : (commercial - used),
+      commercialExceeded: commercial !== null && used >= commercial
+    };
+  }
+  /* the statutory pill — never blended with the commercial number */
+  function ctLicencePill(st) {
+    if (!st) return '<span class="pill outline tiny">—</span>';
+    if (st.max === null) return '<span class="pill outline tiny" title="No CLRA licence ceiling on record — HR must record it">Ceiling not set</span>';
+    if (st.blocked) return '<span class="pill red tiny" title="CLRA licence ceiling reached — onboarding is blocked">At ceiling · ' + st.used + '/' + st.max + '</span>';
+    if (st.nearLimit) return '<span class="pill amber tiny" title="Approaching the licensed ceiling">' + st.headroom + ' left · ' + st.used + '/' + st.max + '</span>';
+    return '<span class="pill green tiny" title="Headroom under the CLRA licensed headcount">' + st.headroom + ' left · ' + st.used + '/' + st.max + '</span>';
+  }
+  /* the commercial pill — explicitly labelled so it can never be read as
+     compliance evidence */
+  function ctCommercialPill(st) {
+    if (!st || st.commercial === null) return '<span class="pill outline tiny">Commercial · not set</span>';
+    if (st.commercialExceeded) return '<span class="pill amber tiny" title="Commercial supply agreement exceeded — advisory only, not a compliance limit">Commercial · over by ' + (st.used - st.commercial) + '</span>';
+    return '<span class="pill outline tiny" title="Commercial supply agreement — advisory only">Commercial · ' + st.used + '/' + st.commercial + '</span>';
+  }
+
+  /* live headroom note under the contractor picker on the capture form */
+  function capLicenceSync() {
+    var host = document.getElementById('cap-licence-note');
+    if (!host) return;
+    if (CAP_STATE.type !== 'contract') { host.innerHTML = ''; return; }
+    var name = (document.getElementById('cap-contractor') || {}).value || '';
+    if (!name) { host.innerHTML = '<div class="tiny muted">Select the vendor to see its CLRA licence headroom.</div>'; return; }
+    var st = ctLicenceState(name);
+    if (!st) { host.innerHTML = ''; return; }
+    var lines = '';
+    if (st.max === null) {
+      lines += '<div class="note amber" style="font-size:0.74rem">No CLRA licence ceiling recorded for ' + kvEsc(st.contractorName) +
+        '. HR must record the licensed headcount before onboarding can be checked against it.</div>';
+    } else if (st.blocked) {
+      lines += '<div class="note red" style="font-size:0.74rem"><strong>Blocked · CLRA licence ceiling reached.</strong> ' +
+        kvEsc(st.contractorName) + ' has ' + st.used + ' of ' + st.max + ' licensed workers deployed (licence ' +
+        kvEsc(st.licenceNo || '—') + '). Onboarding beyond the licensed headcount is a Contract Labour violation and the ' +
+        'principal employer carries joint liability. The agency must have its licence amended first.</div>';
+    } else {
+      lines += '<div class="note ' + (st.nearLimit ? 'amber' : 'green') + '" style="font-size:0.74rem">' +
+        '<strong>CLRA licence · ' + st.headroom + ' of ' + st.max + ' remaining</strong> (' + st.used + ' deployed · licence ' +
+        kvEsc(st.licenceNo || '—') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '). Statutory ceiling — enforced.</div>';
+    }
+    if (st.commercialExceeded) {
+      lines += '<div class="note amber" style="font-size:0.74rem;margin-top:6px"><strong>Commercial alert (not a compliance limit).</strong> ' +
+        'This deployment is ' + (st.used - st.commercial) + ' above the contracted headcount of ' + st.commercial +
+        ' agreed with ' + kvEsc(st.contractorName) + '. Onboarding is allowed — review the commercial agreement.</div>';
+    }
+    host.innerHTML = lines;
+  }
+  /* the gate itself — called by both the single-capture and bulk-import paths.
+     Returns true when onboarding may proceed. */
+  function capLicenceAllows(contractorName, adding) {
+    var st = ctLicenceState(contractorName);
+    if (!st || st.max === null) return true;
+    if (st.used + (adding || 1) > st.max) {
+      toast('CLRA licence ceiling · ' + st.contractorName + ' is licensed for ' + st.max +
+            ' workers and has ' + st.used + ' deployed. Onboarding is blocked until the licence is amended.', 'red');
+      return false;
+    }
+    return true;
+  }
+
+  /* HR-only licence editor — an agency must never be able to raise the number
+     that limits it. */
+  function ctOpenLicenceEditor(id) {
+    if (!kvHrOnly('Only HR can maintain the CLRA licence ceiling.')) return;
+    var st = ctLicenceState(id);
+    if (!st) { toast('Contractor not found', 'red'); return; }
+    var c = st.contractor;
+    var lic = c.clraLicence || {};
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">CLRA licence · statutory ceiling · HR only</span>' +
+        '<span class="modal-h-title">' + kvEsc(c.name) + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="note indigo" style="font-size:0.76rem;margin-bottom:12px">Two different numbers, deliberately kept apart. ' +
+          'The <strong>CLRA licensed headcount</strong> is statutory (OSHC Rules 86-90) and is enforced as a hard block on onboarding. ' +
+          'The <strong>commercial contracted headcount</strong> is Daikin\'s supply agreement — advisory only, it never blocks anything.</div>' +
+        '<div class="card-h-title" style="font-size:0.85rem;margin-bottom:6px">Statutory · CLRA licence</div>' +
+        '<div class="g3" style="gap:10px 14px">' +
+          '<div class="field"><label class="field-l">Licence number</label><input class="input" id="lic-no" value="' + kvEsc(lic.number || '') + '"></div>' +
+          '<div class="field"><label class="field-l">Licensed max headcount <span style="color:var(--red-dk)">*</span></label><input class="input" type="number" min="0" id="lic-max" value="' + (lic.maxHeadcount == null ? '' : lic.maxHeadcount) + '"></div>' +
+          '<div class="field"><label class="field-l">Valid till</label><input class="input" id="lic-till" value="' + kvEsc(lic.validTill || '') + '" placeholder="e.g. 18 Jul 2026"></div>' +
+          '<div class="field"><label class="field-l">Licensing authority</label><input class="input" id="lic-auth" value="' + kvEsc(lic.authority || '') + '"></div>' +
+        '</div>' +
+        '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 6px">Commercial · not a compliance field</div>' +
+        '<div class="g3" style="gap:10px 14px">' +
+          '<div class="field"><label class="field-l">Contracted headcount (commercial)</label><input class="input" type="number" min="0" id="lic-comm" value="' + (c.commercialHeadcount == null ? '' : c.commercialHeadcount) + '"></div>' +
+        '</div>' +
+        '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 6px">Current position</div>' +
+        kv2col(
+          kvKV('Roster already deployed', st.base) +
+          kvKV('Onboarded through the platform', st.onboarded) +
+          kvKV('Total against the licence', '<strong>' + st.used + '</strong>') +
+          kvKV('Statutory headroom', st.max === null ? '—' : ctLicencePill(st)) +
+          kvKV('Commercial position', ctCommercialPill(st))
+        ) +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Lowering the ceiling below the deployed headcount blocks all further onboarding for this agency</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" onclick="ctSaveLicence(\'' + kvEsc(c.id) + '\')">Save licence</button>' +
+        '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>',
+      900
+    );
+  }
+  function ctSaveLicence(id) {
+    if (!kvHrOnly()) return;
+    var v = function (x) { var el = document.getElementById(x); return el ? el.value : ''; };
+    var max = v('lic-max');
+    if (max !== '' && (isNaN(Number(max)) || Number(max) < 0)) { toast('Licensed headcount must be a number', 'red'); return; }
+    kvJson('/api/contractors/' + encodeURIComponent(id) + '/licence', 'POST', {
+      number: v('lic-no'), maxHeadcount: max === '' ? null : Number(max),
+      validTill: v('lic-till'), authority: v('lic-auth'),
+      commercialHeadcount: v('lic-comm') === '' ? null : Number(v('lic-comm'))
+    }).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Could not save the licence', 'red'); return; }
+      var c = ctByName(id);
+      if (c) {
+        c.clraLicence = Object.assign({}, c.clraLicence, {
+          number: v('lic-no'), maxHeadcount: max === '' ? null : Number(max),
+          validTill: v('lic-till'), authority: v('lic-auth')
+        });
+        c.commercialHeadcount = v('lic-comm') === '' ? null : Number(v('lic-comm'));
+      }
+      omCloseModal();
+      if (typeof renderContractorGrid === 'function') renderContractorGrid();
+      if (typeof SELECTED_CT !== 'undefined' && SELECTED_CT === id && typeof openCtDrill === 'function') openCtDrill(id);
+      if (typeof kvRenderLicenceBoard === 'function') kvRenderLicenceBoard();
+      capLicenceSync();
+      toast('CLRA licence updated for ' + (c ? c.name : id), 'green');
+    }).catch(function (e) { toast('Could not save the licence: ' + e.message, 'red'); });
+  }
+
+  /* licence board on the Statutory posture page — every agency's statutory
+     ceiling next to (but never merged with) its commercial position */
+  function kvRenderLicenceBoard() {
+    var body = document.getElementById('lic-board-body');
+    if (!body) return;
+    var list = (typeof CONTRACTORS !== 'undefined' && CONTRACTORS.length) ? CONTRACTORS : ((window.__KVDATA && window.__KVDATA.contractors) || []);
+    var states = list.map(ctLicenceState).filter(Boolean);
+    var kpis = document.getElementById('lic-board-kpis');
+    if (kpis) {
+      var blocked = states.filter(function (s) { return s.blocked; }).length;
+      var near = states.filter(function (s) { return s.nearLimit; }).length;
+      var unset = states.filter(function (s) { return s.max === null; }).length;
+      var over = states.filter(function (s) { return s.commercialExceeded; }).length;
+      kpis.innerHTML =
+        '<div class="kpi"><div class="kpi-eye">Agencies at licence ceiling</div><div class="kpi-val" style="color:var(--red-dk)">' + blocked + '</div><div class="kpi-sub">onboarding hard-blocked</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Approaching the ceiling</div><div class="kpi-val" style="color:var(--amber-dk)">' + near + '</div><div class="kpi-sub">licence amendment due</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">No ceiling recorded</div><div class="kpi-val">' + unset + '</div><div class="kpi-sub">cannot be enforced until HR records it</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Over commercial headcount</div><div class="kpi-val">' + over + '</div><div class="kpi-sub">advisory · not a compliance breach</div></div>';
+    }
+    states.sort(function (a, b) {
+      var av = a.max === null ? 999999 : a.headroom, bv = b.max === null ? 999999 : b.headroom;
+      return av - bv;
+    });
+    KVTABLE.set({
+      key: 'licboard', tbody: 'lic-board-body', pager: 'lic-board-pagination', pageSize: 8, cols: 7, rows: states,
+      text: function (s) { return [s.contractorName, s.licenceNo, s.max, s.used].join(' '); },
+      row: function (s) {
+        return '<tr style="cursor:pointer" onclick="ctOpenContractorByName(\'' + kvEsc(s.contractorName).replace(/'/g, "\\'") + '\')">' +
+          '<td class="t-strong">' + kvEsc(s.contractorName) + '<div class="t-mute mono tiny">' + kvEsc(s.licenceNo || 'no licence on record') + '</div></td>' +
+          '<td class="mono">' + (s.max === null ? '—' : s.max) + '</td>' +
+          '<td class="mono">' + s.used + '<span class="tiny muted"> (' + s.base + ' + ' + s.onboarded + ')</span></td>' +
+          '<td>' + ctLicencePill(s) + '</td>' +
+          '<td>' + ctCommercialPill(s) + '</td>' +
+          '<td class="tiny">' + kvEsc(s.validTill || '—') + '</td>' +
+          '<td style="text-align:right" onclick="event.stopPropagation()">' +
+            (kvIsHR() ? '<button class="btn tiny" onclick="ctOpenLicenceEditor(\'' + kvEsc(s.contractorId) + '\')">Edit licence</button>'
+                      : '<span class="tiny muted">HR only</span>') + '</td>' +
+        '</tr>';
+      }
+    });
+  }
+  function initLicenceBoard() { if (document.getElementById('lic-board-body')) kvRenderLicenceBoard(); }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CR-6 · EPF / ESIC PAYMENT CAPTURE + HR VERIFICATION
+     The principal employer cannot discharge joint liability by assumption: it
+     must hold a verified record that contributions were paid, at the right
+     amount, against the ACTUAL deployed headcount — not the registered one.
+
+     So the agency submits what it paid and the challan it paid against, the
+     platform reconciles the challan headcount with the deployed headcount it
+     independently knows, and HR records the verdict (Full Paid / Partially
+     Paid / Not Paid). That verdict is the compliance record; only HR writes it.
+     ════════════════════════════════════════════════════════════════════════ */
+  var EPF_STATE = { contractor: null, rows: [], month: null, all: [] };
+  var EPF_VERDICTS = [
+    { key: 'full',    label: 'Full Paid',      cls: 'green'   },
+    { key: 'partial', label: 'Partially Paid', cls: 'amber'   },
+    { key: 'none',    label: 'Not Paid',       cls: 'red'     }
+  ];
+  /* employer + employee contribution rates used for the indicative expectation */
+  var EPF_RATE = 0.13;      // 12% EPF/EPS employer + ~1% admin & EDLI
+  var ESIC_RATE = 0.04;     // 3.25% employer + 0.75% employee
+  function epfVerdictMeta(k) { return EPF_VERDICTS.find(function (v) { return v.key === k; }) || null; }
+  function epfVerdictPill(row) {
+    var v = row && row.verification;
+    if (!v || !v.status) return '<span class="pill outline tiny" title="Submitted by the agency — not yet verified by HR">Awaiting HR verification</span>';
+    var m = epfVerdictMeta(v.status);
+    return '<span class="pill ' + m.cls + ' tiny" title="Verified by ' + kvEsc(v.by) + ' on ' + kvDateTime(v.at) + '">' + m.label + '</span>';
+  }
+  function epfAvgPay(c) {
+    var n = String((c && c.avgPay) || '').replace(/[^\d]/g, '');
+    return n ? Number(n) : 0;
+  }
+  /* the three independent headcounts + the money variance */
+  function epfReconcile(row, st, c) {
+    var deployed = st ? st.used : kvNum(row.platformDeployed);
+    var challan = kvNum(row.challanHeadcount);
+    var declared = kvNum(row.declaredHeadcount);
+    var wageBill = kvNum(row.wageBill) || (epfAvgPay(c) * (challan || deployed));
+    var expEpf = Math.round(wageBill * EPF_RATE);
+    var expEsic = Math.round(wageBill * ESIC_RATE);
+    var paidEpf = kvNum(row.epfAmount), paidEsic = kvNum(row.esicAmount);
+    return {
+      deployed: deployed, challan: challan, declared: declared,
+      headcountGap: deployed - challan,
+      wageBill: wageBill,
+      expEpf: expEpf, expEsic: expEsic,
+      epfVar: paidEpf - expEpf, esicVar: paidEsic - expEsic,
+      perWorkerEpf: challan ? Math.round(paidEpf / challan) : 0,
+      perWorkerEsic: challan ? Math.round(paidEsic / challan) : 0,
+      /* the compliance question, stated plainly */
+      reconciled: challan > 0 && deployed > 0 && challan >= deployed
+    };
+  }
+  function epfReconcileNote(rc) {
+    if (!rc.challan) return '<span class="pill red tiny">No challan headcount submitted</span>';
+    if (rc.headcountGap > 0) {
+      return '<span class="pill red tiny">' + rc.headcountGap + ' deployed worker' + (rc.headcountGap === 1 ? '' : 's') + ' not on the challan</span>';
+    }
+    if (rc.headcountGap < 0) {
+      return '<span class="pill amber tiny">Challan covers ' + (-rc.headcountGap) + ' more than deployed</span>';
+    }
+    return '<span class="pill green tiny">Challan matches deployed headcount</span>';
+  }
+
+  function epfLoad(contractorName) {
+    return kvJson('/api/statutory-payments' + (contractorName ? '?contractor=' + encodeURIComponent(contractorName) : ''))
+      .then(function (j) { return (j && j.payments) || []; })
+      .catch(function () { return []; });
+  }
+
+  /* one payment row rendered as a reconciliation card */
+  function epfRowHtml(row, st, c, canVerify) {
+    var rc = epfReconcile(row, st, c);
+    var v = row.verification || null;
+    var money = function (label, paid, expected, variance) {
+      var cls = variance >= 0 ? 'var(--green-dk)' : 'var(--red-dk)';
+      return '<div class="sd-mini"><div class="sd-mini-eye">' + label + '</div>' +
+        '<div class="sd-mini-v">' + kvMoney(paid) + '</div>' +
+        '<div class="sd-mini-s">indicative expectation ' + kvMoney(expected) +
+        ' · <span style="color:' + cls + '">' + (variance >= 0 ? '+' : '') + kvMoney(variance) + '</span></div></div>';
+    };
+    return '<div class="card" style="margin-bottom:12px;border-left:3px solid ' +
+        (v && v.status === 'full' ? 'var(--green)' : v && v.status === 'partial' ? 'var(--amber)' : v && v.status === 'none' ? 'var(--red)' : 'var(--line)') + '">' +
+      '<div class="card-h" style="padding:0"><div>' +
+        '<div class="card-h-title">' + kvMonthLabel(row.month) + ' · ' + kvEsc(row.contractorName) + '</div>' +
+        '<div class="card-h-sub">Submitted by ' + kvEsc(row.submittedBy) + ' · ' + kvDateTime(row.submittedAt) +
+          (row.paidOn ? ' · paid ' + kvDateShort(row.paidOn) : '') + '</div>' +
+      '</div>' + epfVerdictPill(row) + '</div>' +
+      '<div class="sd-mini-grid" style="margin-top:10px">' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Deployed headcount · platform</div>' +
+          '<div class="sd-mini-v">' + rc.deployed + '</div><div class="sd-mini-s">actual, from this platform</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Headcount on the challan</div>' +
+          '<div class="sd-mini-v" style="color:' + (rc.headcountGap > 0 ? 'var(--red-dk)' : 'var(--green-dk)') + '">' + rc.challan + '</div>' +
+          '<div class="sd-mini-s">agency declared ' + rc.declared + '</div></div>' +
+        money('EPF paid', kvNum(row.epfAmount), rc.expEpf, rc.epfVar) +
+        money('ESIC paid', kvNum(row.esicAmount), rc.expEsic, rc.esicVar) +
+      '</div>' +
+      '<div style="margin-top:10px">' + epfReconcileNote(rc) +
+        ' <span class="tiny muted">· ' + kvMoney(rc.perWorkerEpf) + ' EPF and ' + kvMoney(rc.perWorkerEsic) +
+        ' ESIC per worker on the challan · declared wage bill ' + kvMoney(rc.wageBill) + '</span></div>' +
+      kv2col(
+        kvKV('EPF challan / TRRN', kvEsc(row.epfChallanNo || '—') + (row.epfTrrn ? ' · ' + kvEsc(row.epfTrrn) : '')) +
+        kvKV('ESIC challan / CRN', kvEsc(row.esicChallanNo || '—') + (row.esicCrn ? ' · ' + kvEsc(row.esicCrn) : '')) +
+        (row.note ? kvKV('Agency note', kvEsc(row.note)) : '') +
+        (v ? kvKV('Verified by', kvEsc(v.by) + ' · ' + kvDateTime(v.at) +
+              (v.shortfallWorkers ? ' · <span class="pill red tiny">' + v.shortfallWorkers + ' worker shortfall</span>' : '')) : '') +
+        (v && v.note ? kvKV('HR verification note', kvEsc(v.note)) : '')
+      ) +
+      (row.reopenedAt ? '<div class="note amber" style="margin-top:8px;font-size:0.74rem">Resubmitted on ' + kvDateTime(row.reopenedAt) +
+          ' — the amounts changed, so the earlier HR verification was cleared and must be repeated.</div>' : '') +
+      (canVerify
+        ? '<div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">' +
+            '<div class="card-h-title" style="font-size:0.82rem;margin-bottom:4px">HR verification</div>' +
+            '<div class="cap-hint" style="margin:0 0 8px">Reconcile the challan against ' + rc.deployed +
+              ' actually deployed workers, then record the verdict. This is what converts the agency\'s administrative submission into a compliance record.</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+              '<input class="input" id="epf-note-' + kvEsc(row.id) + '" placeholder="Verification note (what you checked)" style="max-width:320px">' +
+              EPF_VERDICTS.map(function (vd) {
+                return '<button class="btn ' + (vd.key === 'full' ? 'primary' : vd.key === 'partial' ? 'amber' : 'danger') +
+                  '" onclick="epfVerify(\'' + kvEsc(row.id) + '\',\'' + vd.key + '\',' + rc.deployed + ')">' + vd.label + '</button>';
+              }).join('') +
+            '</div>' +
+          '</div>'
+        : (v ? '' : '<div class="tiny muted" style="margin-top:10px">Awaiting verification by Plant HR.</div>')) +
+    '</div>';
+  }
+
+  function epfSubmitFormHtml(c, st) {
+    var m = kvThisMonth();
+    return '<div class="card" style="margin-bottom:12px">' +
+      '<div class="card-h" style="padding:0"><div><div class="card-h-title">Submit EPF / ESIC payment</div>' +
+      '<div class="card-h-sub">Per month, per deployed worker. HR reconciles the challan against the deployed headcount before verifying.</div></div></div>' +
+      '<div class="g3" style="gap:10px 14px;margin-top:10px">' +
+        '<div class="field"><label class="field-l">Month</label><select class="sel" id="epf-f-month">' + kvMonthOptions(kvPrevMonth(m)) + '</select></div>' +
+        '<div class="field"><label class="field-l">Workers paid for (declared)</label><input class="input" type="number" min="0" id="epf-f-declared" value="' + (st ? st.used : '') + '"></div>' +
+        '<div class="field"><label class="field-l">Headcount on the challan <span style="color:var(--red-dk)">*</span></label><input class="input" type="number" min="0" id="epf-f-challan"></div>' +
+        '<div class="field"><label class="field-l">EPF amount paid (₹)</label><input class="input" type="number" min="0" id="epf-f-epf"></div>' +
+        '<div class="field"><label class="field-l">EPF challan no.</label><input class="input" id="epf-f-epfchallan"></div>' +
+        '<div class="field"><label class="field-l">EPF TRRN</label><input class="input" id="epf-f-trrn"></div>' +
+        '<div class="field"><label class="field-l">ESIC amount paid (₹)</label><input class="input" type="number" min="0" id="epf-f-esic"></div>' +
+        '<div class="field"><label class="field-l">ESIC challan no.</label><input class="input" id="epf-f-esicchallan"></div>' +
+        '<div class="field"><label class="field-l">ESIC CRN</label><input class="input" id="epf-f-crn"></div>' +
+        '<div class="field"><label class="field-l">Wage bill for the month (₹)</label><input class="input" type="number" min="0" id="epf-f-wage"></div>' +
+        '<div class="field"><label class="field-l">Paid on</label><input class="input" type="date" id="epf-f-paidon"></div>' +
+        '<div class="field"><label class="field-l">Note</label><input class="input" id="epf-f-note" placeholder="Optional"></div>' +
+      '</div>' +
+      '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<button class="btn primary" onclick="epfSubmit(\'' + kvEsc(c.id) + '\')">Submit for HR verification</button>' +
+        '<span class="tiny muted">Resubmitting changed amounts clears any earlier HR verification — it has to be re-verified.</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /* the pane used by the contractor drill-down (HR) and the agency home */
+  function epfRenderInto(hostId, contractorIdOrName, opts) {
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    var c = ctByName(contractorIdOrName);
+    if (!c) { host.innerHTML = '<div class="tiny muted">Contractor record not found.</div>'; return; }
+    var st = ctLicenceState(c);
+    var canVerify = kvIsHR();
+    var canSubmit = kvIsHR() || (kvIsAgency() && String(kvAgencyFirm()).trim().toLowerCase() === String(c.name).trim().toLowerCase());
+    host.innerHTML = '<div class="tiny muted">Loading EPF / ESIC submissions…</div>';
+    epfLoad(c.name).then(function (rows) {
+      EPF_STATE.contractor = c.name;
+      EPF_STATE.rows = rows;
+      var head =
+        '<div class="note indigo" style="font-size:0.76rem;margin-bottom:12px">' +
+          '<strong>Social Security Code · joint liability.</strong> The principal employer must hold a verified record that the ' +
+          'contractor\'s EPF and ESIC contributions were actually paid, at the correct amount, for the <strong>actual deployed ' +
+          'headcount</strong> — not the registered headcount. The reconciliation below compares the headcount on the challan with ' +
+          'the ' + (st ? st.used : '—') + ' workers this platform shows as deployed for ' + kvEsc(c.name) + '.' +
+        '</div>';
+      var unverified = rows.filter(function (r) { return !r.verification || !r.verification.status; }).length;
+      var summary = '<div class="sd-mini-grid" style="margin-bottom:12px">' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Months submitted</div><div class="sd-mini-v">' + rows.length + '</div><div class="sd-mini-s">EPF + ESIC returns</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Awaiting HR verification</div><div class="sd-mini-v" style="color:' + (unverified ? 'var(--amber-dk)' : 'var(--green-dk)') + '">' + unverified + '</div><div class="sd-mini-s">unverified = undischarged liability</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Deployed headcount now</div><div class="sd-mini-v">' + (st ? st.used : '—') + '</div><div class="sd-mini-s">reconciliation baseline</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Verified Full Paid</div><div class="sd-mini-v" style="color:var(--green-dk)">' +
+          rows.filter(function (r) { return r.verification && r.verification.status === 'full'; }).length + '</div><div class="sd-mini-s">months fully discharged</div></div>' +
+      '</div>';
+      var list = rows.length
+        ? rows.map(function (r) { return epfRowHtml(r, st, c, canVerify); }).join('')
+        : '<div class="note amber" style="font-size:0.76rem">No EPF/ESIC payment has been submitted for ' + kvEsc(c.name) +
+          '. Until a submission is verified against the deployed headcount, the principal employer holds an undischarged joint liability for this agency.</div>';
+      host.innerHTML = head + summary + (canSubmit ? epfSubmitFormHtml(c, st) : '') + list;
+    });
+  }
+  function epfSubmit(contractorId) {
+    var c = ctByName(contractorId);
+    if (!c) return;
+    var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    if (!v('epf-f-challan')) { toast('Enter the headcount printed on the challan — it is what HR reconciles against', 'red'); return; }
+    if (!v('epf-f-epf') && !v('epf-f-esic')) { toast('Enter the EPF and/or ESIC amount paid', 'red'); return; }
+    kvJson('/api/statutory-payments', 'POST', {
+      contractorId: c.id, contractor: c.name, actorContractor: kvAgencyFirm() || undefined,
+      month: v('epf-f-month'),
+      declaredHeadcount: v('epf-f-declared'), challanHeadcount: v('epf-f-challan'),
+      epfAmount: v('epf-f-epf'), esicAmount: v('epf-f-esic'),
+      epfChallanNo: v('epf-f-epfchallan'), epfTrrn: v('epf-f-trrn'),
+      esicChallanNo: v('epf-f-esicchallan'), esicCrn: v('epf-f-crn'),
+      wageBill: v('epf-f-wage'), paidOn: v('epf-f-paidon'), note: v('epf-f-note')
+    }).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Submission failed', 'red'); return; }
+      toast('EPF/ESIC submitted for ' + kvMonthLabel(j.payment.month) + ' — awaiting HR verification', 'green');
+      epfRefreshAll();
+    }).catch(function (e) { toast('Submission failed: ' + e.message, 'red'); });
+  }
+  function epfVerify(id, status, deployed) {
+    if (!kvHrOnly('Only HR can record the EPF/ESIC verification.')) return;
+    var note = ((document.getElementById('epf-note-' + id) || {}).value || '').trim();
+    if (status !== 'full' && !note) { toast('Record what was short or missing — a partial/not-paid verdict needs a note', 'red'); return; }
+    kvJson('/api/statutory-payments/' + encodeURIComponent(id) + '/verify', 'POST', {
+      status: status, note: note, reconciledDeployed: deployed
+    }).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Verification failed', 'red'); return; }
+      toast('Recorded · ' + epfVerdictMeta(status).label, 'green');
+      epfRefreshAll();
+      kvLoadHrInbox(true);
+    }).catch(function (e) { toast('Verification failed: ' + e.message, 'red'); });
+  }
+  /* re-render whichever EPF surfaces are on screen */
+  function epfRefreshAll() {
+    if (document.getElementById('ct-pane-epf') && typeof SELECTED_CT !== 'undefined' && SELECTED_CT) epfRenderInto('ct-pane-epf', SELECTED_CT);
+    if (document.getElementById('ct-epf-host')) { var f = kvAgencyFirm() || (typeof CT_ACTIVE !== 'undefined' ? CT_ACTIVE : null); if (f) epfRenderInto('ct-epf-host', f); }
+    if (document.getElementById('epf-rollup-body')) initEpfRollup();
+  }
+  /* jump straight from the HR inbox to the contractor's payment tab */
+  function epfOpenForContractor(id) {
+    if (typeof nav === 'function') nav('vendor', (typeof kvNavEl === 'function' ? kvNavEl('vendor') : null));
+    if (typeof openCtDrill === 'function') openCtDrill(id);
+    setTimeout(function () {
+      var tabs = document.querySelectorAll('#ct-drill .sd-drill-tab');
+      [].forEach.call(tabs, function (t) { if (/EPF/i.test(t.textContent || '')) t.click(); });
+    }, 260);
+  }
+
+  /* ── rollup on the Statutory posture page · every agency, latest months ── */
+  function initEpfRollup() {
+    var body = document.getElementById('epf-rollup-body');
+    if (!body) return;
+    epfLoad(null).then(function (rows) {
+      EPF_STATE.all = rows;
+      var list = (typeof CONTRACTORS !== 'undefined' && CONTRACTORS.length) ? CONTRACTORS : ((window.__KVDATA && window.__KVDATA.contractors) || []);
+      var kpis = document.getElementById('epf-rollup-kpis');
+      if (kpis) {
+        var unverified = rows.filter(function (r) { return !r.verification || !r.verification.status; }).length;
+        var notPaid = rows.filter(function (r) { return r.verification && r.verification.status === 'none'; }).length;
+        var partial = rows.filter(function (r) { return r.verification && r.verification.status === 'partial'; }).length;
+        var noSubmission = list.filter(function (c) { return !rows.some(function (r) { return r.contractorId === c.id; }); }).length;
+        kpis.innerHTML =
+          '<div class="kpi"><div class="kpi-eye">Agencies with no submission</div><div class="kpi-val" style="color:var(--red-dk)">' + noSubmission + '</div><div class="kpi-sub">joint liability undischarged</div></div>' +
+          '<div class="kpi"><div class="kpi-eye">Awaiting HR verification</div><div class="kpi-val" style="color:var(--amber-dk)">' + unverified + '</div><div class="kpi-sub">submitted, not yet reconciled</div></div>' +
+          '<div class="kpi"><div class="kpi-eye">Partially paid</div><div class="kpi-val" style="color:var(--amber-dk)">' + partial + '</div><div class="kpi-sub">verified short against deployment</div></div>' +
+          '<div class="kpi"><div class="kpi-eye">Not paid</div><div class="kpi-val" style="color:var(--red-dk)">' + notPaid + '</div><div class="kpi-sub">escalate to the agency immediately</div></div>';
+      }
+      /* one row per agency-month submitted, plus a row for every agency that
+         has submitted nothing at all — the silent gap is the real exposure */
+      var display = rows.slice();
+      list.forEach(function (c) {
+        if (!rows.some(function (r) { return r.contractorId === c.id; })) {
+          display.push({ id: 'missing_' + c.id, contractorId: c.id, contractorName: c.name, month: '', _missing: true });
+        }
+      });
+      KVTABLE.set({
+        key: 'epfroll', tbody: 'epf-rollup-body', pager: 'epf-rollup-pagination', pageSize: 10, cols: 7, rows: display,
+        text: function (r) { return [r.contractorName, r.month, r.epfChallanNo, r.esicChallanNo, (r.verification || {}).status, r._missing ? 'missing no submission' : ''].join(' '); },
+        row: function (r) {
+          var c = ctByName(r.contractorId);
+          if (r._missing) {
+            return '<tr style="cursor:pointer" onclick="epfOpenForContractor(\'' + kvEsc(r.contractorId) + '\')">' +
+              '<td class="t-strong">' + kvEsc(r.contractorName) + '</td><td class="tiny muted">—</td>' +
+              '<td colspan="3" class="tiny">No EPF/ESIC payment ever submitted</td>' +
+              '<td><span class="pill red tiny">No record held</span></td>' +
+              '<td style="text-align:right"><button class="btn tiny">Chase</button></td></tr>';
+          }
+          var rc = epfReconcile(r, ctLicenceState(r.contractorId), c);
+          return '<tr style="cursor:pointer" onclick="epfOpenForContractor(\'' + kvEsc(r.contractorId) + '\')">' +
+            '<td class="t-strong">' + kvEsc(r.contractorName) + '</td>' +
+            '<td class="tiny">' + kvMonthLabel(r.month) + '</td>' +
+            '<td class="mono tiny">' + kvMoney(r.epfAmount) + '</td>' +
+            '<td class="mono tiny">' + kvMoney(r.esicAmount) + '</td>' +
+            '<td class="tiny">' + rc.challan + ' vs ' + rc.deployed + ' ' + epfReconcileNote(rc) + '</td>' +
+            '<td>' + epfVerdictPill(r) + '</td>' +
+            '<td style="text-align:right"><button class="btn tiny">' + (kvIsHR() ? 'Verify' : 'Open') + '</button></td></tr>';
+        }
+      });
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CR-3 · UNIQUE ROUTE NUMBER + APPEND-ONLY ASSIGNMENT LOG
+     Rule 83 requires documented transport arrangements for women workers on
+     night shifts. It does not mandate route numbering — but without a stable
+     identifier, a boarding record or a night-shift consent cannot be tied back
+     to the route the worker was actually on, and the audit trail the statute
+     does require falls apart.
+
+     So: routeNo is unique and persistent (the bus code B1… can be re-allocated,
+     routeNo cannot), and a re-assignment is APPENDED, never overwritten.
+     ════════════════════════════════════════════════════════════════════════ */
+  function trRouteNo(r) {
+    if (!r) return '—';
+    if (r.routeNo) return r.routeNo;
+    /* fallback for a store seeded before the field existed — stable by index */
+    var list = (typeof TR_ROUTES !== 'undefined') ? TR_ROUTES : [];
+    var i = list.indexOf(r);
+    return 'RT-' + String((i < 0 ? 0 : i) + 1).padStart(2, '0');
+  }
+  function trRouteByAny(v) {
+    var key = String(v || '').trim().toLowerCase();
+    if (!key) return null;
+    var list = (typeof TR_ROUTES !== 'undefined') ? TR_ROUTES : [];
+    return list.find(function (r) {
+      return String(trRouteNo(r)).toLowerCase() === key ||
+             String(r.code || '').toLowerCase() === key ||
+             String(r.route || '').toLowerCase() === key;
+    }) || null;
+  }
+  /* label used everywhere a route is shown: "RT-03 · Route 3 · Sullurpet" */
+  function trRouteLabel(v) {
+    var r = (v && v.route) ? v : trRouteByAny(v);
+    if (!r) return String(v || '—');
+    return trRouteNo(r) + ' · ' + r.route;
+  }
+  function trRouteNoBadge(r) {
+    return '<span class="pill outline tiny mono" title="Unique persistent route number — boarding, attendance and consent records point at this">' + trRouteNo(r) + '</span>';
+  }
+  /* uniqueness is a data-integrity requirement, so it is checked and surfaced
+     rather than assumed */
+  function trRouteNoDuplicates() {
+    var seen = {}, dup = [];
+    ((typeof TR_ROUTES !== 'undefined') ? TR_ROUTES : []).forEach(function (r) {
+      var no = trRouteNo(r);
+      if (seen[no]) dup.push(no); else seen[no] = r.route;
+    });
+    return dup;
+  }
+  function trRenderRouteIntegrity() {
+    var host = document.getElementById('tr-routeno-check');
+    if (!host) return;
+    var routes = (typeof TR_ROUTES !== 'undefined') ? TR_ROUTES : [];
+    var dup = trRouteNoDuplicates();
+    var missing = routes.filter(function (r) { return !r.routeNo; }).length;
+    if (dup.length) {
+      host.innerHTML = '<div class="note red" style="font-size:0.76rem"><strong>Route number collision.</strong> ' +
+        dup.join(', ') + ' is assigned to more than one route. Boarding and night-shift consent records keyed to it cannot be ' +
+        'traced to a single route — fix this before publishing another roster.</div>';
+    } else if (missing) {
+      host.innerHTML = '<div class="note amber" style="font-size:0.76rem"><strong>' + missing + ' route(s) have no stored route number.</strong> ' +
+        'A number is being derived for display, but it will not survive a re-order — restart the backend to have it assigned and persisted.</div>';
+    } else {
+      host.innerHTML = '<div class="note green" style="font-size:0.76rem">' + routes.length +
+        ' routes · every route carries a unique, persistent route number. Boarding, attendance and OSHC R.83 consent records are traceable to the route they were captured on.</div>';
+    }
+  }
+
+  /* ── append-only worker route assignment log ── */
+  function trLogRouteChange(rec, fromRoute, toRoute, reason) {
+    var fr = trRouteByAny(fromRoute), to = trRouteByAny(toRoute);
+    var entry = {
+      at: new Date().toISOString(), by: kvActorName(),
+      fromRoute: fromRoute || '', fromRouteNo: fr ? trRouteNo(fr) : '',
+      toRoute: toRoute || '', toRouteNo: to ? trRouteNo(to) : '',
+      shift: rec.shift || '', reason: reason || ''
+    };
+    /* never overwrite: the prior assignment stays, so any past boarding or
+       consent record linked to it remains interpretable */
+    rec.routeHistory = (rec.routeHistory || []).concat([entry]);
+    if (typeof obPersistRec === 'function') obPersistRec(rec, { routeHistory: rec.routeHistory });
+    kvJson('/api/transport/route-assignment', 'POST', {
+      workerId: rec.backendId || rec.id, workerCode: rec.id, workerName: rec.name,
+      fromRoute: entry.fromRoute, fromRouteNo: entry.fromRouteNo,
+      toRoute: entry.toRoute, toRouteNo: entry.toRouteNo,
+      shift: entry.shift, reason: entry.reason
+    }).catch(function () { /* offline — kept on the record */ });
+    return entry;
+  }
+  function trRouteHistoryHtml(rec) {
+    var hist = (rec && rec.routeHistory) || [];
+    var cur = rec && rec.route ? trRouteByAny(rec.route) : null;
+    var head = '<div class="card-h-title" style="font-size:0.85rem;margin:14px 0 4px">Route assignment history</div>' +
+      '<div class="cap-hint" style="margin:0 0 8px">Route numbers are persistent identifiers. Re-assignments are appended, never overwritten, so a past boarding or night-shift consent record stays traceable to the route it was captured on.</div>' +
+      (cur ? '<div style="margin-bottom:8px">Currently on ' + trRouteNoBadge(cur) + ' <strong>' + kvEsc(cur.route) + '</strong>' +
+             (rec.shift ? ' · ' + kvEsc(rec.shift) + ' shift' : '') + '</div>' : '');
+    if (!hist.length) {
+      return head + '<div class="tiny muted">No re-assignment recorded — the worker is on the route set at onboarding.</div>';
+    }
+    return head + '<table class="t"><thead><tr><th>When</th><th>From</th><th>To</th><th>Shift</th><th>By</th></tr></thead><tbody>' +
+      hist.slice().reverse().map(function (h) {
+        return '<tr><td class="tiny">' + kvDateTime(h.at) + '</td>' +
+          '<td class="tiny">' + (h.fromRouteNo ? '<span class="mono">' + kvEsc(h.fromRouteNo) + '</span> · ' : '') + kvEsc(h.fromRoute || '—') + '</td>' +
+          '<td class="tiny">' + (h.toRouteNo ? '<span class="mono">' + kvEsc(h.toRouteNo) + '</span> · ' : '') + kvEsc(h.toRoute || '— none —') + '</td>' +
+          '<td class="tiny">' + kvEsc(h.shift || '—') + '</td>' +
+          '<td class="tiny">' + kvEsc(h.by || '—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  /* plant-wide route change log on the Transport page */
+  function initRouteChangeLog() {
+    var body = document.getElementById('tr-routelog-body');
+    if (!body) return;
+    trRenderRouteIntegrity();
+    kvJson('/api/transport/route-assignments').then(function (j) {
+      var rows = (j && j.assignments) || [];
+      var cnt = document.getElementById('tr-routelog-count');
+      if (cnt) cnt.textContent = rows.length + ' change' + (rows.length === 1 ? '' : 's');
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="6" class="tiny muted" style="padding:12px">No route re-assignment recorded yet. Every change HR makes to a worker\'s route is appended here with a timestamp.</td></tr>';
+        return;
+      }
+      KVTABLE.set({
+        key: 'trlog', tbody: 'tr-routelog-body', pager: 'tr-routelog-pagination', pageSize: 10, cols: 6, rows: rows,
+        text: function (r) { return [r.workerName, r.workerCode, r.fromRouteNo, r.toRouteNo, r.fromRoute, r.toRoute, r.by].join(' '); },
+        row: function (r) {
+          return '<tr><td class="tiny">' + kvDateTime(r.at) + '</td>' +
+            '<td class="t-strong">' + kvEsc(r.workerName || r.workerCode) + '<div class="t-mute mono tiny">' + kvEsc(r.workerCode) + '</div></td>' +
+            '<td class="tiny">' + (r.fromRouteNo ? '<span class="mono">' + kvEsc(r.fromRouteNo) + '</span> ' : '') + kvEsc(r.fromRoute || '—') + '</td>' +
+            '<td class="tiny">' + (r.toRouteNo ? '<span class="mono">' + kvEsc(r.toRouteNo) + '</span> ' : '') + kvEsc(r.toRoute || '— removed —') + '</td>' +
+            '<td class="tiny">' + kvEsc(r.shift || '—') + '</td>' +
+            '<td class="tiny">' + kvEsc(r.by || '—') + '</td></tr>';
+        }
+      });
+    }).catch(function () {
+      body.innerHTML = '<tr><td colspan="6" class="tiny muted" style="padding:12px">Route change log unavailable — the backend is not reachable.</td></tr>';
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CR-7 · OVERTIME, LOSS OF PAY & VARIABLE ALLOWANCES · monthly register
+     Two different things live in one register, and they are labelled as such:
+
+     · COMPLIANCE — overtime hours and the statutory overtime rate (125% of the
+       ordinary wage rate), and the ESIC ₹21,000 wage-ceiling effect: if OT
+       pushes a worker's monthly wages over the ceiling their contribution
+       status changes, and the engine surfaces that automatically.
+     · OPERATIONAL — Loss of Pay and variable allowances outside standard
+       payroll. These are payroll administration, not a Labour Code obligation.
+       They sit in the same monthly log because the Code on Wages five-year
+       retention window covers the register.
+     ════════════════════════════════════════════════════════════════════════ */
+  var PAY_CEILING = 21000;      // ESIC monthly wage ceiling
+  var PAY_OT_MULT = 1.25;       // overtime at 125% of the ordinary rate
+  var PAY_DAYS = 26, PAY_HOURS = 8;
+  var PAY_BASE_BY_CATEGORY = { 'Unskilled': 15000, 'Semi-skilled': 18000, 'Skilled': 22000, 'Highly skilled': 28000 };
+  var PAY_ALLOWANCE_TYPES = ['Attendance incentive', 'Night-shift allowance', 'Production incentive', 'Conveyance', 'Other'];
+  var PAY_STATE = { month: null, rows: [], filter: '', onlyCeiling: false };
+
+  function payComputeRow(p) {
+    var baseWage = kvNum(p.baseWage), otHours = kvNum(p.otHours), lopDays = kvNum(p.lopDays);
+    var allowances = (p.allowances || []).filter(function (a) { return a && a.label; });
+    var dailyRate = baseWage / PAY_DAYS;
+    var ordinaryHourly = dailyRate / PAY_HOURS;
+    var otHourly = ordinaryHourly * PAY_OT_MULT;
+    var otAmount = Math.round(otHourly * otHours);
+    var lopAmount = Math.round(dailyRate * lopDays);
+    var allowanceTotal = allowances.reduce(function (s, a) { return s + kvNum(a.amount); }, 0);
+    var grossWages = Math.round(baseWage + otAmount + allowanceTotal - lopAmount);
+    var coveredOnBase = baseWage <= PAY_CEILING;
+    var coveredOnGross = grossWages <= PAY_CEILING;
+    return {
+      baseWage: baseWage, otHours: otHours, lopDays: lopDays, allowances: allowances,
+      dailyRate: dailyRate, ordinaryHourly: ordinaryHourly, otHourly: otHourly,
+      otAmount: otAmount, lopAmount: lopAmount, allowanceTotal: allowanceTotal, grossWages: grossWages,
+      esicCoveredOnBase: coveredOnBase, esicCoveredOnGross: coveredOnGross,
+      esicCeilingCrossed: coveredOnBase && !coveredOnGross
+    };
+  }
+  function payBaseFor(rec) {
+    if (rec && rec.baseWage) return kvNum(rec.baseWage);
+    var cat = (rec && rec.category) || 'Unskilled';
+    return PAY_BASE_BY_CATEGORY[cat] || PAY_BASE_BY_CATEGORY['Unskilled'];
+  }
+  /* every worker the register can be written for — onboarded captures first
+     (they carry a category and an employer), then the OM roster */
+  function payWorkerPool() {
+    var out = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : [])
+      .filter(function (r) { return kvStatusOf(r) !== 'exited'; })
+      .map(function (r) {
+        return {
+          code: r.id, name: r.name, category: r.category || 'Unskilled',
+          type: r.type || 'contract', department: (r.employment || {}).dept || '',
+          contractor: r.type === 'direct' ? 'Daikin (direct)' : ((r.employment || {}).contractor || ''),
+          baseWage: payBaseFor(r)
+        };
+      });
+    (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []).forEach(function (r) {
+      out.push({
+        code: r.code, name: r.name, category: 'Semi-skilled', type: 'contract',
+        department: r.dept || '', contractor: 'OM Manpower', baseWage: PAY_BASE_BY_CATEGORY['Semi-skilled']
+      });
+    });
+    return out;
+  }
+
+  function payLoad() {
+    var m = PAY_STATE.month || kvPrevMonth(kvThisMonth());
+    PAY_STATE.month = m;
+    return kvJson('/api/payroll/monthly?month=' + encodeURIComponent(m)).then(function (j) {
+      PAY_STATE.rows = (j && j.rows) || [];
+      return PAY_STATE.rows;
+    }).catch(function () { PAY_STATE.rows = []; return []; });
+  }
+  function paySetMonth(v) { PAY_STATE.month = v; payLoad().then(payRender); }
+  function payToggleCeiling(el) { PAY_STATE.onlyCeiling = !!(el && el.checked); payRender(); }
+
+  function payRender() {
+    var body = document.getElementById('pay-body');
+    if (!body) return;
+    var rows = PAY_STATE.rows.slice();
+    if (PAY_STATE.onlyCeiling) rows = rows.filter(function (r) { return r.esicCeilingCrossed; });
+
+    var kpis = document.getElementById('pay-kpis');
+    if (kpis) {
+      var all = PAY_STATE.rows;
+      var otHours = all.reduce(function (s, r) { return s + kvNum(r.otHours); }, 0);
+      var otPay = all.reduce(function (s, r) { return s + kvNum(r.otAmount); }, 0);
+      var lop = all.reduce(function (s, r) { return s + kvNum(r.lopAmount); }, 0);
+      var crossed = all.filter(function (r) { return r.esicCeilingCrossed; }).length;
+      kpis.innerHTML =
+        '<div class="kpi"><div class="kpi-eye">Overtime hours · ' + kvMonthLabel(PAY_STATE.month) + '</div>' +
+          '<div class="kpi-val">' + otHours + '</div><div class="kpi-sub">across ' + all.length + ' worker record(s)</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Overtime payable @ 125%</div>' +
+          '<div class="kpi-val" style="color:var(--indigo)">' + kvMoney(otPay) + '</div><div class="kpi-sub">statutory rate · computed, never typed</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Crossing the ESIC ceiling</div>' +
+          '<div class="kpi-val" style="color:' + (crossed ? 'var(--red-dk)' : 'var(--green-dk)') + '">' + crossed + '</div>' +
+          '<div class="kpi-sub">OT pushes wages over ' + kvMoney(PAY_CEILING) + '</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Loss of Pay recovered</div>' +
+          '<div class="kpi-val">' + kvMoney(lop) + '</div><div class="kpi-sub">operational payroll · not a Code obligation</div></div>';
+    }
+
+    var alertHost = document.getElementById('pay-ceiling-alert');
+    if (alertHost) {
+      var crossedRows = PAY_STATE.rows.filter(function (r) { return r.esicCeilingCrossed; });
+      alertHost.innerHTML = crossedRows.length
+        ? '<div class="note red" style="font-size:0.78rem"><strong>ESIC contribution status changes for ' + crossedRows.length + ' worker(s) this month.</strong> ' +
+          'Overtime took their monthly wages above the ₹' + PAY_CEILING.toLocaleString('en-IN') + ' ESIC ceiling: ' +
+          crossedRows.slice(0, 6).map(function (r) { return kvEsc(r.workerName) + ' (' + kvMoney(r.grossWages) + ')'; }).join(', ') +
+          (crossedRows.length > 6 ? ' and ' + (crossedRows.length - 6) + ' more' : '') +
+          '. Their contribution must be recalculated for the contribution period — ESIC coverage does not lapse mid-period.</div>'
+        : '<div class="note green" style="font-size:0.78rem">No worker crossed the ₹' + PAY_CEILING.toLocaleString('en-IN') +
+          ' ESIC wage ceiling this month once overtime and allowances are added.</div>';
+    }
+
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="10" class="tiny muted" style="padding:14px">No entries for ' + kvMonthLabel(PAY_STATE.month) +
+        (PAY_STATE.onlyCeiling ? ' matching the ceiling filter' : '') + '. ' +
+        (kvIsHR() ? 'Use “Add / update entry” to record a worker’s OT, Loss of Pay and variable allowances.' : 'HR maintains this register.') + '</td></tr>';
+      var pg = document.getElementById('pay-pagination'); if (pg) pg.innerHTML = '';
+      return;
+    }
+    KVTABLE.set({
+      key: 'pay', tbody: 'pay-body', count: 'pay-count', noun: 'entry', pager: 'pay-pagination',
+      pageSize: 12, cols: 10, rows: rows,
+      text: function (r) { return [r.workerName, r.workerCode, r.contractor, r.department, r.category].join(' '); },
+      row: function (r) {
+        return '<tr style="cursor:pointer" onclick="payOpenEntry(\'' + kvEsc(r.workerCode) + '\')">' +
+          '<td class="t-strong">' + kvEsc(r.workerName) + '<div class="t-mute mono tiny">' + kvEsc(r.workerCode) + '</div></td>' +
+          '<td class="tiny">' + kvEsc(r.contractor || '—') + '</td>' +
+          '<td class="mono tiny">' + kvMoney(r.baseWage) + '</td>' +
+          '<td class="mono">' + kvNum(r.otHours) + ' h</td>' +
+          '<td class="mono tiny">' + kvMoney(r.otHourly) + '<div class="t-mute tiny">125% of ' + kvMoney(r.ordinaryHourly) + '</div></td>' +
+          '<td class="mono tiny">' + kvMoney(r.otAmount) + '</td>' +
+          '<td class="mono tiny">' + kvNum(r.lopDays) + ' d · ' + kvMoney(r.lopAmount) + '</td>' +
+          '<td class="mono tiny">' + kvMoney(r.allowanceTotal) + '</td>' +
+          '<td class="mono t-strong">' + kvMoney(r.grossWages) + '</td>' +
+          '<td>' + (r.esicCeilingCrossed
+            ? '<span class="pill red tiny" title="Overtime took this worker over the ESIC wage ceiling — contribution status changes">Crosses ESIC ceiling</span>'
+            : (r.esicCoveredOnGross ? '<span class="pill green tiny">ESIC covered</span>' : '<span class="pill outline tiny">Above ceiling on base pay</span>')) + '</td>' +
+        '</tr>';
+      }
+    });
+  }
+
+  function payOpenEntry(workerCode) {
+    if (!kvHrOnly('Only HR maintains the wage register.')) return;
+    var pool = payWorkerPool();
+    var existing = PAY_STATE.rows.find(function (r) { return String(r.workerCode) === String(workerCode); });
+    var w = pool.find(function (x) { return String(x.code) === String(workerCode); }) ||
+            (existing ? { code: existing.workerCode, name: existing.workerName, category: existing.category, contractor: existing.contractor, department: existing.department, baseWage: existing.baseWage } : null);
+    var opts = pool.slice(0, 400).map(function (x) {
+      return '<option value="' + kvEsc(x.code) + '"' + (w && x.code === w.code ? ' selected' : '') + '>' + kvEsc(x.name) + ' · ' + kvEsc(x.code) + (x.contractor ? ' · ' + kvEsc(x.contractor) : '') + '</option>';
+    }).join('');
+    var al = (existing && existing.allowances) || [];
+    var alRow = function (i) {
+      var a = al[i] || { label: '', amount: '' };
+      return '<div class="g2" style="gap:8px">' +
+        '<div class="field"><label class="field-l">Allowance ' + (i + 1) + '</label><select class="sel" id="pay-al-l' + i + '">' +
+          '<option value="">— none —</option>' +
+          PAY_ALLOWANCE_TYPES.map(function (t) { return '<option' + (t === a.label ? ' selected' : '') + '>' + t + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field"><label class="field-l">Amount (₹)</label><input class="input" type="number" min="0" id="pay-al-a' + i + '" value="' + (a.amount == null ? '' : a.amount) + '"></div>' +
+      '</div>';
+    };
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">Monthly wage register · ' + kvMonthLabel(PAY_STATE.month) + ' · HR only</span>' +
+        '<span class="modal-h-title">' + (w ? kvEsc(w.name) : 'Add entry') + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="g3" style="gap:10px 14px">' +
+          '<div class="field"><label class="field-l">Worker</label><select class="sel" id="pay-worker" onchange="payPickWorker()">' +
+            (w ? '' : '<option value="">Select worker…</option>') + opts + '</select></div>' +
+          '<div class="field"><label class="field-l">Month</label><select class="sel" id="pay-month">' + kvMonthOptions(PAY_STATE.month) + '</select></div>' +
+          '<div class="field"><label class="field-l">Monthly base wage (₹)</label><input class="input" type="number" min="0" id="pay-base" value="' + (existing ? existing.baseWage : (w ? w.baseWage : '')) + '" oninput="payPreview()"></div>' +
+        '</div>' +
+        '<div class="card-h-title" style="font-size:0.85rem;margin:14px 0 4px">Compliance · overtime</div>' +
+        '<div class="cap-hint" style="margin:0 0 8px">Overtime is paid at <strong>125% of the ordinary wage rate</strong>. The rate is computed from the base wage (' +
+          PAY_DAYS + ' days × ' + PAY_HOURS + ' hours) — it is never typed in, so the register cannot record an under-rate.</div>' +
+        '<div class="g3" style="gap:10px 14px">' +
+          '<div class="field"><label class="field-l">Overtime hours</label><input class="input" type="number" min="0" step="0.5" id="pay-ot" value="' + (existing ? existing.otHours : '') + '" oninput="payPreview()"></div>' +
+        '</div>' +
+        '<div class="card-h-title" style="font-size:0.85rem;margin:14px 0 4px">Operational payroll · Loss of Pay &amp; variable allowances</div>' +
+        '<div class="note indigo" style="margin:0 0 8px;font-size:0.74rem">Loss of Pay and allowances outside standard payroll are <strong>payroll administration, not a Labour Code obligation</strong>. They are logged here because the monthly register itself falls under the Code on Wages five-year retention window.</div>' +
+        '<div class="g3" style="gap:10px 14px">' +
+          '<div class="field"><label class="field-l">Loss of Pay (days)</label><input class="input" type="number" min="0" step="0.5" id="pay-lop" value="' + (existing ? existing.lopDays : '') + '" oninput="payPreview()"></div>' +
+        '</div>' +
+        '<div class="g2" style="gap:10px 14px;margin-top:8px">' + alRow(0) + alRow(1) + alRow(2) + '</div>' +
+        '<div class="field" style="margin-top:8px"><label class="field-l">Note</label><input class="input" id="pay-note" value="' + kvEsc(existing ? existing.note : '') + '" placeholder="Optional"></div>' +
+        '<div id="pay-preview" style="margin-top:14px"></div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Retained 5 years · Code on Wages record retention</span></div>' +
+        '<div class="modal-footer-right">' +
+        (existing ? '<button class="btn danger" onclick="payDelete(\'' + kvEsc(existing.id) + '\')">Delete entry</button>' : '') +
+        '<button class="btn primary" onclick="paySaveEntry()">Save entry</button>' +
+        '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>',
+      980
+    );
+    /* wire the allowance selects into the preview */
+    [0, 1, 2].forEach(function (i) {
+      var l = document.getElementById('pay-al-l' + i), a = document.getElementById('pay-al-a' + i);
+      if (l) l.onchange = payPreview;
+      if (a) a.oninput = payPreview;
+    });
+    payPreview();
+  }
+  function payPickWorker() {
+    var code = (document.getElementById('pay-worker') || {}).value;
+    var w = payWorkerPool().find(function (x) { return String(x.code) === String(code); });
+    var existing = PAY_STATE.rows.find(function (r) { return String(r.workerCode) === String(code); });
+    var base = document.getElementById('pay-base');
+    if (base) base.value = existing ? existing.baseWage : (w ? w.baseWage : '');
+    payPreview();
+  }
+  function payFormValues() {
+    var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    return {
+      workerCode: v('pay-worker'), month: v('pay-month'), baseWage: v('pay-base'),
+      otHours: v('pay-ot'), lopDays: v('pay-lop'), note: v('pay-note'),
+      allowances: [0, 1, 2].map(function (i) { return { label: v('pay-al-l' + i), amount: v('pay-al-a' + i) }; })
+                          .filter(function (a) { return a.label; })
+    };
+  }
+  function payPreview() {
+    var host = document.getElementById('pay-preview');
+    if (!host) return;
+    var f = payFormValues();
+    var c = payComputeRow(f);
+    host.innerHTML =
+      '<div class="sd-mini-grid">' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Ordinary hourly rate</div><div class="sd-mini-v">' + kvMoney(c.ordinaryHourly) + '</div><div class="sd-mini-s">base ÷ ' + PAY_DAYS + ' days ÷ ' + PAY_HOURS + ' h</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Overtime rate @ 125%</div><div class="sd-mini-v" style="color:var(--indigo)">' + kvMoney(c.otHourly) + '</div><div class="sd-mini-s">statutory overtime rate</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Overtime payable</div><div class="sd-mini-v">' + kvMoney(c.otAmount) + '</div><div class="sd-mini-s">' + c.otHours + ' hours</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Gross wages this month</div><div class="sd-mini-v">' + kvMoney(c.grossWages) + '</div>' +
+          '<div class="sd-mini-s">base + OT + allowances − LOP</div></div>' +
+      '</div>' +
+      (c.esicCeilingCrossed
+        ? '<div class="note red" style="margin-top:10px;font-size:0.76rem"><strong>ESIC ceiling crossed.</strong> Base wages of ' + kvMoney(c.baseWage) +
+          ' are within the ₹' + PAY_CEILING.toLocaleString('en-IN') + ' ESIC ceiling, but overtime and allowances take this month\'s wages to ' +
+          kvMoney(c.grossWages) + '. The worker\'s ESIC contribution status changes — recalculate for the contribution period.</div>'
+        : (c.esicCoveredOnGross
+            ? '<div class="note green" style="margin-top:10px;font-size:0.76rem">Within the ESIC wage ceiling at ' + kvMoney(c.grossWages) + ' — contribution status unchanged.</div>'
+            : '<div class="note amber" style="margin-top:10px;font-size:0.76rem">Base wages already exceed the ESIC ceiling — this worker is outside ESIC coverage on base pay.</div>'));
+  }
+  function paySaveEntry() {
+    if (!kvHrOnly('Only HR maintains the wage register.')) return;
+    var f = payFormValues();
+    if (!f.workerCode) { toast('Select the worker this entry is for', 'red'); return; }
+    if (!kvNum(f.baseWage)) { toast('Enter the monthly base wage — the overtime rate is derived from it', 'red'); return; }
+    var w = payWorkerPool().find(function (x) { return String(x.code) === String(f.workerCode); }) || {};
+    kvJson('/api/payroll/monthly', 'POST', Object.assign({}, f, {
+      workerName: w.name || f.workerCode, workerType: w.type || 'contract',
+      contractor: w.contractor || '', department: w.department || '', category: w.category || ''
+    })).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Could not save the entry', 'red'); return; }
+      omCloseModal();
+      if (j.row.month !== PAY_STATE.month) PAY_STATE.month = j.row.month;
+      payLoad().then(function () {
+        payRender();
+        var sel = document.getElementById('pay-month-sel'); if (sel) sel.value = PAY_STATE.month;
+        if (j.row.esicCeilingCrossed && typeof kvNotify === 'function') {
+          kvNotify('ESIC ceiling crossed · ' + j.row.workerName,
+            'Overtime took ' + j.row.workerName + '’s ' + kvMonthLabel(j.row.month) + ' wages to ' + kvMoney(j.row.grossWages) +
+            ' — above the ₹' + PAY_CEILING.toLocaleString('en-IN') + ' ESIC ceiling. Contribution status must be recalculated.', 'warn');
+        }
+      });
+      toast('Wage register updated · ' + j.row.workerName, 'green');
+    }).catch(function (e) { toast('Could not save the entry: ' + e.message, 'red'); });
+  }
+  function payDelete(id) {
+    if (!kvHrOnly()) return;
+    if (!window.confirm('Delete this register entry? The monthly wage register is a statutory record.')) return;
+    kvJson('/api/payroll/monthly/' + encodeURIComponent(id), 'DELETE', {}).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Delete failed', 'red'); return; }
+      omCloseModal(); payLoad().then(payRender); toast('Entry deleted', 'green');
+    });
+  }
+  function payExport() {
+    var headers = ['Month', 'Worker', 'Code', 'Employer', 'Category', 'Base wage', 'OT hours',
+                   'Ordinary hourly', 'OT hourly @125%', 'OT amount', 'LOP days', 'LOP amount',
+                   'Variable allowances', 'Allowance total', 'Gross wages', 'ESIC status', 'Recorded by', 'Recorded at'];
+    var rows = PAY_STATE.rows.map(function (r) {
+      return [kvMonthLabel(r.month), r.workerName, r.workerCode, r.contractor, r.category,
+              r.baseWage, r.otHours, r.ordinaryHourly, r.otHourly, r.otAmount, r.lopDays, r.lopAmount,
+              (r.allowances || []).map(function (a) { return a.label + ' ' + a.amount; }).join('; '),
+              r.allowanceTotal, r.grossWages,
+              r.esicCeilingCrossed ? 'Crosses ESIC ceiling' : (r.esicCoveredOnGross ? 'Covered' : 'Above ceiling on base'),
+              r.updatedBy, r.updatedAt];
+    });
+    downloadWorkbook('Wage register ' + PAY_STATE.month, headers, rows,
+      'karya-vaani_wage-register_' + PAY_STATE.month + '_' + todayStamp() + '.xlsx');
+  }
+  function initWageRegister() {
+    var body = document.getElementById('pay-body');
+    if (!body) return;
+    var sel = document.getElementById('pay-month-sel');
+    if (sel && !sel.dataset.filled) {
+      PAY_STATE.month = PAY_STATE.month || kvPrevMonth(kvThisMonth());
+      sel.innerHTML = kvMonthOptions(PAY_STATE.month);
+      sel.dataset.filled = '1';
+    }
+    var addBtn = document.getElementById('pay-add-btn');
+    if (addBtn) addBtn.style.display = kvIsHR() ? '' : 'none';
+    var gate = document.getElementById('pay-hr-note');
+    if (gate) gate.innerHTML = kvIsHR() ? '' :
+      '<div class="note indigo" style="font-size:0.76rem">The wage register is maintained by Plant HR. Agencies see the entries for their own workers but cannot edit them.</div>';
+    payLoad().then(payRender);
+  }
+
+  /* ── init the change-request surfaces once the DOM is up ── */
+  __kvOnReady(initHrInbox);
+  __kvOnReady(initExitRegister);
+  __kvOnReady(initLicenceBoard);
+  __kvOnReady(initEpfRollup);
+  __kvOnReady(initRouteChangeLog);
+  __kvOnReady(initWageRegister);
