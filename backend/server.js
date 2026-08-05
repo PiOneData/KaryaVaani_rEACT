@@ -376,7 +376,17 @@ app.post('/api/onboarding-captures', (req, res) => {
   }
   try {
     dbPut('onboardingCaptures', capture.id, capture);
-    res.json({ ok: true, capture });
+    /* CR-8a · this onboarding may have taken the agency past its licence
+       warning threshold — raise or escalate the standing alert and hand the
+       agency's current position back with the response. */
+    let licence = null;
+    if ((capture.type || 'direct') === 'contract' && (capture.employment || {}).contractor) {
+      evaluateLicenceAlert(store, capture.employment.contractor, {
+        trigger: 'onboarding', by: actorOf(req).name
+      });
+      licence = licenceState(store, capture.employment.contractor);
+    }
+    res.json({ ok: true, capture, licence });
   } catch (err) {
     console.error('onboarding-capture save error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -395,10 +405,15 @@ app.delete('/api/onboarding-captures/:id', (req, res) => {
   const list = store.data.onboardingCaptures || [];
   const idx = list.findIndex(c => c.id === req.params.id);
   if (idx === -1) return res.status(404).json({ ok: false, error: 'capture not found' });
+  const removed = list[idx];
   list.splice(idx, 1);
   store.data.onboardingCaptures = list;
   try {
     dbDel('onboardingCaptures', req.params.id);
+    /* the slot is back — the alert may no longer be true */
+    if ((removed.employment || {}).contractor) {
+      evaluateLicenceAlert(store, removed.employment.contractor, { trigger: 'worker-removed' });
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error('onboarding-capture delete error:', err.message);
@@ -1911,6 +1926,27 @@ function onboardedUnder(store, contractorName) {
     return st !== 'exited' && st !== 'inactive';
   });
 }
+/* Utilisation thresholds. The ceiling itself is a hard block, but a ceiling
+   that only speaks at 100% speaks too late: a licence amendment takes weeks,
+   so the agency has to know while it still has room to act. 75% is the default
+   warning point and 90% the critical one; HR can move the warning point per
+   agency (clraLicence.alertThresholdPct) because a 40-worker licence and a
+   4,000-worker licence do not need the same runway. */
+const LICENCE_WARN_PCT = 75;
+const LICENCE_CRITICAL_PCT = 90;
+function licenceThresholdPct(lic) {
+  const v = Number((lic || {}).alertThresholdPct);
+  return Number.isFinite(v) && v > 0 && v <= 100 ? v : LICENCE_WARN_PCT;
+}
+/* ok → warn → critical → blocked. Ordered, so an alert can only escalate. */
+const LICENCE_TIERS = ['ok', 'warn', 'critical', 'blocked'];
+function licenceTier(pct, blocked, thresholdPct) {
+  if (blocked) return 'blocked';
+  if (pct === null) return 'ok';
+  if (pct >= LICENCE_CRITICAL_PCT) return 'critical';
+  if (pct >= thresholdPct) return 'warn';
+  return 'ok';
+}
 function licenceState(store, idOrName) {
   const c = findContractor(store, idOrName);
   if (!c) return null;
@@ -1920,12 +1956,25 @@ function licenceState(store, idOrName) {
   const used = base + onboarded;
   const max = Number(lic.maxHeadcount || 0) || null;
   const commercial = Number(c.commercialHeadcount || 0) || null;
+  const blocked = max !== null && used >= max;
+  const pct = max ? Math.round((used / max) * 1000) / 10 : null;
+  const thresholdPct = licenceThresholdPct(lic);
+  const tier = licenceTier(pct, blocked, thresholdPct);
+  const alert = openLicenceAlert(store, c.id);
   return {
     contractorId: c.id, contractorName: c.name,
     licenceNo: lic.number || '', validTill: lic.validTill || '', authority: lic.authority || '',
     max, base, onboarded, used,
     headroom: max === null ? null : (max - used),
-    blocked: max !== null && used >= max,
+    blocked,
+    pct, thresholdPct, tier,
+    /* the headcount at which the warning fires — the number an agency planning
+       a batch of onboardings actually needs */
+    warnAt: max === null ? null : Math.ceil((max * thresholdPct) / 100),
+    nearLimit: tier === 'warn' || tier === 'critical',
+    alertId: alert ? alert.id : null,
+    alertNotes: alert ? (alert.notes || []).length : 0,
+    alertAcknowledged: alert ? !!(alert.acknowledged && alert.acknowledged.at) : false,
     commercial,
     commercialHeadroom: commercial === null ? null : (commercial - used),
     commercialExceeded: commercial !== null && used >= commercial
@@ -1950,11 +1999,33 @@ app.post('/api/contractors/:id/licence', (req, res) => {
   const c = findContractor(store, req.params.id);
   if (!c) return res.status(404).json({ ok: false, error: 'contractor not found' });
   const p = req.body || {};
-  const maxHeadcount = p.maxHeadcount === '' || p.maxHeadcount == null ? null : Number(p.maxHeadcount);
-  if (maxHeadcount !== null && (!Number.isFinite(maxHeadcount) || maxHeadcount < 0)) {
-    return res.status(400).json({ ok: false, error: 'maxHeadcount must be a non-negative number' });
+  /* A partial post must not silently clear the ceiling — only an explicit
+     maxHeadcount (including an explicit blank, meaning "no ceiling on record")
+     changes it. Anything else leaves the statutory number alone. */
+  let maxHeadcount = (c.clraLicence || {}).maxHeadcount;
+  if (maxHeadcount === undefined) maxHeadcount = null;
+  if (p.maxHeadcount !== undefined) {
+    maxHeadcount = (p.maxHeadcount === '' || p.maxHeadcount === null) ? null : Number(p.maxHeadcount);
+    if (maxHeadcount !== null && (!Number.isFinite(maxHeadcount) || maxHeadcount < 0)) {
+      return res.status(400).json({ ok: false, error: 'maxHeadcount must be a non-negative number' });
+    }
+  }
+  /* the point at which the platform starts warning, as a percentage of the
+     licensed headcount — defaults to 75% when HR leaves it alone */
+  let alertThresholdPct = (c.clraLicence || {}).alertThresholdPct;
+  if (p.alertThresholdPct !== undefined) {
+    if (p.alertThresholdPct === '' || p.alertThresholdPct === null) {
+      alertThresholdPct = null;
+    } else {
+      const t = Number(p.alertThresholdPct);
+      if (!Number.isFinite(t) || t <= 0 || t > 100) {
+        return res.status(400).json({ ok: false, error: 'alertThresholdPct must be a percentage between 1 and 100' });
+      }
+      alertThresholdPct = t;
+    }
   }
   c.clraLicence = Object.assign({}, c.clraLicence, {
+    alertThresholdPct,
     number: p.number != null ? String(p.number) : (c.clraLicence || {}).number || '',
     authority: p.authority != null ? String(p.authority) : (c.clraLicence || {}).authority || '',
     validTill: p.validTill != null ? String(p.validTill) : (c.clraLicence || {}).validTill || '',
@@ -1966,7 +2037,229 @@ app.post('/api/contractors/:id/licence', (req, res) => {
     c.commercialHeadcount = Number.isFinite(cm) ? cm : null;
   }
   dbPut('contractors', c.id, c);
+  /* moving the ceiling moves the utilisation — re-evaluate immediately, since
+     lowering a licensed max is itself a way of crossing the warning line */
+  evaluateLicenceAlert(store, c.id, { trigger: 'licence-updated', by: actorOf(req).name });
   res.json({ ok: true, licence: licenceState(store, c.id) });
+});
+
+/* ── CR-8a · licence utilisation alerts + agency notes ─────────────────────
+   The ceiling is enforced at 100%, but an agency that discovers it at 100% has
+   already lost. Once deployment reaches the warning threshold (75% of the
+   licensed headcount by default) the platform raises a standing alert on that
+   agency: the agency sees it on its own portal, HR sees it in the inbox, and
+   the agency records notes against it — what it is doing about the headroom,
+   whether a licence amendment has been applied for, when it expects relief.
+
+   The alert is a record, not a toast. It persists, it escalates (75% → 90% →
+   at ceiling), it carries an append-only note thread, and it resolves itself
+   when the headcount drops back under the threshold. Notes are what makes it
+   auditable: at ceiling, the question a Labour officer asks is not "did you
+   know" but "what did you do and when", and the thread answers it.
+   ──────────────────────────────────────────────────────────────────────── */
+const LICENCE_NOTE_KINDS = [
+  { key: 'amendment',   label: 'Licence amendment applied for' },
+  { key: 'planned',     label: 'Amendment planned / documents being prepared' },
+  { key: 'demobilise',  label: 'Will demobilise to stay within the licence' },
+  { key: 'no-action',   label: 'No further deployment planned under this licence' },
+  { key: 'comment',     label: 'Comment' }
+];
+function openLicenceAlert(store, contractorId) {
+  return (store.data.licenceAlerts || []).find(
+    (a) => a.contractorId === contractorId && a.state === 'open'
+  ) || null;
+}
+function licenceAlertSnapshot(state) {
+  return {
+    tier: state.tier, pct: state.pct, used: state.used, max: state.max,
+    headroom: state.headroom, thresholdPct: state.thresholdPct, warnAt: state.warnAt
+  };
+}
+function licenceAlertHeadline(state) {
+  if (state.tier === 'blocked') {
+    return state.contractorName + ' is at its CLRA licensed headcount (' + state.used + ' / ' + state.max +
+           '). Onboarding is blocked until the licence is amended.';
+  }
+  return state.contractorName + ' has reached ' + state.pct + '% of its CLRA licensed headcount (' +
+         state.used + ' of ' + state.max + ' · ' + state.headroom + ' remaining).';
+}
+/* Raise, escalate or resolve the standing alert for one agency. Called after
+   anything that can move either side of the ratio — an onboarding, a status
+   change, an exit, or HR editing the ceiling. Returns the alert, or null. */
+function evaluateLicenceAlert(store, idOrName, ctx) {
+  const c = findContractor(store, idOrName);
+  if (!c) return null;
+  store.data.licenceAlerts = store.data.licenceAlerts || [];
+  const state = licenceState(store, c.id);
+  if (!state || state.max === null) return null;
+  const nowIso = new Date().toISOString();
+  const by = (ctx && ctx.by) || 'System';
+  const trigger = (ctx && ctx.trigger) || 'recheck';
+  const existing = openLicenceAlert(store, c.id);
+
+  /* back under the threshold — close the alert off, keeping it (and its notes)
+     as history. A later crossing raises a fresh alert rather than reopening a
+     stale one, so each episode reads as its own record. */
+  if (state.tier === 'ok') {
+    if (existing) {
+      existing.state = 'resolved';
+      existing.resolvedAt = nowIso;
+      existing.resolvedBy = by;
+      existing.current = licenceAlertSnapshot(state);
+      existing.events = (existing.events || []).concat([{
+        at: nowIso, by, kind: 'resolved', trigger,
+        text: 'Deployment fell back to ' + state.pct + '% of the licensed headcount (' +
+              state.used + ' / ' + state.max + ') — below the ' + state.thresholdPct + '% warning threshold.'
+      }]);
+      dbPut('licenceAlerts', existing.id, existing);
+    }
+    return null;
+  }
+
+  if (!existing) {
+    const alert = {
+      id: newId('lica'),
+      contractorId: c.id, contractorName: c.name,
+      licenceNo: state.licenceNo, validTill: state.validTill,
+      state: 'open',
+      tier: state.tier,
+      raisedAt: nowIso, raisedBy: by, trigger,
+      raisedAtSnapshot: licenceAlertSnapshot(state),
+      current: licenceAlertSnapshot(state),
+      acknowledged: null,
+      notes: [],
+      events: [{
+        at: nowIso, by, kind: 'raised', trigger, tier: state.tier,
+        text: licenceAlertHeadline(state)
+      }]
+    };
+    store.data.licenceAlerts.push(alert);
+    dbPut('licenceAlerts', alert.id, alert);
+    pushHrNotification(store, {
+      kind: 'licence-utilisation',
+      severity: state.tier === 'warn' ? 'warn' : 'high',
+      title: 'CLRA licence · ' + c.name + ' at ' + state.pct + '% of licensed headcount',
+      body: licenceAlertHeadline(state) + ' The agency has been asked to record what it is doing about the headroom.',
+      contractorId: c.id, ref: alert.id
+    });
+    while (store.data.licenceAlerts.length > 400) {
+      const old = store.data.licenceAlerts.shift();
+      if (old && old.id) dbDel('licenceAlerts', old.id);
+    }
+    return alert;
+  }
+
+  /* an open alert only ever escalates — it must not flap between 75% and 76% */
+  existing.current = licenceAlertSnapshot(state);
+  if (LICENCE_TIERS.indexOf(state.tier) > LICENCE_TIERS.indexOf(existing.tier)) {
+    existing.tier = state.tier;
+    existing.events = (existing.events || []).concat([{
+      at: nowIso, by, kind: 'escalated', trigger, tier: state.tier,
+      text: licenceAlertHeadline(state)
+    }]);
+    pushHrNotification(store, {
+      kind: 'licence-utilisation',
+      severity: state.tier === 'blocked' ? 'high' : 'warn',
+      title: 'CLRA licence · ' + c.name + (state.tier === 'blocked'
+        ? ' has reached its licensed ceiling'
+        : ' now at ' + state.pct + '% of licensed headcount'),
+      body: licenceAlertHeadline(state),
+      contractorId: c.id, ref: existing.id
+    });
+  }
+  dbPut('licenceAlerts', existing.id, existing);
+  return existing;
+}
+/* Re-evaluate every agency. The alert has to be true of the data as it stands,
+   not only of the moment a worker happened to be onboarded — seeded rosters
+   and imports never pass through the capture path. */
+/* a status change or an exit frees (or re-occupies) a licence slot */
+function licenceRecheckForWorker(store, rec, trigger, by) {
+  const name = (rec && rec.employment && rec.employment.contractor) || '';
+  if (name) evaluateLicenceAlert(store, name, { trigger, by });
+}
+function evaluateAllLicenceAlerts(store, ctx) {
+  return (store.data.contractors || [])
+    .map((c) => evaluateLicenceAlert(store, c.id, ctx))
+    .filter(Boolean);
+}
+
+app.get('/api/licence-alerts', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  let list = (store.data.licenceAlerts || []).slice().reverse();
+  if (req.query.contractor) {
+    const key = String(req.query.contractor).trim().toLowerCase();
+    list = list.filter((a) => String(a.contractorId).toLowerCase() === key ||
+                              String(a.contractorName).trim().toLowerCase() === key);
+  }
+  if (req.query.state) list = list.filter((a) => a.state === req.query.state);
+  res.json({ ok: true, alerts: list.slice(0, 200), noteKinds: LICENCE_NOTE_KINDS });
+});
+/* Recompute on demand — the frontend calls this on load and after onboarding
+   so the board reflects the real position without waiting for a write. */
+app.post('/api/licence-alerts/recheck', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const raised = evaluateAllLicenceAlerts(store, { trigger: 'recheck', by: actorOf(req).name });
+  res.json({
+    ok: true,
+    open: (store.data.licenceAlerts || []).filter((a) => a.state === 'open'),
+    raised: raised.length
+  });
+});
+/* The agency's own note against the alert. This is the one thing on a licence
+   record an agency writes — it is its account of what it is doing, not a
+   compliance verdict, so it never changes the ceiling or the tier. HR can note
+   too; every note carries who wrote it and in what role. */
+app.post('/api/licence-alerts/:id/notes', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  const alert = (store.data.licenceAlerts || []).find((a) => a.id === req.params.id);
+  if (!alert) return res.status(404).json({ ok: false, error: 'licence alert not found' });
+  const p = req.body || {};
+  const text = String(p.text || '').trim();
+  if (!text) return res.status(400).json({ ok: false, error: 'A note needs some text.' });
+  const kind = LICENCE_NOTE_KINDS.some((k) => k.key === p.kind) ? p.kind : 'comment';
+  const actor = actorOf(req);
+  const note = {
+    id: newId('licn'), at: new Date().toISOString(),
+    by: actor.name, role: actor.role || 'unknown',
+    byAgency: !isHR(req),
+    kind, text,
+    expectedBy: p.expectedBy ? String(p.expectedBy) : '',
+    /* the position at the moment the note was written, so the thread still
+       makes sense after the headcount has moved on */
+    atSnapshot: alert.current || alert.raisedAtSnapshot || null
+  };
+  alert.notes = (alert.notes || []).concat([note]);
+  dbPut('licenceAlerts', alert.id, alert);
+  /* an agency note is something HR has to see — that is the point of it */
+  if (note.byAgency) {
+    const kindLabel = (LICENCE_NOTE_KINDS.find((k) => k.key === kind) || {}).label || 'Note';
+    pushHrNotification(store, {
+      kind: 'licence-alert-note',
+      severity: 'info',
+      title: 'Licence headroom · note from ' + alert.contractorName,
+      body: kindLabel + ' — ' + text.slice(0, 180) + (note.expectedBy ? ' (expected by ' + note.expectedBy + ')' : ''),
+      contractorId: alert.contractorId, ref: alert.id
+    });
+  }
+  res.json({ ok: true, alert });
+});
+/* HR acknowledging that it has seen the agency's position. Deliberately not a
+   resolution: only the headcount coming down resolves the alert. */
+app.post('/api/licence-alerts/:id/ack', (req, res) => {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const alert = (store.data.licenceAlerts || []).find((a) => a.id === req.params.id);
+  if (!alert) return res.status(404).json({ ok: false, error: 'licence alert not found' });
+  const actor = actorOf(req);
+  const nowIso = new Date().toISOString();
+  alert.acknowledged = { by: actor.name, at: nowIso, note: String((req.body || {}).note || '').trim() };
+  alert.events = (alert.events || []).concat([{
+    at: nowIso, by: actor.name, kind: 'acknowledged',
+    text: 'Plant HR acknowledged the licence-headroom position.'
+  }]);
+  dbPut('licenceAlerts', alert.id, alert);
+  res.json({ ok: true, alert });
 });
 
 /* ── CR-6 · EPF / ESIC payment capture + HR verification ───────────────────
@@ -2140,6 +2433,7 @@ app.post('/api/worker-status', (req, res) => {
     workerId: rec.id, workerName: rec.name, from, to: rec.workStatus,
     reason: rec.workStatusReason, by: actor.name, byRole: 'HR', source: 'hr-change'
   });
+  licenceRecheckForWorker(store, rec, 'status-change', actor.name);
   res.json({ ok: true, capture: rec, event: ev });
 });
 
@@ -2214,6 +2508,7 @@ app.post('/api/worker-status/request/:id/resolve', (req, res) => {
   (store.data.hrNotifications || []).forEach((n) => {
     if (n.ref === request.id && !n.read) { n.read = true; n.readAt = nowIso; n.readBy = actor.name; dbPut('hrNotifications', n.id, n); }
   });
+  if (decision === 'approve') licenceRecheckForWorker(store, rec, 'status-change', actor.name);
   res.json({ ok: true, capture: rec, decision, event: ev });
 });
 
@@ -2317,6 +2612,9 @@ app.post('/api/worker-exit', (req, res) => {
     workerId: rec.id, workerName: rec.name, from, to: 'exited', reason: exitRec.reason,
     by: actor.name, byRole: 'HR', source: 'exit', exitRecordId: exitRec.id
   });
+  /* an exit releases the licence slot — this is often what brings an agency
+     back under its warning threshold */
+  licenceRecheckForWorker(store, rec, 'exit', actor.name);
   res.json({ ok: true, exit: exitRec, capture: rec });
 });
 
@@ -2468,15 +2766,25 @@ function ensureComplianceDefaults() {
   /* CR-8 · a CLRA licence ceiling per contractor, plus the separate commercial
      contracted headcount. The licence is applied for in round numbers above the
      deployment; the commercial number is the agreed supply level. */
-  (store.data.contractors || []).forEach((c) => {
+  /* An agency applies for a licence with room to grow into, and how much room
+     differs by agency — so the backfilled ceilings are spread across the bands
+     the utilisation alert cares about (comfortable / approaching / critical)
+     rather than all sitting just above the deployed headcount. The cycle is
+     indexed, not random, so a re-boot before the first write is stable. */
+  const LICENCE_HEADROOM_CYCLE = [1.70, 1.55, 1.30, 1.85, 1.45, 1.12, 1.60, 1.05];
+  (store.data.contractors || []).forEach((c, i) => {
     let touched = false;
     if (!c.clraLicence || c.clraLicence.maxHeadcount == null) {
       const deployed = Number(c.deployed || 0);
+      const factor = LICENCE_HEADROOM_CYCLE[i % LICENCE_HEADROOM_CYCLE.length];
+      /* licences are applied for in round numbers, and always above the
+         headcount actually deployed under them */
+      const applied = Math.ceil((deployed * factor) / 10) * 10;
       c.clraLicence = Object.assign({
         number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
         authority: 'Licensing Officer · Sricity, Andhra Pradesh',
         validTill: (c.clra && c.clra.expiresOn) || '',
-        maxHeadcount: Math.max(deployed + 1, Math.ceil((deployed + 1) / 25) * 25)
+        maxHeadcount: Math.max(deployed + 1, applied)
       }, c.clraLicence || {});
       touched = true;
     }
@@ -2486,6 +2794,12 @@ function ensureComplianceDefaults() {
     }
     if (touched) dbPut('contractors', c.id, c);
   });
+
+  /* CR-8a · evaluate the licence-utilisation alerts once on boot, so an agency
+     that is already past its warning threshold on seeded data is flagged
+     without waiting for the next onboarding to happen through the UI. */
+  store.data.licenceAlerts = store.data.licenceAlerts || [];
+  evaluateAllLicenceAlerts(store, { trigger: 'boot', by: 'System' });
 
   /* CR-3 · a unique, persistent route number on every transport route. */
   const routes = store.data.routes || [];

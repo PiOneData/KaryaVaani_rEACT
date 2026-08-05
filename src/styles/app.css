@@ -863,6 +863,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 .toast.on { display: inline-flex; animation: toast-in .25s ease; }
 .toast.green { background: var(--green-dk); }
 .toast.red   { background: var(--red-dk); }
+.toast.amber { background: var(--amber-dk); }
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 8px); }
   to   { opacity: 1; transform: translate(-50%, 0); }

@@ -3444,7 +3444,11 @@ function __kvOnReady(fn) {
         html += '<div class="note red" style="margin-top:10px;font-size:0.76rem"><strong>At the CLRA licence ceiling.</strong> ' +
           'No further worker can be onboarded under ' + kvEsc(c.name) + ' until the licence is amended. Deploying past the licensed ' +
           'headcount is a Contract Labour violation and the principal employer permitting it carries joint liability.</div>';
-      } else if (lic.commercialExceeded) {
+      }
+      /* CR-8a · the standing utilisation alert and the agency's notes against
+         it — what the agency says it is doing about the headroom */
+      html += licRenderAlertCard(lic, 'hr', { skipHeadline: lic.blocked });
+      if (!lic.blocked && lic.commercialExceeded) {
         html += '<div class="note amber" style="margin-top:10px;font-size:0.76rem"><strong>Commercial alert — not a compliance breach.</strong> ' +
           'Deployment is ' + (lic.used - lic.commercial) + ' above the contracted headcount of ' + lic.commercial +
           '. Within the CLRA licence, so onboarding continues; review the commercial agreement.</div>';
@@ -12676,28 +12680,41 @@ function __kvOnReady(fn) {
     if (document.getElementById('ct-epf-host')) epfRenderInto('ct-epf-host', c.id);
     /* CR-8 · the agency sees its statutory ceiling and its commercial position,
        clearly separated — it can read both but change neither */
-    var licHost = document.getElementById('ct-licence-host');
-    if (licHost) {
-      var st = ctLicenceState(c);
-      licHost.innerHTML = st ? (
-        '<div class="g2" style="gap:10px 14px">' +
-          '<div class="kpi"><div class="kpi-eye">CLRA licensed headcount · statutory</div>' +
-            '<div class="kpi-val" style="font-size:1.05rem">' + (st.max === null ? '—' : st.used + ' / ' + st.max) + '</div>' +
-            '<div class="kpi-sub">' + kvEsc(st.licenceNo || 'licence number not on record') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '</div></div>' +
-          '<div class="kpi"><div class="kpi-eye">Contracted headcount · commercial</div>' +
-            '<div class="kpi-val" style="font-size:1.05rem">' + (st.commercial === null ? '—' : st.used + ' / ' + st.commercial) + '</div>' +
-            '<div class="kpi-sub">Commercial agreement · advisory, never blocks onboarding</div></div>' +
-        '</div>' +
-        '<div style="margin-top:8px">' + ctLicencePill(st) + ' ' + ctCommercialPill(st) + '</div>' +
-        (st.blocked
-          ? '<div class="note red" style="margin-top:8px;font-size:0.76rem">You are at your CLRA licensed headcount. Further onboarding is blocked until the licence is amended — send the amended licence to Plant HR.</div>'
-          : '<div class="tiny muted" style="margin-top:8px">The licensed ceiling is maintained by Plant HR from your CLRA licence. Send an amended licence to have it raised.</div>')
-      ) : '';
-    }
+    ctRenderLicenceHost(c);
 
     /* CHAT */
     ctChatRender();
     ctChatBadge();
+  }
+
+  /* CR-8 / CR-8a · the agency's own view of its deployment ceilings: the
+     statutory CLRA licence it cannot exceed, the commercial number that is only
+     advisory, and — once it passes the warning threshold — the standing alert
+     with the notes it records against it. Read-only on the numbers, writable on
+     the notes: the agency cannot move its own ceiling, but it is the only party
+     that can say what it is doing about the headroom. */
+  function ctRenderLicenceHost(cIn) {
+    var licHost = document.getElementById('ct-licence-host');
+    if (!licHost) return;
+    var c = cIn || ctByName(typeof CT_ACTIVE !== 'undefined' ? CT_ACTIVE : '');
+    var st = c ? ctLicenceState(c) : null;
+    if (!st) { licHost.innerHTML = ''; return; }
+    licHost.innerHTML =
+      '<div class="g2" style="gap:10px 14px">' +
+        '<div class="kpi"><div class="kpi-eye">CLRA licensed headcount · statutory</div>' +
+          '<div class="kpi-val" style="font-size:1.05rem">' + (st.max === null ? '—' : st.used + ' / ' + st.max) + '</div>' +
+          '<div class="kpi-sub">' + kvEsc(st.licenceNo || 'licence number not on record') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Contracted headcount · commercial</div>' +
+          '<div class="kpi-val" style="font-size:1.05rem">' + (st.commercial === null ? '—' : st.used + ' / ' + st.commercial) + '</div>' +
+          '<div class="kpi-sub">Commercial agreement · advisory, never blocks onboarding</div></div>' +
+      '</div>' +
+      '<div style="margin-top:8px">' + ctLicencePill(st) + ' ' + ctCommercialPill(st) + '</div>' +
+      (st.tier === 'ok' && !licAlertFor(st.contractorId)
+        ? ctLicenceBar(st) +
+          '<div class="tiny muted" style="margin-top:8px">The licensed ceiling is maintained by Plant HR from your CLRA licence. ' +
+          'You will be alerted here — and Plant HR with you — once deployment reaches ' + (st.warnAt === null ? 'the warning threshold' : st.warnAt + ' (' + st.thresholdPct + '%)') +
+          ', with time to apply for an amendment before onboarding stops.</div>'
+        : licRenderAlertCard(st, 'agency'));
   }
 
   function ctRenderActionCard(a) {
@@ -15270,6 +15287,9 @@ function __kvOnReady(fn) {
         if (j && j.ok && j.capture) {
           rec.backendId = j.capture.id;
           rec.createdAt = j.capture.createdAt || rec.createdAt;
+          /* CR-8a · this onboarding may have taken the agency past its licence
+             warning threshold — the server says where it now stands */
+          if (j.licence && typeof licAfterOnboarding === 'function') licAfterOnboarding(j.licence);
           /* DEMO: auto-send the WhatsApp welcome + language template + voice note
              to the worker as soon as they're onboarded (toggle: #cap-autowa). */
           if (typeof kvAutoWaEnabled === 'function' && kvAutoWaEnabled() && rec.mobile && typeof kvSendOnboardingWhatsApp === 'function') {
@@ -15694,6 +15714,11 @@ function __kvOnReady(fn) {
       '<div class="tiny muted" style="margin-top:4px">Now visible in <strong>All Employee Track</strong> and the directory. ' +
       'Verify PAN + Aadhaar to move each into induction training.</div>';
     toast(valid.length + ' worker(s) imported — verify documents to begin induction', 'green');
+    /* CR-8a · a bulk import moves the licence utilisation further than a single
+       capture ever does — re-evaluate once the batch has been posted */
+    if (typeof licLoadAlerts === 'function') {
+      setTimeout(function () { licLoadAlerts().then(licRefreshSurfaces); }, 600);
+    }
     capBulkReset();
     if (typeof obShowTrack === 'function') obShowTrack();
   }
@@ -19653,6 +19678,8 @@ function __kvOnReady(fn) {
             act = '<button class="btn primary tiny" onclick="kvOpenStatusByWorkerId(\'' + kvEsc(n.workerId) + '\')">Review</button>';
           } else if (n.kind === 'epf-esic-submission' && n.contractorId) {
             act = '<button class="btn primary tiny" onclick="epfOpenForContractor(\'' + kvEsc(n.contractorId) + '\')">Verify</button>';
+          } else if ((n.kind === 'licence-utilisation' || n.kind === 'licence-alert-note') && n.contractorId) {
+            act = '<button class="btn primary tiny" onclick="licOpenAlertModal(\'' + kvEsc(n.contractorId) + '\')">Review</button>';
           }
           return '<div class="row-between" style="gap:12px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff">' +
             '<div><div style="font-size:0.84rem;font-weight:600">' + kvEsc(n.title) + '</div>' +
@@ -20168,6 +20195,17 @@ function __kvOnReady(fn) {
       return st !== 'exited' && st !== 'inactive';
     });
   }
+  /* Utilisation thresholds — mirrored from the server, which is where they are
+     enforced. A ceiling that only speaks at 100% speaks too late: a licence
+     amendment takes weeks, so the agency is warned at 75% of its licensed
+     headcount (HR can move that point per agency) and again at 90%. */
+  var LICENCE_WARN_PCT = 75;
+  var LICENCE_CRITICAL_PCT = 90;
+  var LICENCE_TIERS = ['ok', 'warn', 'critical', 'blocked'];
+  function ctLicenceThresholdPct(lic) {
+    var v = Number((lic || {}).alertThresholdPct);
+    return isFinite(v) && v > 0 && v <= 100 ? v : LICENCE_WARN_PCT;
+  }
   function ctLicenceState(cOrName) {
     var c = (cOrName && cOrName.id) ? cOrName : ctByName(cOrName);
     if (!c) return null;
@@ -20177,13 +20215,24 @@ function __kvOnReady(fn) {
     var used = base + onboarded;
     var max = kvNum(lic.maxHeadcount) || null;
     var commercial = kvNum(c.commercialHeadcount) || null;
+    var blocked = max !== null && used >= max;
+    var pct = max ? Math.round((used / max) * 1000) / 10 : null;
+    var thresholdPct = ctLicenceThresholdPct(lic);
+    var tier = blocked ? 'blocked'
+      : pct === null ? 'ok'
+      : pct >= LICENCE_CRITICAL_PCT ? 'critical'
+      : pct >= thresholdPct ? 'warn' : 'ok';
     return {
       contractor: c, contractorId: c.id, contractorName: c.name,
       licenceNo: lic.number || '', validTill: lic.validTill || '', authority: lic.authority || '',
       max: max, base: base, onboarded: onboarded, used: used,
       headroom: max === null ? null : (max - used),
-      blocked: max !== null && used >= max,
-      nearLimit: max !== null && (max - used) > 0 && (max - used) <= Math.max(3, Math.round(max * 0.05)),
+      blocked: blocked,
+      pct: pct, thresholdPct: thresholdPct, tier: tier,
+      /* the headcount at which the warning fires — the number an agency
+         planning a batch of onboardings actually needs to know */
+      warnAt: max === null ? null : Math.ceil((max * thresholdPct) / 100),
+      nearLimit: tier === 'warn' || tier === 'critical',
       commercial: commercial,
       commercialHeadroom: commercial === null ? null : (commercial - used),
       commercialExceeded: commercial !== null && used >= commercial
@@ -20194,8 +20243,28 @@ function __kvOnReady(fn) {
     if (!st) return '<span class="pill outline tiny">—</span>';
     if (st.max === null) return '<span class="pill outline tiny" title="No CLRA licence ceiling on record — HR must record it">Ceiling not set</span>';
     if (st.blocked) return '<span class="pill red tiny" title="CLRA licence ceiling reached — onboarding is blocked">At ceiling · ' + st.used + '/' + st.max + '</span>';
-    if (st.nearLimit) return '<span class="pill amber tiny" title="Approaching the licensed ceiling">' + st.headroom + ' left · ' + st.used + '/' + st.max + '</span>';
+    if (st.tier === 'critical') return '<span class="pill red tiny" title="' + st.pct + '% of the licensed headcount deployed — only ' + st.headroom + ' left">' + st.pct + '% · ' + st.headroom + ' left</span>';
+    if (st.tier === 'warn') return '<span class="pill amber tiny" title="Past the ' + st.thresholdPct + '% warning threshold — ' + st.headroom + ' of ' + st.max + ' remaining">' + st.pct + '% · ' + st.headroom + ' left</span>';
     return '<span class="pill green tiny" title="Headroom under the CLRA licensed headcount">' + st.headroom + ' left · ' + st.used + '/' + st.max + '</span>';
+  }
+  /* the utilisation bar — the same picture wherever the ceiling is shown, with
+     the warning threshold marked so the alert never looks arbitrary */
+  function ctLicenceBar(st) {
+    if (!st || st.max === null) return '';
+    var pct = Math.min(100, st.pct || 0);
+    var colour = st.blocked || st.tier === 'critical' ? 'var(--red)' : st.tier === 'warn' ? 'var(--amber)' : 'var(--green)';
+    return '<div style="margin-top:8px">' +
+      '<div style="position:relative;height:8px;border-radius:5px;background:var(--line);overflow:hidden">' +
+        '<div style="width:' + pct + '%;height:100%;background:' + colour + '"></div>' +
+      '</div>' +
+      '<div style="position:relative;height:12px;margin-top:-1px">' +
+        '<span style="position:absolute;left:' + Math.min(99, st.thresholdPct) + '%;top:0;width:1px;height:6px;background:var(--ink-3)"></span>' +
+      '</div>' +
+      '<div class="tiny muted" style="display:flex;justify-content:space-between;margin-top:-2px">' +
+        '<span>' + st.used + ' deployed · ' + (st.pct === null ? '—' : st.pct + '%') + ' of licence</span>' +
+        '<span>warns at ' + st.warnAt + ' (' + st.thresholdPct + '%) · ceiling ' + st.max + '</span>' +
+      '</div>' +
+    '</div>';
   }
   /* the commercial pill — explicitly labelled so it can never be read as
      compliance evidence */
@@ -20203,6 +20272,265 @@ function __kvOnReady(fn) {
     if (!st || st.commercial === null) return '<span class="pill outline tiny">Commercial · not set</span>';
     if (st.commercialExceeded) return '<span class="pill amber tiny" title="Commercial supply agreement exceeded — advisory only, not a compliance limit">Commercial · over by ' + (st.used - st.commercial) + '</span>';
     return '<span class="pill outline tiny" title="Commercial supply agreement — advisory only">Commercial · ' + st.used + '/' + st.commercial + '</span>';
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CR-8a · LICENCE UTILISATION ALERT + AGENCY NOTES
+     The ceiling is enforced at 100%, but an agency that finds out at 100% has
+     already lost — a licence amendment takes weeks. So once deployment reaches
+     the warning threshold (75% of the licensed headcount by default) a standing
+     alert is raised: the agency sees it on its own portal, HR sees it in the
+     inbox, and the agency records notes against it — what it is doing about the
+     headroom, whether an amendment has been applied for, when it expects it.
+
+     The alert is a record, not a toast. It escalates (75% → 90% → at ceiling),
+     carries an append-only note thread, and resolves itself when the headcount
+     comes back down. The thread is the point: at the ceiling the question is
+     never "did you know" but "what did you do, and when".
+     ════════════════════════════════════════════════════════════════════════ */
+  var KV_LIC_ALERTS = { rows: [], loaded: false, notified: {} };
+  var LIC_NOTE_KINDS = [
+    { key: 'amendment',  label: 'Licence amendment applied for' },
+    { key: 'planned',    label: 'Amendment planned / documents being prepared' },
+    { key: 'demobilise', label: 'Will demobilise to stay within the licence' },
+    { key: 'no-action',  label: 'No further deployment planned under this licence' },
+    { key: 'comment',    label: 'Comment' }
+  ];
+  function licNoteKindLabel(k) {
+    var m = LIC_NOTE_KINDS.find(function (x) { return x.key === k; });
+    return m ? m.label : 'Comment';
+  }
+  function licAlertFor(contractorId) {
+    return KV_LIC_ALERTS.rows.find(function (a) {
+      return a.state === 'open' && String(a.contractorId) === String(contractorId);
+    }) || null;
+  }
+  /* Ask the server to re-evaluate every agency and hand back the open alerts.
+     Recomputing server-side keeps one definition of "past the threshold" — the
+     UI never decides on its own that an alert exists. */
+  function licLoadAlerts(opts) {
+    var quiet = opts && opts.quiet;
+    return kvJson('/api/licence-alerts/recheck', 'POST', {}).then(function (j) {
+      KV_LIC_ALERTS.rows = (j && j.open) || [];
+      KV_LIC_ALERTS.loaded = true;
+      if (!quiet) licNotifyMine();
+      return KV_LIC_ALERTS.rows;
+    }).catch(function () { return KV_LIC_ALERTS.rows; });
+  }
+  /* An agency session is told about its own alert once per session — HR gets
+     the same thing through the HR inbox, so this is the agency-side channel. */
+  function licNotifyMine() {
+    if (!kvIsAgency()) return;
+    var firm = kvAgencyFirm();
+    if (!firm) return;
+    var key = String(firm).trim().toLowerCase();
+    KV_LIC_ALERTS.rows.filter(function (a) {
+      return String(a.contractorName).trim().toLowerCase() === key && !KV_LIC_ALERTS.notified[a.id + a.tier];
+    }).forEach(function (a) {
+      KV_LIC_ALERTS.notified[a.id + a.tier] = 1;
+      var cur = a.current || a.raisedAtSnapshot || {};
+      if (typeof kvNotify === 'function') {
+        kvNotify(
+          a.tier === 'blocked' ? 'CLRA licence ceiling reached' : 'CLRA licence · ' + (cur.pct || '') + '% of your licensed headcount',
+          a.tier === 'blocked'
+            ? 'You are at your licensed headcount of ' + cur.max + '. Onboarding is blocked until the licence is amended. Record what you are doing about it on your portal.'
+            : 'You have ' + cur.headroom + ' of ' + cur.max + ' licensed places left. Plant HR has been notified — record your plan against the alert on your portal.',
+          'warn'
+        );
+      }
+    });
+  }
+  /* The alert card. Same record, two audiences: the agency sees what it must do,
+     HR sees what the agency has said it will do. */
+  function licRenderAlertCard(st, audience, opts) {
+    if (!st || st.max === null) return '';
+    var alert = licAlertFor(st.contractorId);
+    if (st.tier === 'ok' && !alert) return '';
+    var forAgency = audience === 'agency';
+    var skipHeadline = !!(opts && opts.skipHeadline);
+    var cls = st.blocked || st.tier === 'critical' ? 'red' : 'amber';
+    var head, body;
+    if (st.blocked) {
+      head = forAgency ? 'You are at your CLRA licensed headcount'
+                       : st.contractorName + ' is at its CLRA licensed headcount';
+      body = (forAgency ? 'You have ' : 'This agency has ') + st.used + ' of ' + st.max +
+             ' licensed workers deployed. Further onboarding is blocked until the licence is amended.';
+    } else {
+      head = (forAgency ? 'You have reached ' : st.contractorName + ' has reached ') + st.pct +
+             '% of the licensed headcount';
+      body = (forAgency ? 'You have ' : 'This agency has ') + st.headroom + ' of ' + st.max +
+             ' licensed places left (' + st.used + ' deployed). The alert fires at ' + st.thresholdPct +
+             '% — ' + st.warnAt + ' workers — so there is time to act before onboarding stops at ' + st.max + '.';
+    }
+    var canNote = forAgency ? kvIsAgency() : kvIsHR();
+    var html =
+      (skipHeadline ? '' :
+        '<div class="note ' + cls + '" style="margin-top:10px;font-size:0.78rem">' +
+          '<strong>' + kvEsc(head) + '.</strong> ' + kvEsc(body) +
+          (forAgency
+            ? ' Plant HR has been notified. Record what you are doing about the headroom below — that note is what HR reviews.'
+            : ' Notes below are the agency’s own account of what it is doing.') +
+        '</div>') +
+      ctLicenceBar(st);
+    if (!alert) {
+      return html + '<div class="tiny muted" style="margin-top:8px">No alert record open yet — it is raised the moment the threshold is crossed.</div>';
+    }
+    html += '<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
+        '<div class="card-h-title" style="font-size:0.82rem">Notes against this alert' +
+          '<span class="tiny muted" style="font-weight:400"> · raised ' + kvDateTime(alert.raisedAt) +
+          ((alert.notes || []).length ? ' · ' + alert.notes.length + ' note' + (alert.notes.length === 1 ? '' : 's') : '') + '</span></div>' +
+        '<div style="display:flex;gap:6px">' +
+          (canNote ? '<button class="btn tiny primary" onclick="licOpenNote(\'' + kvEsc(alert.id) + '\')">＋ Add note</button>' : '') +
+          (!forAgency && kvIsHR() && !(alert.acknowledged && alert.acknowledged.at)
+            ? '<button class="btn tiny" onclick="licAckAlert(\'' + kvEsc(alert.id) + '\')">Acknowledge</button>' : '') +
+        '</div>' +
+      '</div>' +
+      licRenderNotes(alert);
+    if (alert.acknowledged && alert.acknowledged.at) {
+      html += '<div class="tiny muted" style="margin-top:6px">Acknowledged by ' + kvEsc(alert.acknowledged.by) +
+              ' · ' + kvDateTime(alert.acknowledged.at) +
+              '. Acknowledgement is not a resolution — the alert clears when the headcount comes back under ' +
+              st.warnAt + '.</div>';
+    }
+    return html;
+  }
+  function licRenderNotes(alert) {
+    var notes = (alert.notes || []).slice().reverse();
+    if (!notes.length) {
+      return '<div class="tiny muted" style="margin-top:8px;padding:9px 10px;border:1px dashed var(--line);border-radius:8px">' +
+        'No notes yet. The agency records what it is doing about the headroom here — a licence amendment applied for, ' +
+        'a planned demobilisation, or simply that no further deployment is planned.</div>';
+    }
+    return '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">' +
+      notes.map(function (n) {
+        var snap = n.atSnapshot || {};
+        return '<div style="padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff">' +
+          '<div class="row-between" style="gap:10px;align-items:flex-start">' +
+            '<span class="pill ' + (n.byAgency ? 'indigo' : 'outline') + ' tiny">' + kvEsc(licNoteKindLabel(n.kind)) + '</span>' +
+            '<span class="tiny muted">' + kvDateTime(n.at) + '</span>' +
+          '</div>' +
+          '<div style="font-size:0.8rem;margin-top:5px">' + kvEsc(n.text) + '</div>' +
+          '<div class="tiny muted" style="margin-top:4px">' +
+            kvEsc(n.by) + ' · ' + (n.byAgency ? 'agency' : 'Plant HR') +
+            (n.expectedBy ? ' · expected by ' + kvEsc(n.expectedBy) : '') +
+            (snap.used != null ? ' · at ' + snap.used + '/' + snap.max + ' (' + snap.pct + '%)' : '') +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+  /* the alert opened on its own, from the HR inbox — HR can read the agency's
+     notes and act without first navigating to the contractor */
+  function licOpenAlertModal(contractorId) {
+    var open = function () {
+      var st = ctLicenceState(contractorId);
+      if (!st) { toast('Contractor not found', 'red'); return; }
+      var alert = licAlertFor(st.contractorId);
+      omModal(
+        '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">CLRA licence headroom · alert</span>' +
+          '<span class="modal-h-title">' + kvEsc(st.contractorName) + '</span></div>' +
+          '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+        '<div class="modal-body">' +
+          (alert || st.nearLimit || st.blocked
+            ? licRenderAlertCard(st, 'hr')
+            : '<div class="note green" style="font-size:0.78rem">' + kvEsc(st.contractorName) + ' is back under the ' +
+              st.thresholdPct + '% warning threshold — ' + st.used + ' of ' + st.max + ' licensed places used. The alert has been resolved.</div>' +
+              ctLicenceBar(st)) +
+        '</div>' +
+        '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">HR maintains the ceiling · the agency records what it is doing about it</span></div>' +
+          '<div class="modal-footer-right">' +
+          (kvIsHR() ? '<button class="btn" onclick="ctOpenLicenceEditor(\'' + kvEsc(st.contractorId) + '\')">Edit licence</button>' : '') +
+          '<button class="btn" onclick="omCloseModal()">Close</button></div></div>',
+        820
+      );
+    };
+    if (KV_LIC_ALERTS.loaded) open(); else licLoadAlerts({ quiet: true }).then(open);
+  }
+  function licOpenNote(alertId) {
+    var alert = KV_LIC_ALERTS.rows.find(function (a) { return a.id === alertId; });
+    if (!alert) { toast('That alert is no longer open', 'red'); return; }
+    if (!kvIsAgency() && !kvIsHR()) { toast('Only the agency or Plant HR can note against a licence alert', 'red'); return; }
+    var cur = alert.current || alert.raisedAtSnapshot || {};
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left"><span class="modal-h-eye">CLRA licence headroom · note</span>' +
+        '<span class="modal-h-title">' + kvEsc(alert.contractorName) + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="note ' + (alert.tier === 'warn' ? 'amber' : 'red') + '" style="font-size:0.76rem;margin-bottom:12px">' +
+          '<strong>' + cur.used + ' of ' + cur.max + ' licensed places used (' + cur.pct + '%).</strong> ' +
+          (alert.tier === 'blocked'
+            ? 'Onboarding under this licence is blocked until the licence is amended.'
+            : cur.headroom + ' remaining before onboarding stops.') +
+          ' This note is the agency’s account of what it is doing — it does not change the ceiling.</div>' +
+        '<div class="field"><label class="field-l">What is happening about the headroom?</label>' +
+          '<select class="input" id="lic-note-kind">' +
+            LIC_NOTE_KINDS.map(function (k) { return '<option value="' + k.key + '">' + kvEsc(k.label) + '</option>'; }).join('') +
+          '</select></div>' +
+        '<div class="field" style="margin-top:10px"><label class="field-l">Note <span style="color:var(--red-dk)">*</span></label>' +
+          '<textarea class="input" id="lic-note-text" rows="4" placeholder="e.g. Amendment to 400 applied for with the Licensing Officer on 02 Aug, acknowledgement ALC/2026/1183 attached to the licence document."></textarea></div>' +
+        '<div class="field" style="margin-top:10px"><label class="field-l">Expected by (optional)</label>' +
+          '<input class="input" id="lic-note-by" placeholder="e.g. 20 Aug 2026"></div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Notes are append-only and visible to Plant HR</span></div>' +
+        '<div class="modal-footer-right"><button class="btn primary" onclick="licSaveNote(\'' + kvEsc(alertId) + '\')">Save note</button>' +
+        '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>',
+      760
+    );
+  }
+  function licSaveNote(alertId) {
+    var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var text = String(v('lic-note-text') || '').trim();
+    if (!text) { toast('Add the note text — an empty note tells HR nothing', 'red'); return; }
+    kvJson('/api/licence-alerts/' + encodeURIComponent(alertId) + '/notes', 'POST', {
+      kind: v('lic-note-kind'), text: text, expectedBy: v('lic-note-by')
+    }).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Could not save the note', 'red'); return; }
+      omCloseModal();
+      licLoadAlerts({ quiet: true }).then(licRefreshSurfaces);
+      toast('Note recorded · Plant HR notified', 'green');
+    }).catch(function (e) { toast('Could not save the note: ' + e.message, 'red'); });
+  }
+  function licAckAlert(alertId) {
+    if (!kvHrOnly('Only Plant HR can acknowledge a licence alert.')) return;
+    kvJson('/api/licence-alerts/' + encodeURIComponent(alertId) + '/ack', 'POST', {}).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Could not acknowledge', 'red'); return; }
+      licLoadAlerts({ quiet: true }).then(licRefreshSurfaces);
+      toast('Acknowledged — the alert stays open until the headcount comes down', 'green');
+    });
+  }
+  /* redraw every surface that shows the ceiling, so a note or a new onboarding
+     is reflected wherever the user happens to be looking */
+  function licRefreshSurfaces() {
+    if (typeof kvRenderLicenceBoard === 'function') kvRenderLicenceBoard();
+    if (typeof renderContractorGrid === 'function') renderContractorGrid();
+    if (typeof SELECTED_CT !== 'undefined' && SELECTED_CT && typeof openCtDrill === 'function') openCtDrill(SELECTED_CT);
+    if (typeof ctRenderLicenceHost === 'function') ctRenderLicenceHost();
+    if (typeof kvLoadHrInbox === 'function') kvLoadHrInbox(true);
+    capLicenceSync();
+  }
+  /* called with the licence position the server returns after an onboarding —
+     the moment the threshold is crossed is the moment worth saying it, to
+     whoever did the onboarding, HR or agency alike */
+  function licAfterOnboarding(state) {
+    if (!state || state.max === null) return;
+    licLoadAlerts({ quiet: true }).then(licRefreshSurfaces);
+    if (state.tier === 'ok') return;
+    var msg = state.blocked
+      ? 'CLRA licence · ' + state.contractorName + ' is now at its licensed ceiling of ' + state.max +
+        '. No further worker can be onboarded until the licence is amended.'
+      : 'CLRA licence · ' + state.contractorName + ' is at ' + state.pct + '% of its licensed headcount (' +
+        state.headroom + ' of ' + state.max + ' left). Alert raised — the agency has been asked to record its plan.';
+    toast(msg, state.tier === 'warn' ? 'amber' : 'red');
+    if (typeof kvNotify === 'function') {
+      kvNotify(state.blocked ? 'CLRA licence ceiling reached' : 'CLRA licence at ' + state.pct + '%', msg, 'warn');
+    }
+  }
+  function initLicenceAlerts() {
+    /* only fetch where a ceiling surface is actually mounted */
+    if (!document.getElementById('lic-board-body') &&
+        !document.getElementById('ct-licence-host') &&
+        !document.getElementById('ct-grid-body')) return;
+    licLoadAlerts().then(licRefreshSurfaces);
   }
 
   /* live headroom note under the contractor picker on the capture form */
@@ -20223,10 +20551,27 @@ function __kvOnReady(fn) {
         kvEsc(st.contractorName) + ' has ' + st.used + ' of ' + st.max + ' licensed workers deployed (licence ' +
         kvEsc(st.licenceNo || '—') + '). Onboarding beyond the licensed headcount is a Contract Labour violation and the ' +
         'principal employer carries joint liability. The agency must have its licence amended first.</div>';
+    } else if (st.nearLimit) {
+      /* past the warning threshold — say how much room is left and what the
+         agency is doing about it, because that decides whether this batch of
+         onboardings should go ahead at all */
+      var alert = licAlertFor(st.contractorId);
+      var last = alert && (alert.notes || []).length ? alert.notes[alert.notes.length - 1] : null;
+      lines += '<div class="note ' + (st.tier === 'critical' ? 'red' : 'amber') + '" style="font-size:0.74rem">' +
+        '<strong>' + st.pct + '% of the CLRA licence used · ' + st.headroom + ' of ' + st.max + ' remaining.</strong> ' +
+        kvEsc(st.contractorName) + ' is past the ' + st.thresholdPct + '% warning threshold (licence ' +
+        kvEsc(st.licenceNo || '—') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '). ' +
+        'Onboarding continues until ' + st.max + ', then stops.' +
+        (last
+          ? ' <span style="display:block;margin-top:4px">Agency’s last note · ' + kvEsc(licNoteKindLabel(last.kind)) + ': ' +
+            kvEsc(String(last.text).slice(0, 160)) + (last.expectedBy ? ' (expected by ' + kvEsc(last.expectedBy) + ')' : '') + '</span>'
+          : ' <span style="display:block;margin-top:4px">The agency has not yet recorded what it is doing about the headroom.</span>') +
+        '</div>';
     } else {
-      lines += '<div class="note ' + (st.nearLimit ? 'amber' : 'green') + '" style="font-size:0.74rem">' +
+      lines += '<div class="note green" style="font-size:0.74rem">' +
         '<strong>CLRA licence · ' + st.headroom + ' of ' + st.max + ' remaining</strong> (' + st.used + ' deployed · licence ' +
-        kvEsc(st.licenceNo || '—') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '). Statutory ceiling — enforced.</div>';
+        kvEsc(st.licenceNo || '—') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') +
+        '). Statutory ceiling — enforced · warns at ' + st.warnAt + '.</div>';
     }
     if (st.commercialExceeded) {
       lines += '<div class="note amber" style="font-size:0.74rem;margin-top:6px"><strong>Commercial alert (not a compliance limit).</strong> ' +
@@ -20270,6 +20615,12 @@ function __kvOnReady(fn) {
           '<div class="field"><label class="field-l">Licensed max headcount <span style="color:var(--red-dk)">*</span></label><input class="input" type="number" min="0" id="lic-max" value="' + (lic.maxHeadcount == null ? '' : lic.maxHeadcount) + '"></div>' +
           '<div class="field"><label class="field-l">Valid till</label><input class="input" id="lic-till" value="' + kvEsc(lic.validTill || '') + '" placeholder="e.g. 18 Jul 2026"></div>' +
           '<div class="field"><label class="field-l">Licensing authority</label><input class="input" id="lic-auth" value="' + kvEsc(lic.authority || '') + '"></div>' +
+          '<div class="field"><label class="field-l">Alert at % of licensed headcount</label>' +
+            '<input class="input" type="number" min="1" max="100" id="lic-alert-pct" placeholder="' + LICENCE_WARN_PCT + '" value="' +
+              (lic.alertThresholdPct == null ? '' : lic.alertThresholdPct) + '">' +
+            '<div class="tiny muted" style="margin-top:3px">Blank = ' + LICENCE_WARN_PCT + '%. At ' +
+              (st.max === null ? '—' : Math.ceil((st.max * ctLicenceThresholdPct(lic)) / 100)) +
+              ' workers this agency and Plant HR are both alerted, and the agency is asked to record what it is doing.</div></div>' +
         '</div>' +
         '<div class="card-h-title" style="font-size:0.85rem;margin:16px 0 6px">Commercial · not a compliance field</div>' +
         '<div class="g3" style="gap:10px 14px">' +
@@ -20280,9 +20631,11 @@ function __kvOnReady(fn) {
           kvKV('Roster already deployed', st.base) +
           kvKV('Onboarded through the platform', st.onboarded) +
           kvKV('Total against the licence', '<strong>' + st.used + '</strong>') +
+          kvKV('Licence utilisation', st.pct === null ? '—' : st.pct + '% · alerts at ' + st.thresholdPct + '% (' + st.warnAt + ' workers)') +
           kvKV('Statutory headroom', st.max === null ? '—' : ctLicencePill(st)) +
           kvKV('Commercial position', ctCommercialPill(st))
         ) +
+        ctLicenceBar(st) +
       '</div>' +
       '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Lowering the ceiling below the deployed headcount blocks all further onboarding for this agency</span></div>' +
         '<div class="modal-footer-right"><button class="btn primary" onclick="ctSaveLicence(\'' + kvEsc(c.id) + '\')">Save licence</button>' +
@@ -20295,9 +20648,14 @@ function __kvOnReady(fn) {
     var v = function (x) { var el = document.getElementById(x); return el ? el.value : ''; };
     var max = v('lic-max');
     if (max !== '' && (isNaN(Number(max)) || Number(max) < 0)) { toast('Licensed headcount must be a number', 'red'); return; }
+    var alertPct = v('lic-alert-pct');
+    if (alertPct !== '' && (isNaN(Number(alertPct)) || Number(alertPct) <= 0 || Number(alertPct) > 100)) {
+      toast('The alert threshold must be a percentage between 1 and 100', 'red'); return;
+    }
     kvJson('/api/contractors/' + encodeURIComponent(id) + '/licence', 'POST', {
       number: v('lic-no'), maxHeadcount: max === '' ? null : Number(max),
       validTill: v('lic-till'), authority: v('lic-auth'),
+      alertThresholdPct: alertPct === '' ? null : Number(alertPct),
       commercialHeadcount: v('lic-comm') === '' ? null : Number(v('lic-comm'))
     }).then(function (j) {
       if (!j || !j.ok) { toast((j && j.error) || 'Could not save the licence', 'red'); return; }
@@ -20305,17 +20663,33 @@ function __kvOnReady(fn) {
       if (c) {
         c.clraLicence = Object.assign({}, c.clraLicence, {
           number: v('lic-no'), maxHeadcount: max === '' ? null : Number(max),
-          validTill: v('lic-till'), authority: v('lic-auth')
+          validTill: v('lic-till'), authority: v('lic-auth'),
+          alertThresholdPct: alertPct === '' ? null : Number(alertPct)
         });
         c.commercialHeadcount = v('lic-comm') === '' ? null : Number(v('lic-comm'));
       }
       omCloseModal();
-      if (typeof renderContractorGrid === 'function') renderContractorGrid();
-      if (typeof SELECTED_CT !== 'undefined' && SELECTED_CT === id && typeof openCtDrill === 'function') openCtDrill(id);
-      if (typeof kvRenderLicenceBoard === 'function') kvRenderLicenceBoard();
-      capLicenceSync();
+      /* moving the ceiling (or the threshold) moves the utilisation — the
+         server has already re-evaluated, so pull the alerts back before redraw */
+      licLoadAlerts({ quiet: true }).then(licRefreshSurfaces);
       toast('CLRA licence updated for ' + (c ? c.name : id), 'green');
     }).catch(function (e) { toast('Could not save the licence: ' + e.message, 'red'); });
+  }
+
+  /* what the agency has said about an open alert, in one chip — the board's job
+     is to show HR who still owes an answer */
+  function licBoardNoteChip(s) {
+    if (!s.nearLimit && !s.blocked) return '';
+    var a = licAlertFor(s.contractorId);
+    if (!a) return '';
+    var notes = a.notes || [];
+    if (!notes.length) {
+      return '<div style="margin-top:3px"><span class="pill red tiny" title="Alerted, but the agency has not recorded what it is doing about the headroom">No agency response</span></div>';
+    }
+    var last = notes[notes.length - 1];
+    return '<div style="margin-top:3px"><span class="pill outline tiny" title="' +
+      kvEsc(licNoteKindLabel(last.kind) + ' — ' + last.text) + '">' + notes.length + ' note' + (notes.length === 1 ? '' : 's') +
+      ' · ' + kvEsc(licNoteKindLabel(last.kind)) + '</span></div>';
   }
 
   /* licence board on the Statutory posture page — every agency's statutory
@@ -20330,10 +20704,18 @@ function __kvOnReady(fn) {
       var blocked = states.filter(function (s) { return s.blocked; }).length;
       var near = states.filter(function (s) { return s.nearLimit; }).length;
       var unset = states.filter(function (s) { return s.max === null; }).length;
+      /* how many of the alerted agencies have actually said what they are doing
+         — an alert nobody answered is the one HR has to chase */
+      var silent = states.filter(function (s) {
+        if (!s.nearLimit && !s.blocked) return false;
+        var a = licAlertFor(s.contractorId);
+        return !a || !(a.notes || []).length;
+      }).length;
       var over = states.filter(function (s) { return s.commercialExceeded; }).length;
       kpis.innerHTML =
         '<div class="kpi"><div class="kpi-eye">Agencies at licence ceiling</div><div class="kpi-val" style="color:var(--red-dk)">' + blocked + '</div><div class="kpi-sub">onboarding hard-blocked</div></div>' +
-        '<div class="kpi"><div class="kpi-eye">Approaching the ceiling</div><div class="kpi-val" style="color:var(--amber-dk)">' + near + '</div><div class="kpi-sub">licence amendment due</div></div>' +
+        '<div class="kpi"><div class="kpi-eye">Past the warning threshold</div><div class="kpi-val" style="color:var(--amber-dk)">' + near + '</div>' +
+          '<div class="kpi-sub">at or above ' + LICENCE_WARN_PCT + '% of licensed headcount · ' + silent + ' with no agency note</div></div>' +
         '<div class="kpi"><div class="kpi-eye">No ceiling recorded</div><div class="kpi-val">' + unset + '</div><div class="kpi-sub">cannot be enforced until HR records it</div></div>' +
         '<div class="kpi"><div class="kpi-eye">Over commercial headcount</div><div class="kpi-val">' + over + '</div><div class="kpi-sub">advisory · not a compliance breach</div></div>';
     }
@@ -20349,7 +20731,7 @@ function __kvOnReady(fn) {
           '<td class="t-strong">' + kvEsc(s.contractorName) + '<div class="t-mute mono tiny">' + kvEsc(s.licenceNo || 'no licence on record') + '</div></td>' +
           '<td class="mono">' + (s.max === null ? '—' : s.max) + '</td>' +
           '<td class="mono">' + s.used + '<span class="tiny muted"> (' + s.base + ' + ' + s.onboarded + ')</span></td>' +
-          '<td>' + ctLicencePill(s) + '</td>' +
+          '<td>' + ctLicencePill(s) + licBoardNoteChip(s) + '</td>' +
           '<td>' + ctCommercialPill(s) + '</td>' +
           '<td class="tiny">' + kvEsc(s.validTill || '—') + '</td>' +
           '<td style="text-align:right" onclick="event.stopPropagation()">' +
@@ -21102,6 +21484,7 @@ function __kvOnReady(fn) {
   __kvOnReady(initHrInbox);
   __kvOnReady(initExitRegister);
   __kvOnReady(initLicenceBoard);
+  __kvOnReady(initLicenceAlerts);
   __kvOnReady(initEpfRollup);
   __kvOnReady(initRouteChangeLog);
   __kvOnReady(initWageRegister);

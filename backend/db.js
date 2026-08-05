@@ -75,7 +75,11 @@ const COLLECTIONS = {
   /* CR-7 · monthly OT / LOP / variable-allowance log, one row per worker-month */
   payrollMonths:       { table: 'payroll_months',        kind: 'array', id: (r) => r.id },
   /* HR inbox — anything an agency raises that only HR may action */
-  hrNotifications:     { table: 'hr_notifications',      kind: 'array', id: (r) => r.id }
+  hrNotifications:     { table: 'hr_notifications',      kind: 'array', id: (r) => r.id },
+  /* CR-8 · licence-utilisation alerts raised when an agency's deployed
+     headcount reaches its warning threshold (75% by default) of the CLRA
+     licensed maximum, with the agency's notes appended to each alert */
+  licenceAlerts:       { table: 'licence_alerts',        kind: 'array', id: (r) => r.id }
 };
 const META_TABLE = 'store_meta';
 

@@ -122,13 +122,22 @@ function main() {
   /* CR-8 · the CLRA licence ceiling is a statutory limit and is tracked as its
      own field; commercialHeadcount is Daikin's commercial supply agreement and
      is deliberately kept separate (advisory only, never a compliance block). */
-  (demo.contractors || []).forEach((c) => {
+  /* An agency applies for a licence with room to grow into, and how much room
+     differs by agency — so the ceilings are spread across the bands the
+     utilisation alert cares about (comfortable / approaching / critical)
+     rather than all sitting just above the deployed headcount. Indexed, not
+     random, so re-seeding produces the same picture. */
+  const LICENCE_HEADROOM_CYCLE = [1.70, 1.55, 1.30, 1.85, 1.45, 1.12, 1.60, 1.05];
+  (demo.contractors || []).forEach((c, i) => {
     const deployed = num(c.deployed);
+    const factor = LICENCE_HEADROOM_CYCLE[i % LICENCE_HEADROOM_CYCLE.length];
     c.clraLicence = Object.assign({
       number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
       authority: 'Licensing Officer · Sricity, Andhra Pradesh',
       validTill: (c.clra && c.clra.expiresOn) || '',
-      maxHeadcount: Math.max(deployed + 1, Math.ceil((deployed + 1) / 25) * 25)
+      /* licences are applied for in round numbers, always above the headcount
+         actually deployed under them */
+      maxHeadcount: Math.max(deployed + 1, Math.ceil((deployed * factor) / 10) * 10)
     }, c.clraLicence || {});
     if (c.commercialHeadcount == null) c.commercialHeadcount = Math.ceil((deployed + 1) / 10) * 10;
   });
