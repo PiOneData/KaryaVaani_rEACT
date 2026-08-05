@@ -228,9 +228,10 @@ export default function SecCtHome() {
           <div className="card">
             <div className="card-h">
               <div>
-                <div className="card-h-title">Deployment ceilings</div>
+                <div className="card-h-title">Deployment ceilings · how many you can still onboard</div>
                 {' '}
                 <div className="card-h-sub">
+                  How many workers you have onboarded and how many places remain before the cap.
                   Your CLRA licensed headcount is a statutory limit and is enforced — onboarding stops at it.
                   The contracted headcount is commercial and advisory only.
                 </div>

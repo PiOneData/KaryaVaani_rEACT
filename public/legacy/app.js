@@ -1901,7 +1901,7 @@ function __kvOnReady(fn) {
         '<div class="dir-ct-grid">' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Contractor ID</span><span class="dir-dd-v">' + ct.id + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Deployment area</span><span class="dir-dd-v">' + ct.area + '</span></div>' +
-          '<div class="dir-dd-row"><span class="dir-dd-k">Workers deployed</span><span class="dir-dd-v">' + ct.deployed + '</span></div>' +
+          '<div class="dir-dd-row"><span class="dir-dd-k">Workers deployed</span><span class="dir-dd-v">' + ctDeployedNow(ct) + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">Registered since</span><span class="dir-dd-v">' + ct.registered + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">PAN / CIN</span><span class="dir-dd-v">' + kvIdSpan('PAN / CIN', ct.panCin, ct.id, 'contractor') + '</span></div>' +
           '<div class="dir-dd-row"><span class="dir-dd-k">GST</span><span class="dir-dd-v">' + kvIdSpan('GST', ct.gst, ct.id, 'contractor') + '</span></div>' +
@@ -2126,7 +2126,9 @@ function __kvOnReady(fn) {
 
     /* KPI strip — full set */
     const all = CONTRACTORS.map(function (c) { return { c: c, st: ctdStatus(c) }; });
-    const totalDeployed = all.reduce(function (n, r) { return n + r.c.deployed; }, 0);
+    /* sum the LIVE per-contractor headcounts, so the strip totals the same
+       numbers the rows below it show */
+    const totalDeployed = all.reduce(function (n, r) { return n + ctDeployedNow(r.c); }, 0);
     const set = function (id, v) { const e = document.getElementById(id); if (e) e.textContent = v; };
     set('ctd-kpi-total', all.length);
     set('ctd-kpi-deployed', totalDeployed.toLocaleString('en-IN') + ' workers deployed');
@@ -2157,7 +2159,7 @@ function __kvOnReady(fn) {
           '<div><div class="t-strong">' + c.name + '</div><div class="t-mute">' + c.id + '</div></div>' +
         '</div></td>' +
         '<td>' + c.area + '</td>' +
-        '<td>' + c.deployed + '</td>' +
+        '<td>' + ctDeployedNow(c) + '</td>' +
         '<td><div class="ctd-score"><span class="mono t-strong">' + c.score + '</span>' +
           '<div class="bar thin" style="width:64px"><span style="width:' + c.score +
           '%;background:var(--' + scoreCls + ')"></span></div></div></td>' +
@@ -2245,7 +2247,7 @@ function __kvOnReady(fn) {
         '<div class="dir-dd-card-h">Contractor record</div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Contractor ID</span><span class="dir-dd-v">' + c.id + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Deployment area</span><span class="dir-dd-v">' + c.area + '</span></div>' +
-        '<div class="dir-dd-row"><span class="dir-dd-k">Workers deployed</span><span class="dir-dd-v">' + c.deployed + '</span></div>' +
+        '<div class="dir-dd-row"><span class="dir-dd-k">Workers deployed</span><span class="dir-dd-v">' + ctDeployedNow(c) + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">Registered since</span><span class="dir-dd-v">' + c.registered + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">PAN / CIN</span><span class="dir-dd-v">' + kvIdSpan('PAN / CIN', c.panCin, c.id, 'contractor') + '</span></div>' +
         '<div class="dir-dd-row"><span class="dir-dd-k">GST</span><span class="dir-dd-v">' + kvIdSpan('GST', c.gst, c.id, 'contractor') + '</span></div>' +
@@ -3203,7 +3205,10 @@ function __kvOnReady(fn) {
   function ctSortVal(c, col) {
     switch (col) {
       case 'name':       return c.name.toLowerCase();
-      case 'deployed':   return c.deployed;
+      /* the LIVE deployed headcount, matching the column — sorting on the
+         frozen roster figure would order the grid by a number it no longer
+         shows once workers have been onboarded through the platform */
+      case 'deployed':   { const st = ctLicenceState(c); return st ? st.used : c.deployed; }
       case 'score':      return c.score;
       case 'clraRank':   return CT_CLRA_RANK[c.clra.state];
       case 'esicRank':   return CT_RECON_RANK[c.esic.state];
@@ -3273,6 +3278,23 @@ function __kvOnReady(fn) {
     document.getElementById('ct-sort-state').textContent =
       matchTxt + 'Sorted by ' + colLabel[CT_SORT.col] + ' · ' + (CT_SORT.dir === 1 ? 'asc' : 'desc');
 
+    /* CR-8 · plant-wide deployment against the licensed caps, so HR can see at a
+       glance how much room is left across the agency base and how many are at
+       or near their ceiling — the same quick view the agency gets for itself,
+       aggregated. Computed from the same ctLicenceState the grid rows use. */
+    const licStates = CONTRACTORS.map(function (c) { return ctLicenceState(c); }).filter(Boolean);
+    const capped = licStates.filter(function (s) { return s.max !== null; });
+    const depTotal = licStates.reduce(function (n, s) { return n + s.used; }, 0);
+    const roomTotal = capped.reduce(function (n, s) { return n + Math.max(0, s.headroom); }, 0);
+    const atCap = capped.filter(function (s) { return s.blocked; }).length;
+    const nearCap = capped.filter(function (s) { return !s.blocked && s.nearLimit; }).length;
+    const setK = function (id, v) { const e = document.getElementById(id); if (e) e.textContent = v; };
+    setK('vend-kpi-dep', depTotal.toLocaleString('en-IN'));
+    setK('vend-kpi-dep-s',
+      CONTRACTORS.length + ' agencies · ' + roomTotal.toLocaleString('en-IN') + ' places left under licence' +
+      (atCap ? ' · ' + atCap + ' at cap' : '') +
+      (nearCap ? ' · ' + nearCap + ' near cap' : ''));
+
     const body = document.getElementById('ct-grid-body');
     body.innerHTML = '';
     if (rows.length === 0) {
@@ -3292,7 +3314,16 @@ function __kvOnReady(fn) {
       tr.onclick = () => openCtDrill(c.id);
       tr.innerHTML =
         '<td><span class="t-strong">' + c.name + '</span><div class="t-mute">' + c.area + '</div></td>' +
-        '<td class="t-strong mono">' + c.deployed + '</td>' +
+        /* the live deployed headcount — the roster on site PLUS everyone
+           onboarded through the platform since. Showing c.deployed here was the
+           source of a row reading "139 deployed" beside a "145/145" licence
+           pill: two numbers for one quantity, differing by exactly the workers
+           this platform had onboarded. */
+        '<td class="t-strong mono">' + (lic ? lic.used : c.deployed) +
+          (lic && lic.onboarded
+            ? '<div class="t-mute" style="font-weight:400;font-size:0.72rem">' + lic.base + ' roster + ' + lic.onboarded + ' onboarded</div>'
+            : '') +
+        '</td>' +
         '<td>' + ctLicencePill(lic) + '<div style="margin-top:3px">' + ctCommercialPill(lic) + '</div></td>' +
         '<td><div class="row-gap"><span class="t-strong" style="color:' + sTxt + '">' + c.score + '</span>' +
           '<div class="bar thin" style="width:60px"><span style="width:' + c.score + '%;background:' + sCol + '"></span></div></div></td>' +
@@ -3331,7 +3362,7 @@ function __kvOnReady(fn) {
     const totalLiab = liabilityTotal(c);
     const openTasks = CT_TASKS.filter(t => t.ctId === c.id && t.severity !== 'closed').length;
     document.getElementById('ct-drill-meta').textContent =
-      c.deployed + ' workers deployed · joint liability ' + fmtLakh(totalLiab) +
+      ctDeployedNow(c) + ' workers deployed · joint liability ' + fmtLakh(totalLiab) +
       ' · ' + openTasks + ' open task' + (openTasks !== 1 ? 's' : '') +
       ' · compliance lead ' + c.complianceLead.split(' · ')[0];
 
@@ -3426,13 +3457,14 @@ function __kvOnReady(fn) {
               '<div class="card-h-sub">Statutory licence limit and the commercial supply agreement — tracked separately</div></div>' +
               (kvIsHR() ? '<button class="btn tiny" onclick="ctOpenLicenceEditor(\'' + kvEsc(c.id) + '\')">Edit licence</button>' : '<span class="tiny muted">HR maintains the licence</span>') +
               '</div>';
-      html += '<div class="sd-mini-grid" style="margin-top:8px">' +
-        '<div class="sd-mini"><div class="sd-mini-eye">CLRA licensed headcount · statutory</div>' +
-          '<div class="sd-mini-v">' + (lic.max === null ? '—' : lic.max) + '</div>' +
-          '<div class="sd-mini-s">' + kvEsc(lic.licenceNo || 'no licence number on record') + (lic.validTill ? ' · to ' + kvEsc(lic.validTill) : '') + '</div></div>' +
-        '<div class="sd-mini"><div class="sd-mini-eye">Deployed against the licence</div>' +
-          '<div class="sd-mini-v">' + lic.used + '</div>' +
-          '<div class="sd-mini-s">' + lic.base + ' on roster + ' + lic.onboarded + ' onboarded here</div></div>' +
+      /* the same quick view the agency sees on its own portal, in HR's voice —
+         one shared renderer, so the two logins can never quote different
+         numbers for the same agency */
+      html += '<div style="margin-top:8px">' + licQuickView(lic, 'hr') + '</div>';
+      html += '<div class="sd-mini-grid" style="margin-top:10px">' +
+        '<div class="sd-mini"><div class="sd-mini-eye">CLRA licence on record</div>' +
+          '<div class="sd-mini-v" style="font-size:1rem">' + kvEsc(lic.licenceNo || '—') + '</div>' +
+          '<div class="sd-mini-s">' + (lic.validTill ? 'valid to ' + kvEsc(lic.validTill) : 'no validity date on record') + '</div></div>' +
         '<div class="sd-mini"><div class="sd-mini-eye">Statutory headroom</div>' +
           '<div class="sd-mini-v" style="font-size:1rem">' + ctLicencePill(lic) + '</div>' +
           '<div class="sd-mini-s">' + (lic.blocked ? 'Onboarding is blocked — OSHC Rules 86-90' : 'Enforced as a hard block on onboarding') + '</div></div>' +
@@ -3447,7 +3479,7 @@ function __kvOnReady(fn) {
       }
       /* CR-8a · the standing utilisation alert and the agency's notes against
          it — what the agency says it is doing about the headroom */
-      html += licRenderAlertCard(lic, 'hr', { skipHeadline: lic.blocked });
+      html += licRenderAlertCard(lic, 'hr', { skipHeadline: lic.blocked, skipBar: true });
       if (!lic.blocked && lic.commercialExceeded) {
         html += '<div class="note amber" style="margin-top:10px;font-size:0.76rem"><strong>Commercial alert — not a compliance breach.</strong> ' +
           'Deployment is ' + (lic.used - lic.commercial) + ' above the contracted headcount of ' + lic.commercial +
@@ -3650,7 +3682,13 @@ function __kvOnReady(fn) {
   }
 
   function vwRenderTable(c) {
-    var deployed = (c && c.deployed) || VW_STATE.workers.length;
+    /* The LIVE deployed headcount — roster on site plus workers onboarded
+       through the platform that still occupy a licence slot. c.deployed alone
+       is the roster figure frozen at import: the table below merges onboarded
+       workers into its rows, so dividing those rows by c.deployed produced the
+       impossible "145 of 139 deployed". */
+    var vwLic = (c && typeof ctLicenceState === 'function') ? ctLicenceState(c) : null;
+    var deployed = vwLic ? vwLic.used : ((c && c.deployed) || VW_STATE.workers.length);
     vwRenderFilters();
     var f = VW_STATE.filters || {};
     /* Merge newly onboarded contract workers (from the Onboarding module) into
@@ -3688,9 +3726,20 @@ function __kvOnReady(fn) {
     });
     var filtered = (rows.length !== all.length);
     var sub = document.getElementById('ctw-sub');
+    /* Row count and deployed headcount are different quantities: the table
+       lists every worker on record for this vendor (including any who have
+       exited), while the deployed figure counts only those still occupying a
+       licence slot. State them side by side rather than as a ratio — "N of M
+       deployed" invited exactly the mismatch that produced "145 of 139". */
+    var vwPlaces = vwLic && vwLic.max !== null
+      ? ' · ' + vwLic.used + ' of ' + vwLic.max + ' licensed places used'
+      : '';
+    var vwSrc = VW_STATE.generated ? 'estimated roster — import vendor data to replace' : 'imported vendor data';
     if (sub) sub.textContent = VW_STATE.workers.length
-      ? (rows.length + (filtered ? ' of ' + all.length + ' match filters' : ' of ' + deployed + ' deployed') + ' · ' + (VW_STATE.generated ? 'estimated roster — import vendor data to replace' : 'imported vendor data') + ' · click a worker for details')
-      : ('No workers to show · ' + deployed + ' reported deployed. Use “Import vendor data” to upload the roster.');
+      ? (filtered
+          ? rows.length + ' of ' + all.length + ' match filters' + vwPlaces + ' · ' + vwSrc + ' · click a worker for details'
+          : all.length + ' listed · ' + deployed + ' currently deployed' + vwPlaces + ' · ' + vwSrc + ' · click a worker for details')
+      : ('No workers to show · ' + deployed + ' currently deployed' + vwPlaces + '. Use “Import vendor data” to upload the roster.');
     rows.sort(function (a, b) {
       var va = vwSortVal(a, VW_STATE.sortCol), vb = vwSortVal(b, VW_STATE.sortCol);
       if (va < vb) return -1 * VW_STATE.sortDir;
@@ -12586,8 +12635,10 @@ function __kvOnReady(fn) {
     const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     document.getElementById('ct-hero-greet').textContent = greet + ' ·';
     document.getElementById('ct-hero-name').textContent = c.name;
+    /* live deployed headcount, same figure as the KPI strip and the ceiling panel */
+    var ctHeroSt = ctLicenceState(c);
     document.getElementById('ct-hero-meta').textContent =
-      c.area + ' · ' + c.deployed + ' workers deployed · registered ' + c.registered;
+      c.area + ' · ' + (ctHeroSt ? ctHeroSt.used : c.deployed) + ' workers deployed · registered ' + c.registered;
     const scoreBand = c.score >= 80 ? 'green' : c.score >= 60 ? 'amber' : 'red';
     const chipsHtml = [
       '<span class="emp-hero-chip">' + c.id + '</span>',
@@ -12630,8 +12681,20 @@ function __kvOnReady(fn) {
     }
 
     /* KPI STRIP */
-    document.getElementById('ct-k-dep').textContent = c.deployed;
-    document.getElementById('ct-k-dep-s').textContent = c.area;
+    /* the headline "Workers deployed" figure must be the LIVE one — roster plus
+       everyone onboarded through the platform — and must be stated against the
+       cap. Showing c.deployed here was what made the dashboard read 139 while
+       the ceiling panel below it counted 145. */
+    var ctDepSt = ctLicenceState(c);
+    document.getElementById('ct-k-dep').textContent =
+      ctDepSt ? (ctDepSt.max === null ? String(ctDepSt.used) : ctDepSt.used + ' / ' + ctDepSt.max) : c.deployed;
+    document.getElementById('ct-k-dep-s').textContent = ctDepSt
+      ? (ctDepSt.max === null
+          ? c.area + ' · no licensed cap on record'
+          : (ctDepSt.headroom > 0
+              ? c.area + ' · ' + ctDepSt.headroom + ' more can be onboarded'
+              : c.area + ' · at the licensed cap — onboarding is blocked'))
+      : c.area;
     document.getElementById('ct-k-clra').textContent = c.clra.label;
     document.getElementById('ct-k-clra-s').textContent = 'expires ' + (c.clra.expiresOn || '—');
     document.getElementById('ct-k-esic').textContent = c.esic.label;
@@ -12700,7 +12763,13 @@ function __kvOnReady(fn) {
     var st = c ? ctLicenceState(c) : null;
     if (!st) { licHost.innerHTML = ''; return; }
     licHost.innerHTML =
-      '<div class="g2" style="gap:10px 14px">' +
+      /* Quick view · the two numbers an agency actually acts on before it starts
+         a batch of onboardings: how many it has put on through this platform,
+         and how many more it may put on before the ceiling stops it. Both are
+         derived from the same licenceState the server enforces, so this panel
+         can never disagree with the block the agency hits at the capture form. */
+      licQuickView(st, 'agency') +
+      '<div class="g2" style="gap:10px 14px;margin-top:10px">' +
         '<div class="kpi"><div class="kpi-eye">CLRA licensed headcount · statutory</div>' +
           '<div class="kpi-val" style="font-size:1.05rem">' + (st.max === null ? '—' : st.used + ' / ' + st.max) + '</div>' +
           '<div class="kpi-sub">' + kvEsc(st.licenceNo || 'licence number not on record') + (st.validTill ? ' · valid to ' + kvEsc(st.validTill) : '') + '</div></div>' +
@@ -12710,11 +12779,11 @@ function __kvOnReady(fn) {
       '</div>' +
       '<div style="margin-top:8px">' + ctLicencePill(st) + ' ' + ctCommercialPill(st) + '</div>' +
       (st.tier === 'ok' && !licAlertFor(st.contractorId)
-        ? ctLicenceBar(st) +
-          '<div class="tiny muted" style="margin-top:8px">The licensed ceiling is maintained by Plant HR from your CLRA licence. ' +
+        /* the utilisation bar is already drawn by the quick view above */
+        ? '<div class="tiny muted" style="margin-top:8px">The licensed ceiling is maintained by Plant HR from your CLRA licence. ' +
           'You will be alerted here — and Plant HR with you — once deployment reaches ' + (st.warnAt === null ? 'the warning threshold' : st.warnAt + ' (' + st.thresholdPct + '%)') +
           ', with time to apply for an amendment before onboarding stops.</div>'
-        : licRenderAlertCard(st, 'agency'));
+        : licRenderAlertCard(st, 'agency', { skipBar: true }));
   }
 
   function ctRenderActionCard(a) {
@@ -12794,8 +12863,12 @@ function __kvOnReady(fn) {
     const myWorkers = (typeof CHAT_CONTACTS !== 'undefined')
       ? CHAT_CONTACTS.filter(function (w) { return w.contractor === c.name; })
       : [];
-    /* derive synthetic statutory states from the firm-level subscores */
-    const deployed = c.deployed;
+    /* derive synthetic statutory states from the firm-level subscores.
+       Deployed is the live figure (roster + onboarded), so the "Total deployed"
+       tile agrees with the KPI strip above it rather than trailing it by
+       however many workers have been onboarded through the platform. */
+    const ctWfSt = ctLicenceState(c);
+    const deployed = ctWfSt ? ctWfSt.used : c.deployed;
     const esicShortfall = c.esic.cls === 'red' ? 4 : c.esic.cls === 'amber' ? 3 : 0;
     const esicOk = deployed - esicShortfall;
     const clraOk = Math.round(deployed * (c.subscores.clra / 100));
@@ -19359,7 +19432,7 @@ function __kvOnReady(fn) {
     const c = (CONTRACTORS || []).find(function (x) { return x.id === id; });
     if (!c) return;
     const overview = kvKV('Contractor', c.name) + kvKV('Code', c.id) + kvKV('Deployment area', c.area) +
-      kvKV('Workers deployed', c.deployed) + kvKV('Compliance score', '<span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + '/100</span>') +
+      kvKV('Workers deployed', ctDeployedNow(c)) + kvKV('Compliance score','<span class="pill ' + omComplyBand(c.score) + ' tiny">' + c.score + '/100</span>') +
       kvKV('Compliance lead', c.complianceLead) +
       kvKV('CLRA', '<span class="pill ' + c.clra.cls + ' tiny">' + c.clra.label + '</span>') +
       kvKV('ESIC', '<span class="pill ' + c.esic.cls + ' tiny">' + c.esic.label + '</span>') +
@@ -20266,6 +20339,60 @@ function __kvOnReady(fn) {
       '</div>' +
     '</div>';
   }
+  /* The live deployed headcount for a contractor — the roster on site plus the
+     workers onboarded through this platform that still occupy a licence slot.
+     c.deployed is only the roster figure frozen at import, so reading it
+     directly makes a surface disagree with every licence-aware panel beside it
+     by exactly the number of workers this platform has onboarded. Use this
+     wherever "workers deployed" is shown to a user. */
+  function ctDeployedNow(c) {
+    var st = (c && typeof ctLicenceState === 'function') ? ctLicenceState(c) : null;
+    return st ? st.used : kvNum(c && c.deployed);
+  }
+
+  /* ── Quick view · onboarded vs the cap ──────────────────────────────────
+     One strip of four tiles answering, at a glance, the question both an
+     agency and Plant HR open the page to ask: how many has this agency put on,
+     and how many more can it put on before onboarding stops?
+
+     Every number comes from ctLicenceState, which mirrors the server's
+     licenceState — the same computation that enforces the block. That is the
+     point: a quick view derived independently would be free to drift from the
+     rule it is summarising, which is how "145 of 139" happened in the first
+     place.
+
+     `audience` only changes the voice ('you' vs 'this agency'), never the
+     numbers. */
+  function licQuickView(st, audience) {
+    if (!st) return '';
+    var forAgency = audience === 'agency';
+    var noCeiling = st.max === null;
+    var headroom = noCeiling ? null : Math.max(0, st.headroom);
+    /* the headroom tile carries the urgency, so it takes the tier colour */
+    var hCol = noCeiling ? 'var(--ink-3)'
+      : st.blocked || st.tier === 'critical' ? 'var(--red-dk)'
+      : st.tier === 'warn' ? 'var(--amber-dk)' : 'var(--green-dk)';
+    var hSub = noCeiling
+      ? 'No ceiling on record — HR must set one'
+      : st.blocked
+        ? (forAgency ? 'Ceiling reached — onboarding is blocked' : 'At ceiling — onboarding is blocked')
+        : 'before onboarding stops at ' + st.max;
+    return '<div class="sd-mini-grid">' +
+      '<div class="sd-mini"><div class="sd-mini-eye">Onboarded ' + (forAgency ? 'by you' : 'by the agency') + '</div>' +
+        '<div class="sd-mini-v">' + st.onboarded + '</div>' +
+        '<div class="sd-mini-s">through this platform · still deployed</div></div>' +
+      '<div class="sd-mini"><div class="sd-mini-eye">Total deployed</div>' +
+        '<div class="sd-mini-v">' + st.used + '</div>' +
+        '<div class="sd-mini-s">' + st.base + ' on roster + ' + st.onboarded + ' onboarded</div></div>' +
+      '<div class="sd-mini"><div class="sd-mini-eye">Licensed cap</div>' +
+        '<div class="sd-mini-v">' + (noCeiling ? '—' : st.max) + '</div>' +
+        '<div class="sd-mini-s">' + (noCeiling ? 'not recorded' : st.pct + '% used · warns at ' + st.warnAt) + '</div></div>' +
+      '<div class="sd-mini"><div class="sd-mini-eye">Places left</div>' +
+        '<div class="sd-mini-v" style="color:' + hCol + '">' + (noCeiling ? '—' : headroom) + '</div>' +
+        '<div class="sd-mini-s">' + hSub + '</div></div>' +
+    '</div>' + ctLicenceBar(st);
+  }
+
   /* the commercial pill — explicitly labelled so it can never be read as
      compliance evidence */
   function ctCommercialPill(st) {
@@ -20348,6 +20475,9 @@ function __kvOnReady(fn) {
     if (st.tier === 'ok' && !alert) return '';
     var forAgency = audience === 'agency';
     var skipHeadline = !!(opts && opts.skipHeadline);
+    /* callers that already drew the utilisation bar (the quick view does) pass
+       skipBar, so the same bar is not stacked twice in one panel */
+    var skipBar = !!(opts && opts.skipBar);
     var cls = st.blocked || st.tier === 'critical' ? 'red' : 'amber';
     var head, body;
     if (st.blocked) {
@@ -20371,7 +20501,7 @@ function __kvOnReady(fn) {
             ? ' Plant HR has been notified. Record what you are doing about the headroom below — that note is what HR reviews.'
             : ' Notes below are the agency’s own account of what it is doing.') +
         '</div>') +
-      ctLicenceBar(st);
+      (skipBar ? '' : ctLicenceBar(st));
     if (!alert) {
       return html + '<div class="tiny muted" style="margin-top:8px">No alert record open yet — it is raised the moment the threshold is crossed.</div>';
     }

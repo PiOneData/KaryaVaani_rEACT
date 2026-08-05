@@ -10,6 +10,7 @@
 const path = require('path');
 const fs = require('fs');
 const { writeStore, STORE_PATH } = require('../db');
+const { licenceCeilingFor } = require('../licence-policy');
 
 const PARENT = path.join(__dirname, '..', '..');
 const ODS_PATH = path.join(PARENT, 'OM Manpower_Attendance_Mapping Data.ods');
@@ -131,15 +132,21 @@ function main() {
   (demo.contractors || []).forEach((c, i) => {
     const deployed = num(c.deployed);
     const factor = LICENCE_HEADROOM_CYCLE[i % LICENCE_HEADROOM_CYCLE.length];
+    /* An agency whose real licensed headcount is known is pinned to it rather
+       than left to the generic spread above — see LICENCE_CEILING_POLICY. */
+    const pinned = licenceCeilingFor(c.name);
     c.clraLicence = Object.assign({
       number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
       authority: 'Licensing Officer · Sricity, Andhra Pradesh',
       validTill: (c.clra && c.clra.expiresOn) || '',
       /* licences are applied for in round numbers, always above the headcount
          actually deployed under them */
-      maxHeadcount: Math.max(deployed + 1, Math.ceil((deployed * factor) / 10) * 10)
+      maxHeadcount: pinned != null ? pinned : Math.max(deployed + 1, Math.ceil((deployed * factor) / 10) * 10)
     }, c.clraLicence || {});
-    if (c.commercialHeadcount == null) c.commercialHeadcount = Math.ceil((deployed + 1) / 10) * 10;
+    if (pinned != null) c.clraLicence.maxHeadcount = pinned;
+    if (c.commercialHeadcount == null) {
+      c.commercialHeadcount = pinned != null ? pinned : Math.ceil((deployed + 1) / 10) * 10;
+    }
   });
 
   const data = Object.assign({ omMapping, routes, vendors }, demo);

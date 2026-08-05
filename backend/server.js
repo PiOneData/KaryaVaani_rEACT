@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { readStore, writeStore, initDb, dbPut, dbDel, dbClear } = require('./db');
 const { hashPassword, verifyPassword, DEMO_ACCOUNTS } = require('./auth');
+const { licenceCeilingFor, licenceSetByHR } = require('./licence-policy');
 
 const app = express();
 app.use(cors());
@@ -2774,6 +2775,30 @@ function ensureComplianceDefaults() {
   const LICENCE_HEADROOM_CYCLE = [1.70, 1.55, 1.30, 1.85, 1.45, 1.12, 1.60, 1.05];
   (store.data.contractors || []).forEach((c, i) => {
     let touched = false;
+    /* An agency whose real licensed headcount is known by policy is pinned to
+       it, correcting a ceiling an earlier boot invented. Unlike the backfill
+       below this is NOT guarded on "missing" — a store seeded under the older
+       formula already holds a number, and leaving it there is the whole problem.
+       It is still guarded on HR: a licence HR has saved by hand is never
+       re-pinned, so this can only ever overwrite a machine-generated value. */
+    const pinned = licenceCeilingFor(c.name);
+    if (pinned != null && !licenceSetByHR(c.clraLicence)) {
+      if (!c.clraLicence || c.clraLicence.maxHeadcount !== pinned) {
+        c.clraLicence = Object.assign({
+          number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
+          authority: 'Licensing Officer · Sricity, Andhra Pradesh',
+          validTill: (c.clra && c.clra.expiresOn) || ''
+        }, c.clraLicence || {}, { maxHeadcount: pinned });
+        touched = true;
+      }
+      /* keep the commercial supply number from sitting below the statutory
+         ceiling, which would flag a permanent advisory breach the agency has
+         no way to act on */
+      if (c.commercialHeadcount == null || Number(c.commercialHeadcount) < pinned) {
+        c.commercialHeadcount = pinned;
+        touched = true;
+      }
+    }
     if (!c.clraLicence || c.clraLicence.maxHeadcount == null) {
       const deployed = Number(c.deployed || 0);
       const factor = LICENCE_HEADROOM_CYCLE[i % LICENCE_HEADROOM_CYCLE.length];

@@ -35,10 +35,14 @@ export default function SecVendor() {
       </div>
       {' '}
       <div className="g4" style={{ marginBottom: "18px" }}>
+        {/*  Live deployment against the licensed caps — filled by
+             renderContractorGrid(). Was a hardcoded "7 / 1,400 deployed
+             workers", which drifted from the roster the moment anyone was
+             onboarded through the platform.  */}
         <div className="kpi">
-          <div className="kpi-eye">Active contractors</div>
-          <div className="kpi-val">7</div>
-          <div className="kpi-sub">1,400 deployed workers</div>
+          <div className="kpi-eye">Workers deployed</div>
+          <div className="kpi-val" id="vend-kpi-dep">—</div>
+          <div className="kpi-sub" id="vend-kpi-dep-s">across all agencies</div>
         </div>
         {' '}
         <div className="kpi">
