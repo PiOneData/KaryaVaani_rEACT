@@ -100,6 +100,10 @@ export default function SecDirectory() {
             {' '}
             <button className="dir-fbtn" onClick={(event) => { window.omFilterDept('GA', event.currentTarget) }} data-onclick="omFilterDept('GA',this)">GA</button>
           </div>
+          {' '}
+          {/* Find workers by employment status — Active / Inactive / On notice /
+              Suspended / Exited, or those whose change is awaiting HR. */}
+          <div id="om-status-filter" />
         </div>
         {' '}
         <div style={{ overflowX: "auto" }}>
@@ -115,6 +119,7 @@ export default function SecDirectory() {
                 <th className="om-th-sort" data-omcol="uan" onClick={(event) => { window.omSort('uan') }}>UAN no <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="esi" onClick={(event) => { window.omSort('esi') }}>ESI no <span className="om-caret">⇅</span></th>
                 <th className="om-th-sort" data-omcol="lang" onClick={(event) => { window.omSort('lang') }}>Language <span className="om-caret">⇅</span></th>
+                <th>Employment status</th>
                 <th className="om-th-sort" data-omcol="compliance" onClick={(event) => { window.omSort('compliance') }}>Compliance <span className="om-caret">⇅</span></th>
               </tr>
             </thead>
@@ -138,8 +143,11 @@ export default function SecDirectory() {
           </div>
           <span className="pill outline" id="ob-count">—</span>
         </div>
-        <div className="dir-controls" style={{ marginBottom: "10px" }}>
+        <div className="dir-controls" style={{ marginBottom: "10px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <input type="text" className="input" id="ob-search" autoComplete="off" placeholder="Search ID, name, type, category, contractor, status…" style={{ maxWidth: "380px" }} />
+          {/* Employment-status filter — Active / Inactive / On notice / Suspended / Exited,
+              plus the workers whose status change is waiting on an HR decision. */}
+          <div id="ob-status-filter" />
         </div>
         <div style={{ overflowX: "auto" }}>
           <table className="t" id="ob-grid">
@@ -151,7 +159,8 @@ export default function SecDirectory() {
                 <th>Category</th>
                 <th>Contractor / Position</th>
                 <th>Aadhaar</th>
-                <th>Status</th>
+                <th>Employment status</th>
+                <th>Journey stage</th>
                 <th>Compliance</th>
                 <th style={{ textAlign: "right" }}>Actions</th>
               </tr>

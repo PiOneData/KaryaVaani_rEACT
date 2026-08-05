@@ -20,6 +20,7 @@ import SecAppointmentOrder from './sections/SecAppointmentOrder.jsx';
 import SecVendor from './sections/SecVendor.jsx';
 import SecOhs from './sections/SecOhs.jsx';
 import SecCompliance from './sections/SecCompliance.jsx';
+import SecWages from './sections/SecWages.jsx';
 import SecVaaniBroadcast from './sections/SecVaaniBroadcast.jsx';
 import SecAnalytics from './sections/SecAnalytics.jsx';
 import SecChat from './sections/SecChat.jsx';
@@ -143,6 +144,12 @@ function AuthedApp({ user, onLogout }) {
      8 · COMPLIANCE ASSESSMENT (UMBRELLA)
      ─────────────────────────────────────────────────────────────────  */}
           <SecCompliance />
+          {/*  ─────────────────────────────────────────────────────────────────
+     8b · OVERTIME & WAGE REGISTER
+     Monthly OT / Loss of Pay / variable-allowance log. Overtime at the
+     statutory 125% rate, with the ESIC wage-ceiling effect surfaced.
+     ─────────────────────────────────────────────────────────────────  */}
+          <SecWages />
           {/*  ─────────────────────────────────────────────────────────────────
      9 · VAANI TRANSLATION & BROADCASTING  (merged)
      Compose → translate into two Indian languages → broadcast to a

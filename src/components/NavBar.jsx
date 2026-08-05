@@ -97,6 +97,13 @@ export default function NavBar() {
             <span className="sb-icon">§</span>
             <span className="sb-label">Statutory posture</span>
           </div>
+          {' '}
+          <div className="sb-item" onClick={(event) => { window.nav('wages', event.currentTarget) }} data-onclick="nav('wages', this)">
+            <span className="sb-icon">₹</span>
+            <span className="sb-label">Overtime &amp; wage register</span>
+            {' '}
+            <span className="sb-badge amber">new</span>
+          </div>
         </div>
       </div>
       {' '}

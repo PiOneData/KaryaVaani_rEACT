@@ -188,6 +188,116 @@ export default function SecCompliance() {
           </div>
         </div>
       </div>
+      {' '}
+      {/* ─────────────────────────────────────────────────────────────────
+          CR-6 · EPF / ESIC payment verification
+          The principal employer's joint liability is only discharged by a
+          verified record — amount paid, against the challan, for the actual
+          deployed headcount. Unverified months are exposure, not admin.
+          ───────────────────────────────────────────────────────────────── */}
+      <div className="card" style={{ marginTop: "18px" }}>
+        <div className="card-h">
+          <div>
+            <div className="card-h-title">EPF / ESIC payment verification · contractor joint liability</div>
+            <div className="card-h-sub">
+              Social Security Code — the principal employer is jointly liable for contractor EPF/ESIC remittance.
+              Each agency submits what it paid and the challan it paid against; HR reconciles the challan headcount
+              with the actual deployed headcount and records Full Paid / Partially Paid / Not Paid.
+            </div>
+          </div>
+          <span className="pill outline tiny">HR verifies · agency submits</span>
+        </div>
+        <div id="epf-rollup-kpis" className="g4" style={{ margin: "4px 0 14px" }} />
+        <div style={{ overflowX: "auto" }}>
+          <table className="t">
+            <thead>
+              <tr>
+                <th>Contractor</th>
+                <th>Month</th>
+                <th>EPF paid</th>
+                <th>ESIC paid</th>
+                <th>Challan vs deployed headcount</th>
+                <th>HR verification</th>
+                <th style={{ textAlign: "right" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody id="epf-rollup-body" />
+          </table>
+        </div>
+        <div id="epf-rollup-pagination" className="om-pagination" />
+      </div>
+      {' '}
+      {/* ─────────────────────────────────────────────────────────────────
+          CR-8 · CLRA licence ceiling (statutory) vs contracted headcount
+          (commercial). Tracked as two independent fields on purpose.
+          ───────────────────────────────────────────────────────────────── */}
+      <div className="card" style={{ marginTop: "18px" }}>
+        <div className="card-h">
+          <div>
+            <div className="card-h-title">Contractor deployment ceilings · CLRA licence</div>
+            <div className="card-h-sub">
+              OSHC Rules 86–90 — a contractor licence specifies a maximum authorised deployment headcount, and it is
+              enforced as a hard block on onboarding. Daikin's commercial contracted headcount is shown alongside it
+              as an advisory number, never merged with the statutory limit.
+            </div>
+          </div>
+          <span className="pill red tiny">Hard block on onboarding</span>
+        </div>
+        <div id="lic-board-kpis" className="g4" style={{ margin: "4px 0 14px" }} />
+        <div style={{ overflowX: "auto" }}>
+          <table className="t">
+            <thead>
+              <tr>
+                <th>Contractor · licence</th>
+                <th>Licensed max</th>
+                <th>Deployed</th>
+                <th>Statutory headroom</th>
+                <th>Commercial (advisory)</th>
+                <th>Licence valid till</th>
+                <th style={{ textAlign: "right" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody id="lic-board-body" />
+          </table>
+        </div>
+        <div id="lic-board-pagination" className="om-pagination" />
+      </div>
+      {' '}
+      {/* ─────────────────────────────────────────────────────────────────
+          CR-9 · exit register — access revocation + statutory data
+          disposition. The disposition record is what a Data Protection
+          Board would examine.
+          ───────────────────────────────────────────────────────────────── */}
+      <div className="card" style={{ marginTop: "18px" }}>
+        <div className="card-h">
+          <div>
+            <div className="card-h-title">Worker exits · access revocation &amp; data disposition</div>
+            <div className="card-h-sub">
+              DPDP Act 2023 — continued access to a departed worker's personal data without a valid purpose is unlawful
+              processing. Every exit produces two records: what access was cut and when, and what data is retained
+              (under which statutory obligation, for how long) versus deleted or anonymised.
+            </div>
+          </div>
+          <span className="pill outline tiny">HR only</span>
+        </div>
+        <div id="exit-register-kpis" className="g4" style={{ margin: "4px 0 14px" }} />
+        <div style={{ overflowX: "auto" }}>
+          <table className="t">
+            <thead>
+              <tr>
+                <th>Worker</th>
+                <th>Employer</th>
+                <th>Reason</th>
+                <th>Last working day</th>
+                <th>Access</th>
+                <th>Data disposition</th>
+              </tr>
+            </thead>
+            <tbody id="exit-register-body" />
+          </table>
+        </div>
+        <div id="exit-register-pagination" className="om-pagination" />
+      </div>
     </section>
   );
 }

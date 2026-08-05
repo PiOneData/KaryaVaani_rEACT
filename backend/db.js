@@ -62,7 +62,24 @@ const COLLECTIONS = {
   transportRoster:     { table: 'transport_roster',      kind: 'map' },
   transportAttendance: { table: 'transport_attendance',  kind: 'map' },
   nightConsents:       { table: 'night_consents',        kind: 'map' },
-  transportEvents:     { table: 'transport_events',      kind: 'array', id: (r) => r.id }
+  transportEvents:     { table: 'transport_events',      kind: 'array', id: (r) => r.id },
+  /* CR-6 · agency-submitted EPF/ESIC payment + HR verification, one row per
+     contractor-month. The verification block is the compliance record. */
+  statutoryPayments:   { table: 'statutory_payments',    kind: 'array', id: (r) => r.id },
+  /* worker employment-status lifecycle — append-only, HR is the only writer */
+  workerStatusEvents:  { table: 'worker_status_events',  kind: 'array', id: (r) => r.id },
+  /* CR-9 · exit = access-revocation record + statutory data-disposition record */
+  exitRecords:         { table: 'exit_records',          kind: 'array', id: (r) => r.id },
+  /* CR-3 · append-only transport route assignment log (never overwritten) */
+  routeAssignments:    { table: 'route_assignments',     kind: 'array', id: (r) => r.id },
+  /* CR-7 · monthly OT / LOP / variable-allowance log, one row per worker-month */
+  payrollMonths:       { table: 'payroll_months',        kind: 'array', id: (r) => r.id },
+  /* HR inbox — anything an agency raises that only HR may action */
+  hrNotifications:     { table: 'hr_notifications',      kind: 'array', id: (r) => r.id },
+  /* CR-8 · licence-utilisation alerts raised when an agency's deployed
+     headcount reaches its warning threshold (75% by default) of the CLRA
+     licensed maximum, with the agency's notes appended to each alert */
+  licenceAlerts:       { table: 'licence_alerts',        kind: 'array', id: (r) => r.id }
 };
 const META_TABLE = 'store_meta';
 

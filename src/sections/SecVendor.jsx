@@ -100,6 +100,12 @@ export default function SecVendor() {
                 Deployed
                 <span className="sort-ind">↕</span>
               </th>
+              {/* CR-8 · statutory CLRA ceiling (enforced) above the commercial
+                  contracted headcount (advisory) — deliberately separate lines */}
+              <th className="sortable" data-col="licence">
+                CLRA licence headroom
+                <span className="sort-ind">↕</span>
+              </th>
               <th className="sortable" data-col="score">
                 Score
                 <span className="sort-ind">↕</span>
@@ -170,6 +176,12 @@ export default function SecVendor() {
             Contract workers deployed
           </div>
           {' '}
+          {/* CR-6 · agency submits EPF/ESIC paid per deployed worker, HR verifies
+              it against the challan and the actual deployed headcount */}
+          <div className="sd-drill-tab" onClick={(event) => { window.ctTab(event, 'epf') }} data-onclick="ctTab(event, 'epf')">
+            EPF / ESIC payments
+          </div>
+          {' '}
           <div className="sd-drill-tab" onClick={(event) => { window.ctTab(event, 'tasks') }} data-onclick="ctTab(event, 'tasks')">
             Open tasks
           </div>
@@ -191,6 +203,8 @@ export default function SecVendor() {
           <div className="sd-pane on" id="ct-pane-overview" />
           {' '}
           <div className="sd-pane" id="ct-pane-workers" />
+          {' '}
+          <div className="sd-pane" id="ct-pane-epf" />
           {' '}
           <div className="sd-pane" id="ct-pane-tasks" />
           {' '}
