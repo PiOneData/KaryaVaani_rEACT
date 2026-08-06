@@ -43,7 +43,8 @@ app.get('/api/bootstrap', (req, res) => {
   // per agency on demand — /api/esic-contributions, /api/esic-uploads
   const { onboardingDocuments, contractorDocuments, communications, users, voiceCache, voiceWarm,
           transportRoster, transportAttendance, nightConsents, transportEvents,
-          whatsappMessages, vendorWorkers, esicContributions, esicUploads, ...rest } = s.data;
+          whatsappMessages, vendorWorkers, esicContributions, esicUploads,
+          workerContributions, contributionUploads, ...rest } = s.data;
   res.json(rest);
 });
 
@@ -2387,45 +2388,133 @@ app.post('/api/statutory-payments/:id/verify', (req, res) => {
   res.json({ ok: true, payment: rec });
 });
 
-/* ── ESIC at worker level · Excel upload ────────────────────────────────────
-   The firm-month figure above proves an agency paid SOMETHING. It cannot
-   answer the question a worker actually asks — "was my ESIC paid this month,
-   and what was the challan?" — because one amount for 145 people says nothing
-   about any one of them. So ESIC is also carried per employee, uploaded as the
-   spreadsheet the agency already produces for the ESIC portal.
+/* ── Worker-level statutory contributions · ESIC and EPF ────────────────────
+   The firm-month figures above prove an agency paid SOMETHING. They cannot
+   answer the question a worker actually asks — "was my ESIC/PF paid this month,
+   and against which challan?" — because one amount for 145 people says nothing
+   about any one of them. So both schemes are also carried per employee,
+   uploaded as the spreadsheets the agency already produces for the ESIC and
+   EPFO portals.
+
+   ESIC and EPF differ in exactly two things that matter here: the contribution
+   rates, and what the wage ceiling MEANS. Everything else — the file-per-month
+   shape, the per-employee rows, the reconciliation against wages, HR's
+   verification — is identical, so it is written once and parameterised by
+   scheme rather than duplicated.
 
    The file is parsed in the browser (SheetJS is already loaded there for the
    worker-onboarding template) and posted as rows. The FILE ITSELF is recorded
    too — name, size, row counts, who and when — because a worker-facing payment
    claim needs provenance: every contribution row carries the uploadId of the
-   file it arrived on, so any figure can be traced back to its source document.
+   file it arrived on, so any figure can be traced back to its source document,
+   and that document carries HR's verdict on whether it was actually paid.
    ──────────────────────────────────────────────────────────────────────── */
-const ESIC_ROW_STATUSES = ['paid', 'pending', 'exempt'];
-function esicNormStatus(v) {
+
+/* The wage ceilings are stated as literals rather than read from
+   ESIC_WAGE_CEILING below, which is declared later in this file and would be in
+   its temporal dead zone here. contribAssertCeilings() cross-checks them at
+   boot so the two cannot drift apart unnoticed. */
+const CONTRIB_SCHEMES = {
+  esic: {
+    key: 'esic', label: 'ESIC',
+    employeeRate: 0.0075,          // 0.75% of wages
+    employerRate: 0.0325,          // 3.25% of wages
+    wageCeiling: 21000,
+    /* ABOVE the ceiling an employee is out of ESIC's scope entirely — no
+       contribution is due from either side. */
+    ceilingMeans: 'exempt',
+    memberIdLabel: 'ESIC number',
+    challanLabel: 'challan'
+  },
+  epf: {
+    key: 'epf', label: 'EPF',
+    employeeRate: 0.12,            // 12% of wages
+    employerRate: 0.13,            // 12% + 1% administration
+    wageCeiling: 15000,
+    /* EPF does not exempt a higher-paid worker; the contribution is simply
+       COMPUTED on wages capped at the ceiling. */
+    ceilingMeans: 'cap',
+    memberIdLabel: 'UAN',
+    challanLabel: 'TRRN / challan'
+  }
+};
+function contribScheme(v) {
+  const k = String(v || 'esic').trim().toLowerCase();
+  return CONTRIB_SCHEMES[k] || null;
+}
+function contribAssertCeilings() {
+  if (typeof ESIC_WAGE_CEILING === 'number' && ESIC_WAGE_CEILING !== CONTRIB_SCHEMES.esic.wageCeiling) {
+    console.warn('[contrib] ESIC wage ceiling disagrees: payroll uses ' + ESIC_WAGE_CEILING +
+                 ', contributions use ' + CONTRIB_SCHEMES.esic.wageCeiling);
+  }
+}
+
+/* THE FORMULA · what the two sides should have contributed on these wages.
+   Returned alongside every uploaded row so HR verifies against a computed
+   figure rather than taking the agency's number on trust. Null when no wage was
+   supplied — an unknown wage is not a variance, it is simply nothing to check
+   against, and reporting it as a shortfall would be wrong. */
+function contribExpected(schemeKey, wages) {
+  const s = contribScheme(schemeKey);
+  const w = Number(wages) || 0;
+  if (!s || w <= 0) return null;
+  if (s.ceilingMeans === 'exempt' && w > s.wageCeiling) {
+    return { employee: 0, employer: 0, total: 0, base: 0, outOfScope: true };
+  }
+  const base = s.ceilingMeans === 'cap' ? Math.min(w, s.wageCeiling) : w;
+  const employee = Math.round(base * s.employeeRate);
+  const employer = Math.round(base * s.employerRate);
+  return { employee, employer, total: employee + employer, base, outOfScope: false };
+}
+
+const CONTRIB_ROW_STATUSES = ['paid', 'pending', 'exempt'];
+function contribNormStatus(v) {
   const s = String(v || '').trim().toLowerCase();
   if (!s) return 'paid';
   if (s === 'paid' || s === 'y' || s === 'yes' || s === 'done' || s === 'success') return 'paid';
   if (s === 'exempt' || s === 'exempted' || s === 'na' || s === 'n/a') return 'exempt';
   if (s === 'pending' || s === 'unpaid' || s === 'no' || s === 'n' || s === 'due') return 'pending';
-  return ESIC_ROW_STATUSES.indexOf(s) === -1 ? 'paid' : s;
+  return CONTRIB_ROW_STATUSES.indexOf(s) === -1 ? 'paid' : s;
 }
 /* the employee key: whatever the agency put in the sheet, matched against the
    ids the platform already knows. Kept as a plain trimmed string — matching is
    done case-insensitively at read time rather than by rewriting what was
    uploaded, so the stored row always reflects the file. */
-function esicKey(v) { return String(v == null ? '' : v).trim(); }
+function contribKey(v) { return String(v == null ? '' : v).trim(); }
+function contribNum(v) {
+  const n = Number(String(v == null ? '' : v).replace(/[,\s₹]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+/* a rupee or less apart is rounding, not a discrepancy worth a verdict */
+const CONTRIB_VARIANCE_TOLERANCE = 1;
 
-app.get('/api/esic-contributions', (req, res) => {
+const CONTRIB_VERDICTS = ['full', 'partial', 'none'];
+
+function contribList(store) {
+  store.data.workerContributions = store.data.workerContributions || [];
+  return store.data.workerContributions;
+}
+function contribUploadList(store) {
+  store.data.contributionUploads = store.data.contributionUploads || [];
+  return store.data.contributionUploads;
+}
+
+function contribGetContributions(req, res) {
   const store = storeOr503(res); if (!store) return;
-  let list = (store.data.esicContributions || []).slice();
+  let list = contribList(store).slice();
+  if (req.query.scheme) {
+    const sk = String(req.query.scheme).trim().toLowerCase();
+    list = list.filter((r) => String(r.scheme || 'esic') === sk);
+  }
   if (req.query.worker) {
-    const k = esicKey(req.query.worker).toLowerCase();
+    const k = contribKey(req.query.worker).toLowerCase();
     /* a worker is identified by employee id, the platform worker code, or the
-       ESIC insurance number — whichever the agency's sheet carried */
+       scheme member number (ESIC insurance number / UAN) — whichever the
+       agency's sheet carried */
     list = list.filter((r) =>
       String(r.employeeId || '').trim().toLowerCase() === k ||
       String(r.workerCode || '').trim().toLowerCase() === k ||
-      String(r.esiNumber || '').trim().toLowerCase() === k);
+      String(r.memberId || '').trim().toLowerCase() === k);
   }
   if (req.query.contractor) {
     const k = String(req.query.contractor).trim().toLowerCase();
@@ -2436,12 +2525,27 @@ app.get('/api/esic-contributions', (req, res) => {
   /* ?year=2026 — the worker view is a year at a time with the prior years kept */
   if (req.query.year) list = list.filter((r) => String(r.month || '').slice(0, 4) === String(req.query.year));
   list.sort((a, b) => String(b.month).localeCompare(String(a.month)));
-  res.json({ ok: true, contributions: list });
-});
+  /* the verdict lives on the upload, but every caller that shows a contribution
+     wants to know whether it has been verified — carry it onto the row */
+  const ups = {};
+  contribUploadList(store).forEach((u) => { ups[u.id] = u; });
+  const out = list.map((r) => {
+    const u = ups[r.uploadId];
+    return Object.assign({}, r, {
+      uploadFileName: u ? u.fileName : '',
+      verification: u ? (u.verification || null) : null
+    });
+  });
+  res.json({ ok: true, contributions: out });
+}
 
-app.get('/api/esic-uploads', (req, res) => {
+function contribGetUploads(req, res) {
   const store = storeOr503(res); if (!store) return;
-  let list = (store.data.esicUploads || []).slice();
+  let list = contribUploadList(store).slice();
+  if (req.query.scheme) {
+    const sk = String(req.query.scheme).trim().toLowerCase();
+    list = list.filter((u) => String(u.scheme || 'esic') === sk);
+  }
   if (req.query.contractor) {
     const k = String(req.query.contractor).trim().toLowerCase();
     list = list.filter((u) => String(u.contractorName || '').trim().toLowerCase() === k ||
@@ -2449,12 +2553,14 @@ app.get('/api/esic-uploads', (req, res) => {
   }
   list.sort((a, b) => String(b.uploadedAt).localeCompare(String(a.uploadedAt)));
   res.json({ ok: true, uploads: list });
-});
+}
 
-app.post('/api/esic-contributions/upload', (req, res) => {
+function contribPostUpload(req, res) {
   const store = storeOr503(res); if (!store) return;
   const p = req.body || {};
   const actor = actorOf(req);
+  const s = contribScheme(p.scheme);
+  if (!s) return res.status(400).json({ ok: false, error: 'scheme must be one of esic | epf' });
   if (!p.contractor && !p.contractorId) return res.status(400).json({ ok: false, error: 'contractor is required' });
   const c = findContractor(store, p.contractorId || p.contractor);
   if (!c) return res.status(404).json({ ok: false, error: 'contractor not found' });
@@ -2462,129 +2568,264 @@ app.post('/api/esic-contributions/upload', (req, res) => {
      against itself, HR may upload for anyone */
   if (!isHR(req) && actor.role === 'contractor' && p.actorContractor &&
       String(p.actorContractor).trim().toLowerCase() !== String(c.name).trim().toLowerCase()) {
-    return res.status(403).json({ ok: false, error: 'An agency can only upload its own ESIC contributions.' });
+    return res.status(403).json({ ok: false, error: 'An agency can only upload its own ' + s.label + ' contributions.' });
   }
   const rows = Array.isArray(p.rows) ? p.rows : [];
   if (!rows.length) return res.status(400).json({ ok: false, error: 'the file contained no data rows' });
   if (rows.length > 5000) return res.status(413).json({ ok: false, error: 'too many rows in one upload (max 5000)' });
 
   const nowIso = new Date().toISOString();
-  const uploadId = newId('esu');
-  const nnum = (v) => { const n = Number(String(v == null ? '' : v).replace(/[,\s₹]/g, '')); return Number.isFinite(n) ? n : 0; };
-
-  store.data.esicContributions = store.data.esicContributions || [];
-  const all = store.data.esicContributions;
+  const uploadId = newId('cup');
+  const all = contribList(store);
   const accepted = [];
   const rejected = [];
 
   rows.forEach((raw, i) => {
     const r = raw || {};
-    const employeeId = esicKey(r.employeeId);
-    const workerCode = esicKey(r.workerCode) || employeeId;
+    const employeeId = contribKey(r.employeeId);
+    const workerCode = contribKey(r.workerCode) || employeeId;
+    const memberId = contribKey(r.memberId != null ? r.memberId : r.esiNumber);
     const month = String(r.month || p.month || '').trim();
     /* a row without an employee to attach to, or without a month, is not a
        contribution record — it is reported back rather than silently dropped */
-    if (!employeeId && !workerCode && !esicKey(r.esiNumber)) {
-      rejected.push({ row: i + 2, reason: 'no employee id, worker code or ESIC number' }); return;
+    if (!employeeId && !workerCode && !memberId) {
+      rejected.push({ row: i + 2, reason: 'no employee id, worker code or ' + s.memberIdLabel }); return;
     }
     if (!/^\d{4}-\d{2}$/.test(month)) {
       rejected.push({ row: i + 2, reason: 'month must be YYYY-MM (got "' + (r.month || p.month || '') + '")' }); return;
     }
+    const wages = contribNum(r.wages);
+    const employeeContribution = contribNum(r.employeeContribution);
+    const employerContribution = contribNum(r.employerContribution);
+    const declaredTotal = contribNum(r.amount) || (employeeContribution + employerContribution);
+    const expected = contribExpected(s.key, wages);
     const contribution = {
+      scheme: s.key,
       uploadId,
       contractorId: c.id,
       contractorName: c.name,
       month,
       employeeId,
       workerCode,
-      workerName: esicKey(r.workerName),
-      esiNumber: esicKey(r.esiNumber),
-      /* the three numbers on an ESIC line: what the employee contributed, what
-         the employer did, and the wages they were computed on */
-      employeeContribution: nnum(r.employeeContribution),
-      employerContribution: nnum(r.employerContribution),
-      wages: nnum(r.wages),
-      amount: nnum(r.amount) || (nnum(r.employeeContribution) + nnum(r.employerContribution)),
-      challanNo: esicKey(r.challanNo),
-      paidOn: esicKey(r.paidOn),
-      status: esicNormStatus(r.status),
-      note: esicKey(r.note)
+      workerName: contribKey(r.workerName),
+      memberId,
+      /* the three numbers on a contribution line: what the employee paid, what
+         the employer paid, and the wages they were computed on */
+      wages,
+      employeeContribution,
+      employerContribution,
+      amount: declaredTotal,
+      /* …and what the statutory formula says those should have been */
+      expectedEmployee: expected ? expected.employee : null,
+      expectedEmployer: expected ? expected.employer : null,
+      expectedTotal: expected ? expected.total : null,
+      outOfScope: expected ? !!expected.outOfScope : false,
+      variance: expected ? Math.round((declaredTotal - expected.total) * 100) / 100 : null,
+      challanNo: contribKey(r.challanNo),
+      paidOn: contribKey(r.paidOn),
+      status: contribNormStatus(r.status),
+      note: contribKey(r.note)
     };
-    /* one row per employee-month: a re-upload for the same month corrects the
-       earlier figure rather than doubling it, and the row moves to the new
+    /* one row per employee-month-scheme: a re-upload for the same month corrects
+       the earlier figure rather than doubling it, and the row moves to the new
        upload so its provenance points at the file actually in force */
-    const key = (contribution.employeeId || contribution.workerCode || contribution.esiNumber).toLowerCase();
+    const key = (contribution.employeeId || contribution.workerCode || contribution.memberId).toLowerCase();
     const idx = all.findIndex((x) =>
+      String(x.scheme || 'esic') === s.key &&
       x.contractorId === c.id && x.month === month &&
-      String(x.employeeId || x.workerCode || x.esiNumber || '').trim().toLowerCase() === key);
+      String(x.employeeId || x.workerCode || x.memberId || '').trim().toLowerCase() === key);
     let rec;
     if (idx !== -1) {
       rec = Object.assign(all[idx], contribution, { updatedAt: nowIso, updatedBy: actor.name });
     } else {
-      rec = Object.assign({ id: newId('esc'), createdAt: nowIso }, contribution, { updatedAt: nowIso, updatedBy: actor.name });
+      rec = Object.assign({ id: newId('wc'), createdAt: nowIso }, contribution, { updatedAt: nowIso, updatedBy: actor.name });
       all.push(rec);
     }
-    dbPut('esicContributions', rec.id, rec);
+    dbPut('workerContributions', rec.id, rec);
     accepted.push(rec);
   });
 
+  const totalDeclared = accepted.reduce((n, r) => n + Number(r.amount || 0), 0);
+  const checkable = accepted.filter((r) => r.expectedTotal !== null);
+  const totalExpected = checkable.reduce((n, r) => n + Number(r.expectedTotal || 0), 0);
+  const withVariance = checkable.filter((r) => Math.abs(Number(r.variance || 0)) > CONTRIB_VARIANCE_TOLERANCE);
   const upload = {
     id: uploadId,
+    scheme: s.key,
     contractorId: c.id,
     contractorName: c.name,
     /* provenance — the file as submitted */
-    fileName: esicKey(p.fileName) || 'esic-upload.xlsx',
+    fileName: contribKey(p.fileName) || (s.key + '-upload.xlsx'),
     fileSize: Number(p.fileSize) || 0,
-    sheetName: esicKey(p.sheetName),
+    sheetName: contribKey(p.sheetName),
     month: /^\d{4}-\d{2}$/.test(String(p.month || '')) ? String(p.month) : (accepted[0] ? accepted[0].month : ''),
     months: Array.from(new Set(accepted.map((r) => r.month))).sort(),
     rowCount: rows.length,
     acceptedCount: accepted.length,
     rejectedCount: rejected.length,
     rejected: rejected.slice(0, 50),
-    totalAmount: accepted.reduce((n, r) => n + Number(r.amount || 0), 0),
+    totalAmount: totalDeclared,
+    /* the reconciliation HR verifies against */
+    totalExpected,
+    checkedRows: checkable.length,
+    varianceRows: withVariance.length,
+    totalVariance: Math.round((totalDeclared - totalExpected) * 100) / 100,
+    /* HR's verdict — an upload is not evidence of payment until it is verified */
+    verification: null,
     uploadedBy: actor.name,
     uploadedRole: actor.role || '',
     uploadedAt: nowIso
   };
-  store.data.esicUploads = store.data.esicUploads || [];
-  store.data.esicUploads.push(upload);
-  dbPut('esicUploads', upload.id, upload);
+  contribUploadList(store).push(upload);
+  dbPut('contributionUploads', upload.id, upload);
 
-  if (!isHR(req)) {
-    pushHrNotification(store, {
-      kind: 'esic-worker-upload', severity: 'info',
-      title: 'Worker-level ESIC uploaded · ' + c.name,
-      body: c.name + ' uploaded "' + upload.fileName + '" covering ' + upload.acceptedCount +
-            ' employee' + (upload.acceptedCount === 1 ? '' : 's') +
-            (upload.months.length ? ' for ' + upload.months.join(', ') : '') +
-            ' · ₹' + upload.totalAmount.toLocaleString('en-IN') + ' total' +
-            (upload.rejectedCount ? ' · ' + upload.rejectedCount + ' row(s) rejected' : '') + '.',
-      contractorId: c.id, contractorName: c.name, ref: upload.id, by: actor.name
-    });
+  /* Every upload needs HR's verdict, including one HR did itself — the
+     verification is a separate compliance act from the submission, and the
+     principal employer's record must show who checked it, not merely who
+     uploaded it. */
+  pushHrNotification(store, {
+    kind: 'contribution-upload', severity: withVariance.length ? 'warn' : 'info',
+    title: s.label + ' worker-level upload awaiting verification · ' + c.name,
+    body: (actor.name || 'Someone') + ' uploaded "' + upload.fileName + '" covering ' + upload.acceptedCount +
+          ' employee' + (upload.acceptedCount === 1 ? '' : 's') +
+          (upload.months.length ? ' for ' + upload.months.join(', ') : '') +
+          ' · ₹' + totalDeclared.toLocaleString('en-IN') + ' declared' +
+          (checkable.length ? ' against ₹' + totalExpected.toLocaleString('en-IN') + ' expected' : '') +
+          (withVariance.length ? ' · ' + withVariance.length + ' row(s) differ from the statutory formula' : '') +
+          (upload.rejectedCount ? ' · ' + upload.rejectedCount + ' row(s) rejected' : '') +
+          '. Awaiting HR verification.',
+    contractorId: c.id, contractorName: c.name, ref: upload.id, by: actor.name
+  });
+  res.json({ ok: true, upload, accepted: accepted.length, rejected });
+}
+
+/* HR's verdict on an uploaded file. Mirrors the firm-month verification: the
+   upload is the agency's claim, this is the principal employer's record that it
+   was checked — without which the joint liability stays undischarged. */
+function contribPostVerify(req, res) {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const rec = contribUploadList(store).find((x) => x.id === req.params.id);
+  if (!rec) return res.status(404).json({ ok: false, error: 'upload not found' });
+  const p = req.body || {};
+  if (CONTRIB_VERDICTS.indexOf(String(p.status)) === -1) {
+    return res.status(400).json({ ok: false, error: 'status must be one of full | partial | none' });
   }
-  res.json({ ok: true, upload: upload, accepted: accepted.length, rejected: rejected });
-});
+  const note = String(p.note || '').trim();
+  if (String(p.status) !== 'full' && !note) {
+    return res.status(400).json({ ok: false, error: 'a partial or not-paid verdict needs a note saying what was short' });
+  }
+  const actor = actorOf(req);
+  const prior = rec.verification || null;
+  rec.verification = {
+    status: String(p.status),
+    note,
+    /* the figures the verdict was reached against, frozen at verification time
+       so a later re-upload cannot silently re-base what HR signed off */
+    declaredTotal: Number(rec.totalAmount || 0),
+    expectedTotal: Number(rec.totalExpected || 0),
+    varianceRows: Number(rec.varianceRows || 0),
+    employeesCovered: Number(rec.acceptedCount || 0),
+    by: actor.name, at: new Date().toISOString()
+  };
+  rec.verifiedAt = rec.verification.at;
+  rec.verificationHistory = (rec.verificationHistory || []).concat(prior ? [prior] : []);
+  dbPut('contributionUploads', rec.id, rec);
+  res.json({ ok: true, upload: rec });
+}
 
 /* HR-only correction path — a single contribution row can be re-stated without
    re-uploading the whole file (e.g. a challan number typed wrong). */
-app.post('/api/esic-contributions/:id', (req, res) => {
+function contribPostRowEdit(req, res) {
   const store = storeOr503(res); if (!store) return;
   if (!requireHR(req, res)) return;
-  const rec = (store.data.esicContributions || []).find((x) => x.id === req.params.id);
+  const rec = contribList(store).find((x) => x.id === req.params.id);
   if (!rec) return res.status(404).json({ ok: false, error: 'contribution not found' });
   const p = req.body || {};
   const actor = actorOf(req);
-  if (p.status !== undefined) rec.status = esicNormStatus(p.status);
-  if (p.challanNo !== undefined) rec.challanNo = esicKey(p.challanNo);
-  if (p.paidOn !== undefined) rec.paidOn = esicKey(p.paidOn);
-  if (p.amount !== undefined) rec.amount = Number(p.amount) || 0;
-  if (p.note !== undefined) rec.note = esicKey(p.note);
+  if (p.status !== undefined) rec.status = contribNormStatus(p.status);
+  if (p.challanNo !== undefined) rec.challanNo = contribKey(p.challanNo);
+  if (p.paidOn !== undefined) rec.paidOn = contribKey(p.paidOn);
+  if (p.amount !== undefined) {
+    rec.amount = Number(p.amount) || 0;
+    /* re-derive the variance so a corrected amount is reconciled, not stale */
+    if (rec.expectedTotal !== null && rec.expectedTotal !== undefined) {
+      rec.variance = Math.round((rec.amount - rec.expectedTotal) * 100) / 100;
+    }
+  }
+  if (p.note !== undefined) rec.note = contribKey(p.note);
   rec.updatedAt = new Date().toISOString();
   rec.updatedBy = actor.name;
-  dbPut('esicContributions', rec.id, rec);
+  dbPut('workerContributions', rec.id, rec);
   res.json({ ok: true, contribution: rec });
+}
+
+
+/* route registrations — one implementation, mounted where each caller expects */
+app.get('/api/contributions', contribGetContributions);
+app.get('/api/contribution-uploads', contribGetUploads);
+app.post('/api/contributions/upload', contribPostUpload);
+app.post('/api/contribution-uploads/:id/verify', contribPostVerify);
+app.post('/api/contributions/:id', contribPostRowEdit);
+
+/* ── Compatibility · the ESIC-only routes this feature shipped with ─────────
+   A browser tab opened before this change still calls these. They pin the
+   scheme to esic and hand straight to the same handlers, so there is one
+   implementation and the old paths cannot drift from the new ones. */
+app.get('/api/esic-contributions', (req, res) => {
+  req.query = Object.assign({}, req.query, { scheme: 'esic' });
+  return contribGetContributions(req, res);
 });
+app.get('/api/esic-uploads', (req, res) => {
+  req.query = Object.assign({}, req.query, { scheme: 'esic' });
+  return contribGetUploads(req, res);
+});
+app.post('/api/esic-contributions/upload', (req, res) => {
+  req.body = Object.assign({}, req.body, { scheme: 'esic' });
+  return contribPostUpload(req, res);
+});
+app.post('/api/esic-contributions/:id', (req, res) => contribPostRowEdit(req, res));
+
+/* ── Migration · the ESIC-only collections this feature shipped with ────────
+   Rows written before the scheme discriminator existed live in esicUploads /
+   esicContributions. They are copied across once, tagged scheme 'esic', so an
+   agency that has already uploaded does not lose its record — and are matched
+   by id, so a re-run cannot duplicate them. The originals are left in place
+   rather than deleted: nothing reads them any more, and a one-way copy is the
+   safer half of the trade. */
+function migrateEsicContributions() {
+  const store = readStore();
+  if (!store || !store.data) return;
+  const ups = contribUploadList(store);
+  const rows = contribList(store);
+  const haveUp = {}; ups.forEach((u) => { haveUp[u.id] = 1; });
+  const haveRow = {}; rows.forEach((r) => { haveRow[r.id] = 1; });
+  let moved = 0;
+  (store.data.esicUploads || []).forEach((u) => {
+    if (haveUp[u.id]) return;
+    const next = Object.assign({}, u, {
+      scheme: 'esic',
+      totalExpected: 0, checkedRows: 0, varianceRows: 0, totalVariance: 0,
+      verification: u.verification || null
+    });
+    ups.push(next); dbPut('contributionUploads', next.id, next); moved++;
+  });
+  (store.data.esicContributions || []).forEach((r) => {
+    if (haveRow[r.id]) return;
+    const expected = contribExpected('esic', r.wages);
+    const next = Object.assign({}, r, {
+      scheme: 'esic',
+      memberId: r.memberId != null ? r.memberId : (r.esiNumber || ''),
+      expectedEmployee: expected ? expected.employee : null,
+      expectedEmployer: expected ? expected.employer : null,
+      expectedTotal: expected ? expected.total : null,
+      outOfScope: expected ? !!expected.outOfScope : false,
+      variance: expected ? Math.round((Number(r.amount || 0) - expected.total) * 100) / 100 : null
+    });
+    rows.push(next); dbPut('workerContributions', next.id, next); moved++;
+  });
+  if (moved) console.log('[contrib] migrated ' + moved + ' ESIC record(s) into the scheme-aware tables');
+}
 
 /* ── Worker employment status (Active / Inactive / … / Exited) ──────────────
    The status drives access. An agency can REQUEST a change; only HR can make
@@ -3236,6 +3477,9 @@ const PORT = process.env.PORT || 4000;
 Promise.resolve(initDb())
   .then(() => { try { ensureDemoUsers(); } catch (e) { console.error('[auth] demo user seed failed:', e.message); } })
   .then(() => { try { ensureComplianceDefaults(); } catch (e) { console.error('[compliance] default backfill failed:', e.message); } })
+  /* carry ESIC rows written before the scheme discriminator into the shared
+     tables, and check the two ESIC wage ceilings still agree */
+  .then(() => { try { migrateEsicContributions(); contribAssertCeilings(); } catch (e) { console.error('[contrib] migration failed:', e.message); } })
   .catch((err) => console.error('Store init error:', err.message))
   .finally(() => {
     app.listen(PORT, () => console.log(`Karya Vaani backend listening on http://localhost:${PORT}`));

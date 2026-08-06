@@ -13995,6 +13995,7 @@ function __kvOnReady(fn) {
     if (rec && rec.id) keys.push(rec.id);
     if (code) keys.push(code);
     if (rec && rec.esi) keys.push(rec.esi);
+    if (rec && rec.uan) keys.push(rec.uan);   /* EPF matches on the UAN */
     /* de-duplicate so one identifier is not queried twice */
     return keys.filter(function (k, i) { return k && keys.indexOf(k) === i; });
   }
@@ -14006,25 +14007,16 @@ function __kvOnReady(fn) {
     var key = keys.join('|');
     if (!keys.length) {
       EMP_ESIC = { key: null, rows: [], year: null, loading: false };
-      host.innerHTML = '<div class="tiny muted">No employee id on this worker record yet — ESIC contributions are matched by employee id, platform code or ESIC number.</div>';
+      host.innerHTML = '<div class="tiny muted">No employee id on this worker record yet — contributions are matched by employee id, platform code, ESIC number or UAN.</div>';
       empEsicFillYears();
       return;
     }
     if (EMP_ESIC.key === key && !EMP_ESIC.loading) { empEsicPaint(); return; }
     EMP_ESIC.key = key; EMP_ESIC.loading = true; EMP_ESIC.rows = [];
-    host.innerHTML = '<div class="tiny muted">Loading your ESIC contributions…</div>';
-    /* try each identifier in turn and merge — a worker whose sheet rows were
-       uploaded under two different ids still sees one continuous history */
-    Promise.all(keys.map(function (k) {
-      return kvJson('/api/esic-contributions?worker=' + encodeURIComponent(k))
-        .then(function (j) { return (j && j.contributions) || []; })
-        .catch(function () { return []; });
-    })).then(function (lists) {
-      var seen = {}, merged = [];
-      lists.forEach(function (rows) {
-        rows.forEach(function (r) { if (!seen[r.id]) { seen[r.id] = 1; merged.push(r); } });
-      });
-      merged.sort(function (a, b) { return String(b.month).localeCompare(String(a.month)); });
+    host.innerHTML = '<div class="tiny muted">Loading your ESIC and PF contributions…</div>';
+    /* both schemes, merged — a worker whose rows were uploaded under two
+       different ids still sees one continuous history */
+    contribLoadForKeys(keys).then(function (merged) {
       EMP_ESIC.rows = merged;
       EMP_ESIC.loading = false;
       if (!EMP_ESIC.year && merged.length) EMP_ESIC.year = String(merged[0].month).slice(0, 4);
@@ -14054,36 +14046,33 @@ function __kvOnReady(fn) {
     var sub = document.getElementById('emp-esic-sub');
     var all = EMP_ESIC.rows || [];
     if (!all.length) {
-      host.innerHTML = '<div class="note indigo" style="font-size:0.76rem">No ESIC contribution has been recorded against you yet. ' +
+      host.innerHTML = '<div class="note indigo" style="font-size:0.76rem">No ESIC or PF contribution has been recorded against you yet. ' +
         'Your employer uploads these each month — once they do, every month will be listed here with its challan.</div>';
-      if (sub) sub.textContent = 'Month by month — what was contributed, the challan it was paid on, and whether it has been paid';
+      if (sub) sub.textContent = 'Month by month — what was contributed to ESIC and PF, the challan it was paid on, and whether it has been paid';
       return;
     }
     var year = EMP_ESIC.year || empEsicYears()[0];
     var rows = all.filter(function (r) { return String(r.month || '').slice(0, 4) === String(year); });
     var total = rows.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
-    var paid = rows.filter(function (r) { return (r.status || 'paid') === 'paid'; }).length;
     var pending = rows.filter(function (r) { return r.status === 'pending'; }).length;
     if (sub) {
-      sub.textContent = rows.length + ' month(s) in ' + year + ' · ₹' + total.toLocaleString('en-IN') +
-        ' contributed · ' + paid + ' paid' + (pending ? ' · ' + pending + ' pending' : '') +
+      sub.textContent = rows.length + ' contribution' + (rows.length === 1 ? '' : 's') + ' in ' + year +
+        ' · ₹' + total.toLocaleString('en-IN') + ' total' + (pending ? ' · ' + pending + ' pending' : '') +
         (all.length > rows.length ? ' · earlier years in the picker' : '');
     }
     host.innerHTML =
+      /* ESIC and PF stated separately — they are different schemes with
+         different rates, and a worker asking "was my PF paid?" is not asking
+         about ESIC. The combined figure is on the right. */
       '<div class="sd-mini-grid" style="margin-bottom:10px">' +
-        '<div class="sd-mini"><div class="sd-mini-eye">Contributed in ' + kvEsc(String(year)) + '</div>' +
+        contribSchemeTiles(rows) +
+        '<div class="sd-mini"><div class="sd-mini-eye">Total in ' + kvEsc(String(year)) + '</div>' +
           '<div class="sd-mini-v">₹' + total.toLocaleString('en-IN') + '</div>' +
-          '<div class="sd-mini-s">employee + employer share</div></div>' +
-        '<div class="sd-mini"><div class="sd-mini-eye">Months paid</div>' +
-          '<div class="sd-mini-v" style="color:var(--green-dk)">' + paid + '</div>' +
-          '<div class="sd-mini-s">of ' + rows.length + ' recorded</div></div>' +
-        '<div class="sd-mini"><div class="sd-mini-eye">Awaiting payment</div>' +
-          '<div class="sd-mini-v" style="color:' + (pending ? 'var(--amber-dk)' : 'var(--ink-3)') + '">' + pending + '</div>' +
-          '<div class="sd-mini-s">' + (pending ? 'raise with your employer' : 'nothing outstanding') + '</div></div>' +
+          '<div class="sd-mini-s">' + (pending ? pending + ' still pending' : 'employee + employer share') + '</div></div>' +
       '</div>' +
       esicHistoryTableHtml(rows, 'worker') +
-      '<div class="tiny muted" style="margin-top:8px;line-height:1.5">Recorded by your employer from the ESIC portal return. ' +
-        'If a month is missing or marked pending, raise it with your employer or Plant HR.</div>';
+      '<div class="tiny muted" style="margin-top:8px;line-height:1.5">Recorded by your employer from the ESIC and EPFO portal returns, ' +
+        'and checked by Plant HR. If a month is missing, marked pending, or still shows “awaiting HR”, raise it with your employer or Plant HR.</div>';
   }
 
   /* attendance loaded for the selected week+date, keyed by route|shift. */
@@ -19315,10 +19304,11 @@ function __kvOnReady(fn) {
         { id: 'compliance', label: 'Compliance', html: compliance },
         /* the per-worker ESIC record — filled in after the modal mounts, since
            it is fetched per worker rather than shipped with the bootstrap */
-        { id: 'esic', label: 'ESIC', html:
+        { id: 'esic', label: 'ESIC / PF', html:
           '<div class="cap-hint" style="margin-bottom:10px">What was actually contributed for this worker, month by month, ' +
-          'from the agency\'s worker-level ESIC upload. This is the same record the worker sees on their own portal.</div>' +
-          '<div id="ob-esic-host"><div class="tiny muted">Loading ESIC contributions…</div></div>' }
+          'from the agency\'s worker-level ESIC and EPF uploads — with Plant HR\'s verdict on each file. ' +
+          'This is the same record the worker sees on their own portal.</div>' +
+          '<div id="ob-esic-host"><div class="tiny muted">Loading ESIC / PF contributions…</div></div>' }
       ],
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + (rec.mobile ? 'Worker mobile ' + rec.mobile : '') + '</span></div>' +
         '<div class="modal-footer-right">' +
@@ -21375,7 +21365,12 @@ function __kvOnReady(fn) {
     host.innerHTML = '<div class="tiny muted">Loading EPF / ESIC submissions…</div>';
     /* the worker-level ESIC files are loaded alongside the firm-month rows so
        the card renders once with both, rather than flashing in two stages */
-    if (ESIC_UP.contractor !== c.name) { ESIC_UP.contractor = c.name; ESIC_UP.rows = []; ESIC_UP.fileName = ''; ESIC_UP.fileSize = 0; }
+    /* switching agency discards anything staged for the previous one — a file
+       chosen for one agency must never be uploadable against another */
+    CONTRIB_ORDER.forEach(function (k) {
+      var up = CONTRIB_UP[k];
+      if (up.contractor !== c.name) { up.contractor = c.name; up.rows = []; up.fileName = ''; up.fileSize = 0; up.sheetName = ''; }
+    });
     Promise.all([epfLoad(c.name), esicLoadUploads(c.name)]).then(function (both) {
       var rows = both[0];
       EPF_STATE.contractor = c.name;
@@ -21400,18 +21395,21 @@ function __kvOnReady(fn) {
         : '<div class="note amber" style="font-size:0.76rem">No EPF/ESIC payment has been submitted for ' + kvEsc(c.name) +
           '. Until a submission is verified against the deployed headcount, the principal employer holds an undischarged joint liability for this agency.</div>';
       host.innerHTML = head + summary + (canSubmit ? epfSubmitFormHtml(c, st) : '') +
-        (canSubmit ? esicUploadPanelHtml(c) : esicUploadPanelReadOnlyHtml()) + list;
+        contribPanelsHtml(c, canSubmit) + list;
     });
   }
   /* someone who may read the card but not submit still sees which files the
-     ESIC record was built from — the provenance is the point */
-  function esicUploadPanelReadOnlyHtml() {
-    var ups = ESIC_UP.uploads || [];
+     record was built from, and HR's verdict on each — the provenance is the
+     point, and an unverified upload is not evidence of payment */
+  function esicUploadPanelReadOnlyHtml(scheme) {
+    var s = CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic;
+    var ups = contribUp(s.key).uploads || [];
     if (!ups.length) return '';
     return '<div class="card" style="margin:16px 0;padding:16px">' +
-      '<div class="card-h-title" style="font-size:0.88rem">ESIC · worker level</div>' +
-      '<div class="card-h-sub" style="margin-top:4px">Files this agency\'s per-employee ESIC record was built from.</div>' +
-      esicUploadsTableHtml(ups) +
+      '<div class="card-h-title" style="font-size:0.88rem">' + kvEsc(s.full) + ' · worker level</div>' +
+      '<div class="card-h-sub" style="margin-top:4px">Files this agency\'s per-employee ' + kvEsc(s.label) +
+        ' record was built from, and Plant HR\'s verdict on each.</div>' +
+      esicUploadsTableHtml(ups, s.key, kvIsHR()) +
     '</div>';
   }
   function epfSubmit(contractorId) {
@@ -21454,40 +21452,89 @@ function __kvOnReady(fn) {
     if (document.getElementById('epf-rollup-body')) initEpfRollup();
   }
   /* ════════════════════════════════════════════════════════════════════════
-     ESIC AT WORKER LEVEL · EXCEL UPLOAD
-     The submission above is one amount for the whole firm-month. It proves the
-     agency paid something; it cannot tell any individual worker whether THEIR
-     ESIC was paid. So ESIC is also carried per employee, uploaded as the
-     spreadsheet the agency already produces for the ESIC portal.
+     WORKER-LEVEL STATUTORY CONTRIBUTIONS · ESIC AND EPF · EXCEL UPLOAD
+     The submissions above are one amount for the whole firm-month. They prove
+     the agency paid something; they cannot tell any individual worker whether
+     THEIR ESIC or PF was paid. So both schemes are also carried per employee,
+     uploaded as the spreadsheets the agency already produces for the two
+     portals.
 
+     ESIC and EPF differ only in their rates and in what the wage ceiling means,
+     so one implementation is parameterised by scheme rather than written twice.
      Parsed here in the browser (SheetJS is already loaded for the worker
      onboarding template) and posted as rows, together with the file's own
      details — name, size, sheet — because a payment record shown to a worker
-     needs to be traceable to the document it came from.
+     needs to be traceable to the document it came from, and that document
+     needs HR's verdict on it.
      ════════════════════════════════════════════════════════════════════════ */
-  var ESIC_UP = { contractor: null, rows: [], fileName: '', fileSize: 0, sheetName: '', uploads: [] };
-  /* the sheet columns, in order. employeeId is first because it is the column
-     that ties an ESIC line to a person in this platform. */
-  var ESIC_COLS = ['employeeId', 'workerName', 'esiNumber', 'month', 'wages',
-                   'employeeContribution', 'employerContribution', 'amount',
-                   'challanNo', 'paidOn', 'status'];
-  var ESIC_COL_LABEL = {
-    employeeId: 'employee id', workerName: 'worker name', esiNumber: 'esic number',
-    month: 'month', wages: 'wages', employeeContribution: 'employee contribution',
-    employerContribution: 'employer contribution', amount: 'total amount',
-    challanNo: 'challan no', paidOn: 'paid on', status: 'status'
+
+  /* mirrors CONTRIB_SCHEMES on the server, which is where the figures are
+     computed and enforced — these are for labels and the client-side preview */
+  var CONTRIB_SCHEMES = {
+    esic: {
+      key: 'esic', label: 'ESIC', full: 'ESIC · Employees’ State Insurance',
+      employeeRate: 0.0075, employerRate: 0.0325, wageCeiling: 21000,
+      ceilingMeans: 'exempt', memberIdLabel: 'esic number', memberIdShort: 'ESIC no',
+      challanLabel: 'challan', fileStem: 'esic',
+      rateNote: '0.75% employee + 3.25% employer, on wages up to ₹21,000. Above that the worker is outside ESIC.'
+    },
+    epf: {
+      key: 'epf', label: 'EPF', full: 'EPF / PF · Employees’ Provident Fund',
+      employeeRate: 0.12, employerRate: 0.13, wageCeiling: 15000,
+      ceilingMeans: 'cap', memberIdLabel: 'uan', memberIdShort: 'UAN',
+      challanLabel: 'trrn / challan', fileStem: 'epf',
+      rateNote: '12% employee + 13% employer (12% + 1% admin), computed on wages capped at ₹15,000.'
+    }
   };
+  var CONTRIB_ORDER = ['esic', 'epf'];
+  /* one staging slot per scheme, so a file chosen for EPF cannot be uploaded
+     against ESIC by accident */
+  var CONTRIB_UP = {
+    esic: { contractor: null, rows: [], fileName: '', fileSize: 0, sheetName: '', uploads: [] },
+    epf:  { contractor: null, rows: [], fileName: '', fileSize: 0, sheetName: '', uploads: [] }
+  };
+  function contribUp(scheme) { return CONTRIB_UP[scheme] || CONTRIB_UP.esic; }
+
+  var CONTRIB_COLS = ['employeeId', 'workerName', 'memberId', 'month', 'wages',
+                      'employeeContribution', 'employerContribution', 'amount',
+                      'challanNo', 'paidOn', 'status'];
+  function contribColLabel(scheme, key) {
+    var s = CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic;
+    return ({
+      employeeId: 'employee id', workerName: 'worker name', memberId: s.memberIdLabel,
+      month: 'month', wages: 'wages', employeeContribution: 'employee contribution',
+      employerContribution: 'employer contribution', amount: 'total amount',
+      challanNo: s.challanLabel, paidOn: 'paid on', status: 'status'
+    })[key];
+  }
+  /* THE FORMULA, mirrored from the server so the preview can show the expected
+     figure before anything is uploaded. The server recomputes it and its answer
+     is the one stored — this is here so a mistake is visible while the file is
+     still on screen. */
+  function contribExpectedFor(scheme, wages) {
+    var s = CONTRIB_SCHEMES[scheme];
+    var w = Number(wages) || 0;
+    if (!s || w <= 0) return null;
+    if (s.ceilingMeans === 'exempt' && w > s.wageCeiling) {
+      return { employee: 0, employer: 0, total: 0, outOfScope: true };
+    }
+    var base = s.ceilingMeans === 'cap' ? Math.min(w, s.wageCeiling) : w;
+    var employee = Math.round(base * s.employeeRate);
+    var employer = Math.round(base * s.employerRate);
+    return { employee: employee, employer: employer, total: employee + employer, outOfScope: false };
+  }
+
   /* Excel hands back whatever the cell held — a serial number for a date, a
      string for text. Both are normalised here rather than at the server, so the
      preview the uploader signs off on is the value that will be stored. */
-  function esicExcelDate(n) {
+  function contribExcelDate(n) {
     var d = new Date(Math.round((Number(n) - 25569) * 86400 * 1000));
     return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
   }
-  var ESIC_MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  function esicMonthNorm(v) {
+  var CONTRIB_MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function contribMonthNorm(v) {
     if (v == null || v === '') return '';
-    if (typeof v === 'number' && v > 20000 && v < 80000) return esicExcelDate(v).slice(0, 7);
+    if (typeof v === 'number' && v > 20000 && v < 80000) return contribExcelDate(v).slice(0, 7);
     var s = String(v).trim();
     if (/^\d{4}-\d{2}$/.test(s)) return s;
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 7);
@@ -21495,43 +21542,55 @@ function __kvOnReady(fn) {
     if (m) return m[2] + '-' + ('0' + m[1]).slice(-2);
     m = s.match(/^([A-Za-z]{3,})[\s\-]+(\d{4})$/);          // Jul 2026 / July 2026
     if (m) {
-      var i = ESIC_MONTH_NAMES.indexOf(m[1].slice(0, 3).toLowerCase());
+      var i = CONTRIB_MONTH_NAMES.indexOf(m[1].slice(0, 3).toLowerCase());
       if (i !== -1) return m[2] + '-' + ('0' + (i + 1)).slice(-2);
     }
     return s;
   }
-  function esicDateNorm(v) {
+  function contribDateNorm(v) {
     if (v == null || v === '') return '';
-    if (typeof v === 'number' && v > 20000 && v < 80000) return esicExcelDate(v);
+    if (typeof v === 'number' && v > 20000 && v < 80000) return contribExcelDate(v);
     return String(v).trim();
   }
-  function esicNum(v) {
+  function contribNumVal(v) {
     var n = Number(String(v == null ? '' : v).replace(/[,\s₹]/g, ''));
     return isFinite(n) ? n : 0;
   }
   /* mirrors the server's acceptance rule, so the preview cannot promise a row
      the server will reject */
-  function esicRowIssue(r) {
-    if (!r.employeeId && !r.workerCode && !r.esiNumber) return 'no employee id / ESIC number';
+  function contribRowIssue(r) {
+    if (!r.employeeId && !r.workerCode && !r.memberId) return 'no employee id / member no';
     if (!/^\d{4}-\d{2}$/.test(String(r.month || ''))) return 'month must be YYYY-MM';
     return '';
   }
 
-  function esicDownloadTemplate() {
-    var headers = ESIC_COLS.map(function (k) { return ESIC_COL_LABEL[k]; });
+  function contribDownloadTemplate(scheme) {
+    var s = CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic;
+    var headers = CONTRIB_COLS.map(function (k) { return contribColLabel(s.key, k); });
     var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
     var thisMonth = new Date().toISOString().slice(0, 7);
+    /* the sample rows are computed from the real formula, so the template
+       itself demonstrates what the figures should look like */
+    var mk = function (id, name, member, wages) {
+      var e = contribExpectedFor(s.key, wages) || { employee: 0, employer: 0, total: 0 };
+      return [id, name, member, thisMonth, wages, e.employee, e.employer, e.total,
+              s.key === 'epf' ? 'TRRN-5510' : 'CHL-88213', thisMonth + '-12', 'paid'];
+    };
     var sample = [
-      ['EMP-1001', 'Ramesh Naidu', '5201234567', thisMonth, 18500, 138.75, 601.25, 740, 'CHL-88213', thisMonth + '-12', 'paid'],
-      ['EMP-1002', 'Lalita Devi', '5201234568', thisMonth, 16000, 120, 520, 640, 'CHL-88213', thisMonth + '-12', 'paid']
+      mk('EMP-1001', 'Ramesh Naidu', s.key === 'epf' ? 'UAN100200300' : '5201234567', 18500),
+      mk('EMP-1002', 'Lalita Devi', s.key === 'epf' ? 'UAN100200301' : '5201234568', 16000)
     ];
     if (typeof XLSX !== 'undefined') {
       var wb = XLSX.utils.book_new();
       var ws = XLSX.utils.aoa_to_sheet([headers].concat(sample));
-      /* employee id, ESIC number, month and challan must stay TEXT — Excel will
-         otherwise turn a long insurance number into 5.2E+09 and a month into a
-         date serial, and both come back unusable */
-      [0, 2, 3, 8, 9].forEach(function (col) {
+      /* employee id, member number, month and challan must stay TEXT — Excel
+         will otherwise turn a long UAN into 1.002E+11 and a month into a date
+         serial, and both come back unusable. Indices are resolved from the
+         header row so a column added ahead of them cannot point this at the
+         wrong cells. */
+      ['employee id', s.memberIdLabel, 'month', s.challanLabel, 'paid on'].forEach(function (h) {
+        var col = headers.indexOf(h);
+        if (col < 0) return;
         sample.forEach(function (_, r) {
           var addr = XLSX.utils.encode_cell({ c: col, r: r + 1 });
           if (ws[addr]) { ws[addr].t = 's'; ws[addr].z = '@'; ws[addr].v = String(ws[addr].v); }
@@ -21539,44 +21598,50 @@ function __kvOnReady(fn) {
       });
       ws['!cols'] = headers.map(function (h) { return { wch: Math.max(14, h.length + 2) }; });
       ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-      XLSX.utils.book_append_sheet(wb, ws, 'ESIC');
+      XLSX.utils.book_append_sheet(wb, ws, s.label);
       var ref = [
-        ['WORKER-LEVEL ESIC UPLOAD · ' + (scope || 'agency') ],
+        [s.full + ' · worker-level upload' + (scope ? ' · ' + scope : '')],
         [''],
         ['One row per employee per month.'],
         ['Re-uploading the same employee + month CORRECTS that row — it does not add a second one.'],
+        ['Every upload is checked against the statutory formula and then verified by Plant HR.'],
+        [''],
+        ['HOW THE FIGURES ARE CHECKED'],
+        [s.rateNote],
         [''],
         ['employee id', 'The id this worker carries in Karya Vaani (wage register / onboarding).'],
-        ['esic number', 'The ESIC insurance number. Either this or the employee id must be present.'],
+        [s.memberIdLabel, 'The ' + s.label + ' member number. Either this or the employee id must be present.'],
         ['month', 'YYYY-MM, e.g. ' + thisMonth + '. "Jul 2026" and 07/2026 are also accepted.'],
+        ['wages', 'The wages the contribution was computed on. Needed for the check above.'],
         ['total amount', 'Leave blank to have it computed as employee + employer contribution.'],
         ['paid on', 'The date the challan was paid, YYYY-MM-DD.'],
         [''],
         ['ALLOWED STATUS'], ['paid'], ['pending'], ['exempt']
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'How to fill');
-      XLSX.writeFile(wb, 'karya-vaani-esic-worker-template.xlsx');
-      toast('ESIC upload template downloaded (.xlsx)', 'green');
+      XLSX.writeFile(wb, 'karya-vaani-' + s.fileStem + '-worker-template.xlsx');
+      toast(s.label + ' upload template downloaded (.xlsx)', 'green');
       return;
     }
     var csv = headers.join(',') + '\n' + sample.map(function (r) { return r.join(','); }).join('\n') + '\n';
     var blob = new Blob([csv], { type: 'text/csv' });
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = 'karya-vaani-esic-worker-template.csv';
+    a.href = URL.createObjectURL(blob); a.download = 'karya-vaani-' + s.fileStem + '-worker-template.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    toast('ESIC upload template downloaded', 'green');
+    toast(s.label + ' upload template downloaded', 'green');
   }
 
-  function esicPickFile(ev) {
+  function contribPickFile(ev, scheme) {
     var f = ev && ev.target && ev.target.files && ev.target.files[0];
-    if (f) esicReadFile(f);
+    if (f) contribReadFile(f, scheme);
     if (ev && ev.target) ev.target.value = '';
   }
-  function esicReadFile(file) {
+  function contribReadFile(file, scheme) {
     if (!file) return;
-    ESIC_UP.fileName = file.name || 'esic-upload.xlsx';
-    ESIC_UP.fileSize = file.size || 0;
-    var isXlsx = /\.(xlsx|xls)$/i.test(ESIC_UP.fileName);
+    var up = contribUp(scheme);
+    up.fileName = file.name || (scheme + '-upload.xlsx');
+    up.fileSize = file.size || 0;
+    var isXlsx = /\.(xlsx|xls)$/i.test(up.fileName);
     var reader = new FileReader();
     reader.onload = function (e) {
       try {
@@ -21584,41 +21649,45 @@ function __kvOnReady(fn) {
         if (isXlsx) {
           if (typeof XLSX === 'undefined') { toast('Excel library not loaded — save as CSV and retry', 'red'); return; }
           var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-          ESIC_UP.sheetName = wb.SheetNames[0] || '';
+          up.sheetName = wb.SheetNames[0] || '';
           matrix = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
         } else {
-          ESIC_UP.sheetName = '';
+          up.sheetName = '';
           matrix = String(e.target.result).split(/\r?\n/).filter(function (l) { return l.trim(); })
             .map(function (l) { return l.split(','); });
         }
-        esicParseMatrix(matrix);
+        contribParseMatrix(matrix, scheme);
       } catch (err) { toast('Could not read file: ' + (err && err.message || err), 'red'); }
     };
     if (isXlsx) reader.readAsArrayBuffer(file); else reader.readAsText(file);
   }
   /* header-driven, so column order in the agency's own file does not matter */
-  function esicParseMatrix(matrix) {
+  function contribParseMatrix(matrix, scheme) {
+    var s = CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic;
+    var up = contribUp(scheme);
     if (!matrix || !matrix.length) { toast('The file is empty', 'red'); return; }
     var head = (matrix[0] || []).map(function (h) { return String(h == null ? '' : h).trim().toLowerCase(); });
     var idx = function (key) {
-      var label = ESIC_COL_LABEL[key];
+      var label = contribColLabel(s.key, key);
       var i = head.indexOf(label);
       if (i !== -1) return i;
-      /* tolerate the field name itself and a few common spellings */
+      /* tolerate the field name itself and the spellings each portal uses */
       var alts = [key.toLowerCase(), label.replace(/\s+/g, ''), label.replace(/\s+/g, '_')];
       if (key === 'employeeId') alts.push('emp id', 'empid', 'employee code', 'employee number');
-      if (key === 'esiNumber') alts.push('esi number', 'esi no', 'ip number', 'insurance number');
-      if (key === 'workerName') alts.push('name', 'employee name');
+      if (key === 'memberId') alts.push('esic number', 'esi number', 'esi no', 'ip number', 'insurance number',
+                                        'uan', 'uan no', 'uan number', 'pf number', 'member id');
+      if (key === 'workerName') alts.push('name', 'employee name', 'member name');
       if (key === 'amount') alts.push('total', 'total contribution', 'contribution');
-      if (key === 'challanNo') alts.push('challan', 'challan number');
+      if (key === 'challanNo') alts.push('challan', 'challan number', 'trrn', 'trrn no');
       if (key === 'paidOn') alts.push('paid date', 'payment date', 'date');
+      if (key === 'wages') alts.push('gross wages', 'wage', 'epf wages', 'esi wages');
       for (var a = 0; a < alts.length; a++) { var j = head.indexOf(alts[a]); if (j !== -1) return j; }
       return -1;
     };
     var map = {};
-    ESIC_COLS.forEach(function (k) { map[k] = idx(k); });
-    if (map.employeeId === -1 && map.esiNumber === -1) {
-      toast('No “employee id” or “esic number” column found — download the template', 'red'); return;
+    CONTRIB_COLS.forEach(function (k) { map[k] = idx(k); });
+    if (map.employeeId === -1 && map.memberId === -1) {
+      toast('No “employee id” or “' + s.memberIdLabel + '” column found — download the ' + s.label + ' template', 'red'); return;
     }
     var rows = [];
     for (var r = 1; r < matrix.length; r++) {
@@ -21629,93 +21698,123 @@ function __kvOnReady(fn) {
       var rec = {
         employeeId: String(get('employeeId') == null ? '' : get('employeeId')).trim(),
         workerName: String(get('workerName') == null ? '' : get('workerName')).trim(),
-        esiNumber: String(get('esiNumber') == null ? '' : get('esiNumber')).trim(),
-        month: esicMonthNorm(get('month')),
-        wages: esicNum(get('wages')),
-        employeeContribution: esicNum(get('employeeContribution')),
-        employerContribution: esicNum(get('employerContribution')),
+        memberId: String(get('memberId') == null ? '' : get('memberId')).trim(),
+        month: contribMonthNorm(get('month')),
+        wages: contribNumVal(get('wages')),
+        employeeContribution: contribNumVal(get('employeeContribution')),
+        employerContribution: contribNumVal(get('employerContribution')),
         challanNo: String(get('challanNo') == null ? '' : get('challanNo')).trim(),
-        paidOn: esicDateNorm(get('paidOn')),
+        paidOn: contribDateNorm(get('paidOn')),
         status: String(get('status') == null ? '' : get('status')).trim().toLowerCase() || 'paid'
       };
-      rec.amount = esicNum(get('amount')) || (rec.employeeContribution + rec.employerContribution);
-      rec._issue = esicRowIssue(rec);
+      rec.amount = contribNumVal(get('amount')) || (rec.employeeContribution + rec.employerContribution);
+      rec._issue = contribRowIssue(rec);
+      /* show the statutory expectation next to what was declared */
+      var exp = contribExpectedFor(s.key, rec.wages);
+      rec._expected = exp ? exp.total : null;
+      rec._outOfScope = exp ? exp.outOfScope : false;
+      rec._variance = exp ? Math.round((rec.amount - exp.total) * 100) / 100 : null;
       rows.push(rec);
     }
-    ESIC_UP.rows = rows;
+    up.rows = rows;
     var bad = rows.filter(function (x) { return x._issue; }).length;
-    toast(rows.length + ' row(s) read from ' + ESIC_UP.fileName + (bad ? ' · ' + bad + ' need attention' : ''), bad ? 'amber' : 'green');
+    var off = rows.filter(function (x) { return x._variance !== null && Math.abs(x._variance) > 1; }).length;
+    toast(rows.length + ' row(s) read from ' + up.fileName +
+      (bad ? ' · ' + bad + ' need attention' : '') +
+      (off ? ' · ' + off + ' differ from the ' + s.label + ' formula' : ''), (bad || off) ? 'amber' : 'green');
     epfRefreshAll();
   }
-  function esicClearUpload() { ESIC_UP.rows = []; ESIC_UP.fileName = ''; ESIC_UP.fileSize = 0; epfRefreshAll(); }
+  function contribClearUpload(scheme) {
+    var up = contribUp(scheme);
+    up.rows = []; up.fileName = ''; up.fileSize = 0;
+    epfRefreshAll();
+  }
 
-  function esicFmtSize(n) {
+  function contribFmtSize(n) {
     n = Number(n) || 0;
     return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
   }
-  function esicStatusPill(s) {
+  function contribStatusPill(s) {
     var v = String(s || 'paid').toLowerCase();
     var cls = v === 'paid' ? 'green' : v === 'pending' ? 'amber' : 'outline';
     return '<span class="pill ' + cls + ' tiny">' + kvEsc(v) + '</span>';
   }
+  var CONTRIB_VERDICTS = {
+    full:    { label: 'Verified · fully paid', cls: 'green' },
+    partial: { label: 'Verified · partly paid', cls: 'amber' },
+    none:    { label: 'Verified · not paid', cls: 'red' }
+  };
+  function contribVerdictPill(u) {
+    var v = u && u.verification;
+    if (!v || !v.status) return '<span class="pill amber tiny" title="Uploaded but not yet checked by Plant HR — an unverified upload is not evidence of payment">Awaiting HR verification</span>';
+    var m = CONTRIB_VERDICTS[v.status] || CONTRIB_VERDICTS.partial;
+    return '<span class="pill ' + m.cls + ' tiny" title="' + kvEsc(v.note || m.label) + ' — ' + kvEsc(v.by || '') + '">' + m.label + '</span>';
+  }
+  /* the money-vs-formula line, shown wherever an upload is listed */
+  function contribReconcileNote(u) {
+    if (!u || !u.checkedRows) return '<span class="t-mute">no wages supplied — nothing to check against</span>';
+    var v = Number(u.totalVariance || 0);
+    if (Math.abs(v) <= 1) return '<span style="color:var(--green-dk)">matches the formula</span>';
+    return '<span style="color:var(--red-dk)">' + (v < 0 ? 'short by ₹' + Math.abs(v).toLocaleString('en-IN')
+                                                         : 'over by ₹' + v.toLocaleString('en-IN')) +
+      ' across ' + u.varianceRows + ' row' + (u.varianceRows === 1 ? '' : 's') + '</span>';
+  }
 
   /* Scroll wrapper for every table in this module. The app's table styling is
-     `table.t` — an earlier version of this panel used `.tbl`, which does not
-     exist in the stylesheet, so the tables rendered with browser defaults: no
-     cell padding, no header rule, nothing aligned. */
+     `table.t` — an earlier version used `.tbl`, which does not exist in the
+     stylesheet, so the tables rendered with browser defaults: no cell padding,
+     no header rule, nothing aligned. */
   function esicTable(headers, bodyHtml) {
     return '<div style="overflow-x:auto;margin-top:10px">' +
       '<table class="t"><thead><tr>' +
         headers.map(function (h) { return '<th' + (h.align ? ' style="text-align:' + h.align + '"' : '') + '>' + h.label + '</th>'; }).join('') +
       '</tr></thead><tbody>' + bodyHtml + '</tbody></table></div>';
   }
-  /* One ESIC history table, used by the worker's own view and by the ESIC tab
-     on the worker record HR and the agency open. `audience` only changes the
-     column wording ("Your share" vs "Employee share") — never the figures. */
+
+  /* One contribution-history table, used by the worker's own view and by the
+     ESIC / EPF tab on the worker record HR and the agency open. `audience` only
+     changes the column wording — never the figures. */
   function esicHistoryTableHtml(rows, audience) {
     var mine = audience === 'worker';
     return esicTable(
-      [{ label: 'Month' }, { label: 'Paid on' }, { label: 'Challan' },
+      [{ label: 'Scheme' }, { label: 'Month' }, { label: 'Paid on' }, { label: 'Challan' },
        { label: mine ? 'Your share' : 'Employee share', align: 'right' },
        { label: 'Employer share', align: 'right' },
-       { label: 'Total', align: 'right' }, { label: 'Status' }],
+       { label: 'Total', align: 'right' }, { label: 'Status' }, { label: 'HR verified' }],
       rows.map(function (r) {
+        var s = CONTRIB_SCHEMES[r.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
+        var vr = r.verification;
+        var vm = vr && vr.status ? (CONTRIB_VERDICTS[vr.status] || CONTRIB_VERDICTS.partial) : null;
         return '<tr>' +
+          '<td><span class="pill outline tiny">' + kvEsc(s.label) + '</span></td>' +
           '<td class="t-strong">' + kvEsc(kvMonthLabel(r.month)) + '</td>' +
           '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
           '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
           '<td class="mono" style="text-align:right">' + (r.employeeContribution ? '₹' + Number(r.employeeContribution).toLocaleString('en-IN') : '—') + '</td>' +
           '<td class="mono" style="text-align:right">' + (r.employerContribution ? '₹' + Number(r.employerContribution).toLocaleString('en-IN') : '—') + '</td>' +
           '<td class="mono t-strong" style="text-align:right">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
-          '<td>' + esicStatusPill(r.status) + '</td>' +
+          '<td>' + contribStatusPill(r.status) + '</td>' +
+          '<td>' + (vm ? '<span class="pill ' + vm.cls + ' tiny" title="' + kvEsc(vr.note || '') + '">' + vm.label.replace('Verified · ', '') + '</span>'
+                       : '<span class="pill amber tiny" title="Plant HR has not yet checked the file this row came from">awaiting HR</span>') + '</td>' +
         '</tr>';
       }).join('')
     );
   }
 
-  /* ── A single worker's ESIC history, for HR and the agency ───────────────
+  /* ── A single worker's contribution history, for HR and the agency ───────
      The worker sees this on their own portal. HR and the agency need the same
-     answer about a worker they are looking at — "has this person's ESIC
-     actually been paid, and on which challan?" — so it hangs off the worker
-     record as its own tab rather than living only on the worker's login.
+     answer about a worker they are looking at — "have this person's ESIC and PF
+     actually been paid, and against which challans?" — so it hangs off the
+     worker record as its own tab rather than living only on the worker's login.
      ──────────────────────────────────────────────────────────────────────── */
   function esicWorkerKeysFor(rec) {
     if (!rec) return [];
-    var keys = [rec.employeeId, rec.id, rec.esi].filter(Boolean);
+    var keys = [rec.employeeId, rec.id, rec.esi, rec.uan].filter(Boolean);
     return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
   }
-  function esicRenderWorkerHistory(hostId, rec) {
-    var host = document.getElementById(hostId);
-    if (!host) return;
-    var keys = esicWorkerKeysFor(rec);
-    if (!keys.length) {
-      host.innerHTML = '<div class="note amber" style="font-size:0.76rem">This worker has no Employee ID or ESIC number on record, ' +
-        'so no ESIC contribution can be matched to them. Add one on the Identification tab.</div>';
-      return;
-    }
-    host.innerHTML = '<div class="tiny muted">Loading ESIC contributions…</div>';
-    Promise.all(keys.map(function (k) {
-      return kvJson('/api/esic-contributions?worker=' + encodeURIComponent(k))
+  function contribLoadForKeys(keys) {
+    return Promise.all(keys.map(function (k) {
+      return kvJson('/api/contributions?worker=' + encodeURIComponent(k))
         .then(function (j) { return (j && j.contributions) || []; })
         .catch(function () { return []; });
     })).then(function (lists) {
@@ -21723,98 +21822,206 @@ function __kvOnReady(fn) {
       lists.forEach(function (list) {
         list.forEach(function (r) { if (!seen[r.id]) { seen[r.id] = 1; merged.push(r); } });
       });
-      merged.sort(function (a, b) { return String(b.month).localeCompare(String(a.month)); });
+      merged.sort(function (a, b) {
+        var d = String(b.month).localeCompare(String(a.month));
+        return d !== 0 ? d : String(a.scheme).localeCompare(String(b.scheme));
+      });
+      return merged;
+    });
+  }
+  /* per-scheme summary tiles — the same shape for both, so ESIC and PF read
+     side by side rather than as two different-looking reports */
+  function contribSchemeTiles(rows) {
+    return CONTRIB_ORDER.map(function (k) {
+      var s = CONTRIB_SCHEMES[k];
+      var mine = rows.filter(function (r) { return (r.scheme || 'esic') === k; });
+      var total = mine.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
+      var pending = mine.filter(function (r) { return r.status === 'pending'; }).length;
+      var unver = mine.filter(function (r) { return !r.verification || !r.verification.status; }).length;
+      return '<div class="sd-mini"><div class="sd-mini-eye">' + kvEsc(s.label) + ' contributed</div>' +
+        '<div class="sd-mini-v">' + (mine.length ? '₹' + total.toLocaleString('en-IN') : '—') + '</div>' +
+        '<div class="sd-mini-s">' + (mine.length
+          ? mine.length + ' month' + (mine.length === 1 ? '' : 's') +
+            (pending ? ' · ' + pending + ' pending' : '') +
+            (unver ? ' · ' + unver + ' awaiting HR' : '')
+          : 'nothing uploaded yet') + '</div></div>';
+    }).join('');
+  }
+  function esicRenderWorkerHistory(hostId, rec) {
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    var keys = esicWorkerKeysFor(rec);
+    if (!keys.length) {
+      host.innerHTML = '<div class="note amber" style="font-size:0.76rem">This worker has no Employee ID, ESIC number or UAN on record, ' +
+        'so no contribution can be matched to them. Add one on the Identification tab.</div>';
+      return;
+    }
+    host.innerHTML = '<div class="tiny muted">Loading ESIC / EPF contributions…</div>';
+    contribLoadForKeys(keys).then(function (merged) {
       if (!merged.length) {
         host.innerHTML = '<div class="note indigo" style="font-size:0.76rem">' +
-          'No worker-level ESIC contribution has been uploaded for <strong>' + kvEsc(rec.name) + '</strong> yet' +
+          'No worker-level ESIC or EPF contribution has been uploaded for <strong>' + kvEsc(rec.name) + '</strong> yet' +
           (rec.employeeId ? ' (employee id <span class="mono">' + kvEsc(rec.employeeId) + '</span>)' : '') + '. ' +
-          'The agency uploads these from the <strong>ESIC · worker level</strong> panel on its EPF/ESIC page.</div>';
+          'The agency uploads these from the <strong>worker-level</strong> panels on its EPF/ESIC page.</div>';
         return;
       }
-      var total = merged.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
-      var paid = merged.filter(function (r) { return (r.status || 'paid') === 'paid'; }).length;
-      var pending = merged.filter(function (r) { return r.status === 'pending'; }).length;
-      var years = {};
-      merged.forEach(function (r) { years[String(r.month).slice(0, 4)] = 1; });
       host.innerHTML =
-        '<div class="sd-mini-grid">' +
-          '<div class="sd-mini"><div class="sd-mini-eye">Months on record</div>' +
-            '<div class="sd-mini-v">' + merged.length + '</div>' +
-            '<div class="sd-mini-s">' + Object.keys(years).sort().join(', ') + '</div></div>' +
-          '<div class="sd-mini"><div class="sd-mini-eye">Total contributed</div>' +
-            '<div class="sd-mini-v">₹' + total.toLocaleString('en-IN') + '</div>' +
-            '<div class="sd-mini-s">employee + employer</div></div>' +
-          '<div class="sd-mini"><div class="sd-mini-eye">Paid</div>' +
-            '<div class="sd-mini-v" style="color:var(--green-dk)">' + paid + '</div>' +
-            '<div class="sd-mini-s">of ' + merged.length + ' months</div></div>' +
-          '<div class="sd-mini"><div class="sd-mini-eye">Pending</div>' +
-            '<div class="sd-mini-v" style="color:' + (pending ? 'var(--amber-dk)' : 'var(--ink-3)') + '">' + pending + '</div>' +
-            '<div class="sd-mini-s">' + (pending ? 'not yet paid' : 'nothing outstanding') + '</div></div>' +
-        '</div>' +
+        '<div class="sd-mini-grid">' + contribSchemeTiles(merged) + '</div>' +
         esicHistoryTableHtml(merged, 'hr') +
         '<div class="tiny muted" style="margin-top:8px;line-height:1.5">Matched on ' +
           keys.map(function (k) { return '<span class="mono">' + kvEsc(k) + '</span>'; }).join(' / ') +
-          '. Uploaded by the agency from its ESIC portal return — the same rows this worker sees on their own portal.</div>';
+          '. Uploaded by the agency from its portal returns — the same rows this worker sees on their own portal. ' +
+          '“Awaiting HR” means the file has not yet been verified by Plant HR.</div>';
     });
   }
 
   /* the uploaded-files table, shared by the editable and read-only panels */
-  function esicUploadsTableHtml(ups) {
+  function esicUploadsTableHtml(ups, scheme, canVerify) {
     if (!ups || !ups.length) {
-      return '<div class="tiny muted" style="margin-top:8px">No worker-level ESIC file uploaded for this agency yet.</div>';
+      return '<div class="tiny muted" style="margin-top:8px">No worker-level ' +
+        kvEsc((CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic).label) + ' file uploaded for this agency yet.</div>';
     }
     return esicTable(
       [{ label: 'File' }, { label: 'Covering' }, { label: 'Employees', align: 'right' },
-       { label: 'Total', align: 'right' }, { label: 'Uploaded' }],
+       { label: 'Declared', align: 'right' }, { label: 'Against the formula' },
+       { label: 'Uploaded' }, { label: 'HR verification' }],
       ups.slice(0, 8).map(function (u) {
         return '<tr>' +
           '<td><span class="t-strong">' + kvEsc(u.fileName) + '</span>' +
-            (u.fileSize ? '<div class="t-mute">' + esicFmtSize(u.fileSize) + '</div>' : '') + '</td>' +
+            (u.fileSize ? '<div class="t-mute">' + contribFmtSize(u.fileSize) + '</div>' : '') + '</td>' +
           '<td class="mono">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</td>' +
           '<td class="mono" style="text-align:right">' + u.acceptedCount +
             (u.rejectedCount ? '<div class="t-mute" style="color:var(--red-dk)">' + u.rejectedCount + ' skipped</div>' : '') + '</td>' +
-          '<td class="mono" style="text-align:right">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</td>' +
+          '<td class="mono" style="text-align:right">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') +
+            (u.checkedRows ? '<div class="t-mute">vs ₹' + Number(u.totalExpected || 0).toLocaleString('en-IN') + ' due</div>' : '') + '</td>' +
+          '<td class="tiny">' + contribReconcileNote(u) + '</td>' +
           '<td>' + kvDateTime(u.uploadedAt) + '<div class="t-mute">by ' + kvEsc(u.uploadedBy || '—') + '</div></td>' +
+          '<td>' + contribVerdictPill(u) +
+            (u.verification && u.verification.note
+              ? '<div class="t-mute" style="margin-top:3px">“' + kvEsc(String(u.verification.note).slice(0, 90)) + '”</div>' : '') +
+            (u.verification && u.verification.by
+              ? '<div class="t-mute">' + kvEsc(u.verification.by) + ' · ' + kvDateTime(u.verification.at) + '</div>' : '') +
+            (canVerify
+              ? '<div style="margin-top:6px"><button class="btn tiny" onclick="contribOpenVerify(\'' + kvEsc(u.id) + '\')">' +
+                (u.verification && u.verification.status ? 'Re-verify' : 'Verify') + '</button></div>'
+              : '') +
+          '</td>' +
         '</tr>';
       }).join('')
     );
   }
 
-  /* the upload panel, rendered inside the EPF/ESIC card for whoever may submit */
-  function esicUploadPanelHtml(c) {
-    var rows = ESIC_UP.rows || [];
+  /* HR's verdict on one uploaded file. The upload is the agency's claim; this
+     is the principal employer's record that it was checked — without which the
+     joint liability stays undischarged, exactly as for the firm-month figure. */
+  function contribOpenVerify(uploadId) {
+    if (!kvHrOnly('Only HR can verify a worker-level contribution upload.')) return;
+    var u = null;
+    CONTRIB_ORDER.forEach(function (k) {
+      (CONTRIB_UP[k].uploads || []).forEach(function (x) { if (x.id === uploadId) u = x; });
+    });
+    if (!u) { toast('Upload not found', 'red'); return; }
+    var s = CONTRIB_SCHEMES[u.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left">' +
+        '<span class="modal-h-eye">' + kvEsc(s.label) + ' · worker-level upload · HR verification</span>' +
+        '<span class="modal-h-title">' + kvEsc(u.fileName) + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="note indigo" style="font-size:0.76rem;margin-bottom:12px">An upload records what the agency ' +
+          '<em>says</em> it paid. Verifying it is the principal employer\'s own check — until that is on record, the ' +
+          'joint liability for these workers is undischarged. Compare the declared total against the ' + kvEsc(s.label) +
+          ' formula (' + kvEsc(s.rateNote) + ')</div>' +
+        '<div class="sd-mini-grid">' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Employees covered</div><div class="sd-mini-v">' + u.acceptedCount + '</div>' +
+            '<div class="sd-mini-s">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Declared</div><div class="sd-mini-v">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</div>' +
+            '<div class="sd-mini-s">as uploaded</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Due on the formula</div><div class="sd-mini-v">' +
+            (u.checkedRows ? '₹' + Number(u.totalExpected || 0).toLocaleString('en-IN') : '—') + '</div>' +
+            '<div class="sd-mini-s">' + (u.checkedRows ? u.checkedRows + ' row(s) had wages' : 'no wages supplied') + '</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Rows differing</div>' +
+            '<div class="sd-mini-v" style="color:' + (u.varianceRows ? 'var(--red-dk)' : 'var(--green-dk)') + '">' + (u.varianceRows || 0) + '</div>' +
+            '<div class="sd-mini-s">' + contribReconcileNote(u) + '</div></div>' +
+        '</div>' +
+        (u.rejectedCount ? '<div class="note amber" style="font-size:0.74rem;margin-top:10px">' + u.rejectedCount +
+          ' row(s) in this file were rejected and are not part of the record: ' +
+          kvEsc((u.rejected || []).map(function (r) { return 'row ' + r.row + ' — ' + r.reason; }).slice(0, 4).join('; ')) + '</div>' : '') +
+        '<div class="field" style="margin-top:14px"><label class="field-l">What did you check, and what was short?</label>' +
+          '<textarea class="input" id="contrib-verify-note" rows="3" placeholder="Required for a partial or not-paid verdict — e.g. EMP-1003 short by ₹1,000, agency to file a supplementary challan">' +
+          kvEsc((u.verification && u.verification.note) || '') + '</textarea></div>' +
+        (u.verification && u.verification.status
+          ? '<div class="tiny muted" style="margin-top:8px">Currently ' + kvEsc((CONTRIB_VERDICTS[u.verification.status] || {}).label || u.verification.status) +
+            ' by ' + kvEsc(u.verification.by) + ' on ' + kvDateTime(u.verification.at) + '. Re-verifying keeps the earlier verdict in the history.</div>'
+          : '') +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Recorded against ' +
+          kvEsc(u.contractorName) + '</span></div>' +
+        '<div class="modal-footer-right">' +
+          '<button class="btn green" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'full\')">Fully paid</button>' +
+          '<button class="btn amber" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'partial\')">Partly paid</button>' +
+          '<button class="btn danger" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'none\')">Not paid</button>' +
+          '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>', 720);
+  }
+  function contribVerify(uploadId, status) {
+    if (!kvHrOnly('Only HR can verify a worker-level contribution upload.')) return;
+    var note = ((document.getElementById('contrib-verify-note') || {}).value || '').trim();
+    if (status !== 'full' && !note) {
+      toast('Record what was short or missing — a partial or not-paid verdict needs a note', 'red'); return;
+    }
+    kvJson('/api/contribution-uploads/' + encodeURIComponent(uploadId) + '/verify', 'POST', { status: status, note: note })
+      .then(function (j) {
+        if (!j || !j.ok) { toast((j && j.error) || 'Verification failed', 'red'); return; }
+        omCloseModal();
+        toast('Recorded · ' + ((CONTRIB_VERDICTS[status] || {}).label || status), 'green');
+        epfRefreshAll();
+        if (typeof kvLoadHrInbox === 'function') kvLoadHrInbox(true);
+      })
+      .catch(function (e) { toast('Verification failed: ' + e.message, 'red'); });
+  }
+
+  /* the upload panel for ONE scheme, rendered inside the EPF/ESIC card */
+  function esicUploadPanelHtml(c, scheme) {
+    var s = CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic;
+    var up = contribUp(s.key);
+    var canVerify = kvIsHR();
+    var rows = up.rows || [];
     var ok = rows.filter(function (r) { return !r._issue; });
     var bad = rows.filter(function (r) { return r._issue; });
+    var off = ok.filter(function (r) { return r._variance !== null && Math.abs(r._variance) > 1; });
     var total = ok.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
+    var due = ok.reduce(function (n, r) { return n + Number(r._expected || 0); }, 0);
+    var inputId = 'contrib-up-input-' + s.key;
     var html =
       '<div class="card" style="margin:16px 0;padding:16px">' +
         /* header: title + intent on the left, the two actions on the right */
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1 1 320px;min-width:0">' +
-            '<div class="card-h-title" style="font-size:0.88rem">ESIC · worker level</div>' +
-            '<div class="card-h-sub" style="margin-top:4px;line-height:1.5">One row per employee per month, uploaded as Excel. ' +
-            'The firm-month figure above proves a payment was made; this is what lets an individual worker see that ' +
-            '<strong>their</strong> ESIC was paid.</div>' +
+            '<div class="card-h-title" style="font-size:0.88rem">' + kvEsc(s.full) + ' · worker level</div>' +
+            '<div class="card-h-sub" style="margin-top:4px;line-height:1.5">One row per employee per month. ' +
+            'Checked against the statutory formula — ' + kvEsc(s.rateNote) + ' — then verified by Plant HR.</div>' +
           '</div>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">' +
-            '<button class="btn tiny" onclick="esicDownloadTemplate()">⬇ Template</button>' +
-            '<button class="btn tiny primary" onclick="document.getElementById(\'esic-up-input\').click()">Choose file…</button>' +
+            '<button class="btn tiny" onclick="contribDownloadTemplate(\'' + s.key + '\')">⬇ Template</button>' +
+            '<button class="btn tiny primary" onclick="document.getElementById(\'' + inputId + '\').click()">Choose file…</button>' +
           '</div>' +
         '</div>' +
-        '<input type="file" id="esic-up-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="esicPickFile(event)">';
+        '<input type="file" id="' + inputId + '" accept=".xlsx,.xls,.csv" style="display:none" onchange="contribPickFile(event,\'' + s.key + '\')">';
 
-    if (ESIC_UP.fileName) {
+    if (up.fileName) {
       /* the file being staged — name on its own line, the counts beneath it,
          so a long filename cannot push the numbers out of view */
-      html += '<div class="note ' + (bad.length ? 'amber' : 'green') + '" style="margin-top:14px">' +
-        '<div style="font-size:0.8rem;word-break:break-all"><strong>📄 ' + kvEsc(ESIC_UP.fileName) + '</strong></div>' +
+      html += '<div class="note ' + (bad.length || off.length ? 'amber' : 'green') + '" style="margin-top:14px">' +
+        '<div style="font-size:0.8rem;word-break:break-all"><strong>📄 ' + kvEsc(up.fileName) + '</strong></div>' +
         '<div class="tiny" style="margin-top:5px;line-height:1.6">' +
-          [(ESIC_UP.fileSize ? esicFmtSize(ESIC_UP.fileSize) : ''),
-           (ESIC_UP.sheetName ? 'sheet “' + kvEsc(ESIC_UP.sheetName) + '”' : ''),
+          [(up.fileSize ? contribFmtSize(up.fileSize) : ''),
+           (up.sheetName ? 'sheet “' + kvEsc(up.sheetName) + '”' : ''),
            rows.length + ' row' + (rows.length === 1 ? '' : 's') + ' read',
            '<strong>' + ok.length + '</strong> ready to upload',
            (bad.length ? '<strong>' + bad.length + '</strong> will be skipped' : ''),
-           (total ? '₹' + total.toLocaleString('en-IN') + ' total' : '')
+           (total ? '₹' + total.toLocaleString('en-IN') + ' declared' : ''),
+           (due ? '₹' + due.toLocaleString('en-IN') + ' due on the formula' : ''),
+           (off.length ? '<strong>' + off.length + '</strong> differ from the formula' : '')
           ].filter(Boolean).join(' &nbsp;·&nbsp; ') +
         '</div>' +
       '</div>';
@@ -21822,18 +22029,26 @@ function __kvOnReady(fn) {
     if (rows.length) {
       var preview = rows.slice(0, 12);
       html += esicTable(
-        [{ label: 'Employee' }, { label: 'ESIC no' }, { label: 'Month' },
-         { label: 'Amount', align: 'right' }, { label: 'Challan' }, { label: 'Paid on' }, { label: 'Status' }],
+        [{ label: 'Employee' }, { label: s.memberIdShort }, { label: 'Month' },
+         { label: 'Wages', align: 'right' }, { label: 'Declared', align: 'right' },
+         { label: 'Due', align: 'right' }, { label: 'Challan' }, { label: 'Status' }],
         preview.map(function (r) {
+          var offRow = r._variance !== null && Math.abs(r._variance) > 1;
           return '<tr' + (r._issue ? ' style="background:var(--red-soft)"' : '') + '>' +
             '<td><span class="t-strong">' + kvEsc(r.workerName || '—') + '</span>' +
               '<div class="t-mute mono">' + kvEsc(r.employeeId || '—') + '</div></td>' +
-            '<td class="mono">' + kvEsc(r.esiNumber || '—') + '</td>' +
+            '<td class="mono">' + kvEsc(r.memberId || '—') + '</td>' +
             '<td class="mono">' + kvEsc(r.month || '—') + '</td>' +
-            '<td class="mono" style="text-align:right">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
+            '<td class="mono" style="text-align:right">' + (r.wages ? '₹' + Number(r.wages).toLocaleString('en-IN') : '—') + '</td>' +
+            '<td class="mono' + (offRow ? '' : ' t-strong') + '" style="text-align:right' + (offRow ? ';color:var(--red-dk)' : '') + '">' +
+              (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
+            '<td class="mono" style="text-align:right">' + (r._expected === null ? '—'
+              : (r._outOfScope ? '<span class="t-mute">out of scope</span>' : '₹' + Number(r._expected).toLocaleString('en-IN'))) + '</td>' +
             '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
-            '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
-            '<td>' + (r._issue ? '<span class="pill red tiny" title="' + kvEsc(r._issue) + '">' + kvEsc(r._issue) + '</span>' : esicStatusPill(r.status)) + '</td>' +
+            '<td>' + (r._issue
+              ? '<span class="pill red tiny" title="' + kvEsc(r._issue) + '">' + kvEsc(r._issue) + '</span>'
+              : (offRow ? '<span class="pill amber tiny" title="Differs from the statutory formula by ₹' + Math.abs(r._variance) + '">off by ₹' + Math.abs(r._variance) + '</span>'
+                        : contribStatusPill(r.status))) + '</td>' +
           '</tr>';
         }).join('')
       );
@@ -21843,44 +22058,58 @@ function __kvOnReady(fn) {
       }
       html += '<div style="display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
           '<button class="btn primary"' + (ok.length ? '' : ' disabled') +
-            ' onclick="esicUploadSend(\'' + kvEsc(c.id) + '\')">Upload ' + ok.length + ' row' + (ok.length === 1 ? '' : 's') + '</button>' +
-          '<button class="btn" onclick="esicClearUpload()">Clear</button>' +
+            ' onclick="esicUploadSend(\'' + kvEsc(c.id) + '\',\'' + s.key + '\')">Upload ' + ok.length + ' row' + (ok.length === 1 ? '' : 's') + '</button>' +
+          '<button class="btn" onclick="contribClearUpload(\'' + s.key + '\')">Clear</button>' +
           (bad.length ? '<span class="tiny muted" style="flex:1 1 220px">Flagged rows are skipped — correct them in the file and upload again.</span>' : '') +
+          (!bad.length && off.length ? '<span class="tiny muted" style="flex:1 1 220px">Rows marked “off by” are still uploaded — HR sees the difference when verifying.</span>' : '') +
         '</div>';
     }
-    /* provenance — which files this agency's ESIC record was actually built from */
+    /* provenance — which files this agency's record was built from, and HR's
+       verdict on each */
     html += '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--line)">' +
-      '<div class="card-h-title" style="font-size:0.82rem">Uploaded files</div>' +
-      '<div class="card-h-sub">Every worker-level figure on this agency traces back to one of these.</div>' +
-      esicUploadsTableHtml(ESIC_UP.uploads) +
+      '<div class="card-h-title" style="font-size:0.82rem">Uploaded files · ' + kvEsc(s.label) + '</div>' +
+      '<div class="card-h-sub">Every worker-level figure traces back to one of these, and to Plant HR\'s verdict on it.</div>' +
+      esicUploadsTableHtml(up.uploads, s.key, canVerify) +
     '</div>';
     return html + '</div>';
   }
+  /* both schemes, in order */
+  function contribPanelsHtml(c, canSubmit) {
+    return CONTRIB_ORDER.map(function (k) {
+      return canSubmit ? esicUploadPanelHtml(c, k) : esicUploadPanelReadOnlyHtml(k);
+    }).join('');
+  }
 
-  function esicUploadSend(contractorId) {
+  function esicUploadSend(contractorId, scheme) {
     var c = ctByName(contractorId);
     if (!c) return;
-    var ok = (ESIC_UP.rows || []).filter(function (r) { return !r._issue; })
+    var s = CONTRIB_SCHEMES[scheme] || CONTRIB_SCHEMES.esic;
+    var up = contribUp(s.key);
+    var ok = (up.rows || []).filter(function (r) { return !r._issue; })
       .map(function (r) {
-        var o = {}; ESIC_COLS.forEach(function (k) { o[k] = r[k]; }); return o;
+        var o = {}; CONTRIB_COLS.forEach(function (k) { o[k] = r[k]; }); return o;
       });
     if (!ok.length) { toast('No valid rows to upload', 'red'); return; }
-    kvJson('/api/esic-contributions/upload', 'POST', {
+    kvJson('/api/contributions/upload', 'POST', {
+      scheme: s.key,
       contractorId: c.id, contractor: c.name, actorContractor: kvAgencyFirm() || undefined,
-      fileName: ESIC_UP.fileName, fileSize: ESIC_UP.fileSize, sheetName: ESIC_UP.sheetName,
+      fileName: up.fileName, fileSize: up.fileSize, sheetName: up.sheetName,
       rows: ok
     }).then(function (j) {
       if (!j || !j.ok) { toast((j && j.error) || 'Upload failed', 'red'); return; }
-      toast('ESIC uploaded · ' + j.accepted + ' employee row(s) recorded from ' + ESIC_UP.fileName, 'green');
-      ESIC_UP.rows = []; ESIC_UP.fileName = ''; ESIC_UP.fileSize = 0;
+      toast(s.label + ' uploaded · ' + j.accepted + ' employee row(s) recorded from ' + up.fileName +
+        ' — awaiting Plant HR verification', 'green');
+      up.rows = []; up.fileName = ''; up.fileSize = 0;
       epfRefreshAll();
       if (typeof kvLoadHrInbox === 'function') kvLoadHrInbox(true);
     }).catch(function (e) { toast('Upload failed: ' + e.message, 'red'); });
   }
   function esicLoadUploads(contractorName) {
-    return kvJson('/api/esic-uploads?contractor=' + encodeURIComponent(contractorName))
-      .then(function (j) { ESIC_UP.uploads = (j && j.uploads) || []; return ESIC_UP.uploads; })
-      .catch(function () { ESIC_UP.uploads = []; return []; });
+    return Promise.all(CONTRIB_ORDER.map(function (k) {
+      return kvJson('/api/contribution-uploads?scheme=' + k + '&contractor=' + encodeURIComponent(contractorName))
+        .then(function (j) { CONTRIB_UP[k].uploads = (j && j.uploads) || []; })
+        .catch(function () { CONTRIB_UP[k].uploads = []; });
+    }));
   }
 
   /* jump straight from the HR inbox to the contractor's payment tab */

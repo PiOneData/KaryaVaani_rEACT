@@ -175,10 +175,10 @@ export default function SecEmpHome() {
           <div className="card" id="emp-esic-card">
             <div className="card-h">
               <div>
-                <div className="card-h-title">Your ESIC contributions</div>
+                <div className="card-h-title">Your ESIC &amp; PF contributions</div>
                 {' '}
                 <div className="card-h-sub" id="emp-esic-sub">
-                  Month by month — what was contributed, the challan it was paid on, and whether it has been paid
+                  Month by month — what was contributed to ESIC and PF, the challan it was paid on, and whether it has been paid
                 </div>
               </div>
               {' '}

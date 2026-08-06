@@ -89,7 +89,19 @@ const COLLECTIONS = {
                            the upload it arrived on, so any figure a worker is
                            shown can be traced back to the file it came from. */
   esicUploads:         { table: 'esic_uploads',          kind: 'array', id: (r) => r.id },
-  esicContributions:   { table: 'esic_contributions',    kind: 'array', id: (r) => r.id }
+  esicContributions:   { table: 'esic_contributions',    kind: 'array', id: (r) => r.id },
+  /* Worker-level statutory contributions, ESIC and EPF alike. The two above
+     were ESIC-only; these carry a `scheme` discriminator because the two
+     schemes differ in their rates and their wage ceiling but in nothing else
+     that matters here — same file-per-month shape, same per-employee rows, same
+     HR verification. Keeping them in one pair of tables means the reconciliation
+     and the verification workflow are written once.
+       contributionUploads   — one row per uploaded file, carrying HR's verdict
+       workerContributions   — one row per employee-month-scheme
+     The esic* tables above are retained so a store written before this change
+     still loads; their rows are migrated across on boot. */
+  contributionUploads: { table: 'contribution_uploads',  kind: 'array', id: (r) => r.id },
+  workerContributions: { table: 'worker_contributions',  kind: 'array', id: (r) => r.id }
 };
 const META_TABLE = 'store_meta';
 
