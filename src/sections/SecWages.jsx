@@ -133,6 +133,9 @@ export default function SecWages() {
             <thead>
               <tr>
                 <th>Worker</th>
+                {/*  the identifier the register is keyed to for statutory
+                     returns and the worker-level ESIC upload  */}
+                <th>Employee ID</th>
                 <th>Employer</th>
                 <th>Base wage</th>
                 <th>OT hours</th>

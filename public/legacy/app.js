@@ -12079,6 +12079,9 @@ function __kvOnReady(fn) {
     /* attendance & travel (boarding history, same as the worker directory) */
     empRenderTravel(c);
 
+    /* the worker's own ESIC contribution history, a year at a time */
+    empRenderEsic(c);
+
     /* onboarding / induction status (only for workers with an onboarding record) */
     empRenderOnboarding(c);
 
@@ -13961,6 +13964,142 @@ function __kvOnReady(fn) {
     host.innerHTML = omTravelHtml(travel);
   }
 
+  /* ── Worker's own ESIC contribution history ──────────────────────────────
+     ESIC comes off a worker's wages every month, but until now the worker had
+     no way to see where it went. These are the per-employee rows the agency
+     uploads (see the ESIC worker-level upload on the agency portal): one line
+     per month with the challan it was paid on.
+
+     Presented a year at a time — that is the unit ESIC is reconciled in — with
+     every earlier year still reachable from the picker, because the question
+     "was my ESIC paid two years ago?" is exactly the one that matters when a
+     claim is refused.
+     ──────────────────────────────────────────────────────────────────────── */
+  var EMP_ESIC = { key: null, rows: [], year: null, loading: false };
+  function empEsicKeys(c) {
+    /* whichever identifiers this worker is known by — the agency's sheet may
+       carry the employee id, the platform code, or the ESIC number */
+    var keys = [];
+    var code = (typeof empWorkerCode === 'function') ? empWorkerCode(c) : '';
+    /* same resolution the onboarding card uses: a real worker login resolves to
+       its own linked capture, otherwise fall back to matching on name */
+    var caps = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : []);
+    var u = window.__KVUSER || {};
+    var rec = null;
+    if (u.role === 'employee' && u.linkedType === 'worker' && u.linkedId) {
+      rec = caps.find(function (r) { return r.backendId === u.linkedId || r.id === u.linkedId; });
+    }
+    if (!rec && c) rec = caps.find(function (r) { return r.name && String(r.name).toLowerCase() === String(c.name).toLowerCase(); });
+    if (!rec && code) rec = caps.find(function (r) { return String(r.id) === String(code); });
+    if (rec && rec.employeeId) keys.push(rec.employeeId);
+    if (rec && rec.id) keys.push(rec.id);
+    if (code) keys.push(code);
+    if (rec && rec.esi) keys.push(rec.esi);
+    /* de-duplicate so one identifier is not queried twice */
+    return keys.filter(function (k, i) { return k && keys.indexOf(k) === i; });
+  }
+  function empEsicSetYear(y) { EMP_ESIC.year = y || null; empEsicPaint(); }
+  function empRenderEsic(c) {
+    var host = document.getElementById('emp-esic-list');
+    if (!host) return;
+    var keys = empEsicKeys(c);
+    var key = keys.join('|');
+    if (!keys.length) {
+      EMP_ESIC = { key: null, rows: [], year: null, loading: false };
+      host.innerHTML = '<div class="tiny muted">No employee id on this worker record yet — ESIC contributions are matched by employee id, platform code or ESIC number.</div>';
+      empEsicFillYears();
+      return;
+    }
+    if (EMP_ESIC.key === key && !EMP_ESIC.loading) { empEsicPaint(); return; }
+    EMP_ESIC.key = key; EMP_ESIC.loading = true; EMP_ESIC.rows = [];
+    host.innerHTML = '<div class="tiny muted">Loading your ESIC contributions…</div>';
+    /* try each identifier in turn and merge — a worker whose sheet rows were
+       uploaded under two different ids still sees one continuous history */
+    Promise.all(keys.map(function (k) {
+      return kvJson('/api/esic-contributions?worker=' + encodeURIComponent(k))
+        .then(function (j) { return (j && j.contributions) || []; })
+        .catch(function () { return []; });
+    })).then(function (lists) {
+      var seen = {}, merged = [];
+      lists.forEach(function (rows) {
+        rows.forEach(function (r) { if (!seen[r.id]) { seen[r.id] = 1; merged.push(r); } });
+      });
+      merged.sort(function (a, b) { return String(b.month).localeCompare(String(a.month)); });
+      EMP_ESIC.rows = merged;
+      EMP_ESIC.loading = false;
+      if (!EMP_ESIC.year && merged.length) EMP_ESIC.year = String(merged[0].month).slice(0, 4);
+      empEsicFillYears();
+      empEsicPaint();
+    });
+  }
+  function empEsicYears() {
+    var ys = {};
+    (EMP_ESIC.rows || []).forEach(function (r) { var y = String(r.month || '').slice(0, 4); if (y) ys[y] = 1; });
+    return Object.keys(ys).sort().reverse();
+  }
+  function empEsicFillYears() {
+    var sel = document.getElementById('emp-esic-year');
+    if (!sel) return;
+    var years = empEsicYears();
+    if (!years.length) { sel.innerHTML = '<option value="">—</option>'; sel.disabled = true; return; }
+    sel.disabled = false;
+    if (!EMP_ESIC.year || years.indexOf(EMP_ESIC.year) === -1) EMP_ESIC.year = years[0];
+    sel.innerHTML = years.map(function (y) {
+      return '<option value="' + y + '"' + (y === EMP_ESIC.year ? ' selected' : '') + '>' + y + '</option>';
+    }).join('');
+  }
+  function empEsicPaint() {
+    var host = document.getElementById('emp-esic-list');
+    if (!host) return;
+    var sub = document.getElementById('emp-esic-sub');
+    var all = EMP_ESIC.rows || [];
+    if (!all.length) {
+      host.innerHTML = '<div class="note indigo" style="font-size:0.76rem">No ESIC contribution has been recorded against you yet. ' +
+        'Your employer uploads these each month — once they do, every month will be listed here with its challan.</div>';
+      if (sub) sub.textContent = 'Month by month — what was contributed, the challan it was paid on, and whether it has been paid';
+      return;
+    }
+    var year = EMP_ESIC.year || empEsicYears()[0];
+    var rows = all.filter(function (r) { return String(r.month || '').slice(0, 4) === String(year); });
+    var total = rows.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
+    var paid = rows.filter(function (r) { return (r.status || 'paid') === 'paid'; }).length;
+    var pending = rows.filter(function (r) { return r.status === 'pending'; }).length;
+    if (sub) {
+      sub.textContent = rows.length + ' month(s) in ' + year + ' · ₹' + total.toLocaleString('en-IN') +
+        ' contributed · ' + paid + ' paid' + (pending ? ' · ' + pending + ' pending' : '') +
+        (all.length > rows.length ? ' · earlier years in the picker' : '');
+    }
+    host.innerHTML =
+      '<div class="sd-mini-grid" style="margin-bottom:10px">' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Contributed in ' + kvEsc(String(year)) + '</div>' +
+          '<div class="sd-mini-v">₹' + total.toLocaleString('en-IN') + '</div>' +
+          '<div class="sd-mini-s">employee + employer share</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Months paid</div>' +
+          '<div class="sd-mini-v" style="color:var(--green-dk)">' + paid + '</div>' +
+          '<div class="sd-mini-s">of ' + rows.length + ' recorded</div></div>' +
+        '<div class="sd-mini"><div class="sd-mini-eye">Awaiting payment</div>' +
+          '<div class="sd-mini-v" style="color:' + (pending ? 'var(--amber-dk)' : 'var(--ink-3)') + '">' + pending + '</div>' +
+          '<div class="sd-mini-s">' + (pending ? 'raise with your employer' : 'nothing outstanding') + '</div></div>' +
+      '</div>' +
+      '<div class="tbl-wrap"><table class="tbl tiny"><thead><tr>' +
+        '<th>Month</th><th>Paid on</th><th>Challan</th><th>Your share</th><th>Employer</th><th>Total</th><th>Status</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr>' +
+          '<td class="t-strong">' + kvEsc(kvMonthLabel ? kvMonthLabel(r.month) : r.month) + '</td>' +
+          '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
+          '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
+          '<td class="mono">' + (r.employeeContribution ? '₹' + Number(r.employeeContribution).toLocaleString('en-IN') : '—') + '</td>' +
+          '<td class="mono">' + (r.employerContribution ? '₹' + Number(r.employerContribution).toLocaleString('en-IN') : '—') + '</td>' +
+          '<td class="mono t-strong">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
+          '<td>' + esicStatusPill(r.status) + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+      '<div class="tiny muted" style="margin-top:6px">Recorded by your employer from the ESIC portal return. ' +
+        'If a month is missing or marked pending, raise it with your employer or Plant HR.</div>';
+  }
+
   /* attendance loaded for the selected week+date, keyed by route|shift. */
   function trLoadAttendance() {
     const week = trWeekKey(TR_STATE.weekOffset);
@@ -15299,6 +15438,17 @@ function __kvOnReady(fn) {
       toast('This WhatsApp number is already onboarded to ' + dupWorker.name + ' (' + dupWorker.id + '). Numbers must be unique.', 'red');
       return;
     }
+    /* the employee id keys the wage register and the worker-level ESIC upload,
+       so a worker onboarded without one cannot be reconciled in either */
+    const empId = capVal('cap-empid').trim();
+    if (!empId) { toast('Enter the Employee ID — the wage register and ESIC upload are keyed to it', 'red'); return; }
+    const dupEmp = (CAP_STATE.recent || []).find(function (r) {
+      return r.employeeId && String(r.employeeId).trim().toLowerCase() === empId.toLowerCase();
+    });
+    if (dupEmp) {
+      toast('Employee ID ' + empId + ' is already used by ' + dupEmp.name + '. Employee IDs must be unique.', 'red');
+      return;
+    }
     if (CAP_STATE.type === 'direct' && !capVal('cap-posid')) {
       toast('Tag this worker to an approved Position ID', 'red'); return;
     }
@@ -15319,7 +15469,7 @@ function __kvOnReady(fn) {
     const getC = function (id) { const e = document.getElementById(id); return e ? e.checked : false; };
     const mgrParts = (capVal('cap-manager') || '').split('|');
     const rec = {
-      id: wid, name: name, type: CAP_STATE.type, status: 'sent',
+      id: wid, employeeId: empId, name: name, type: CAP_STATE.type, status: 'sent',
       lang: capLangName(), category: capVal('cap-category') || 'Unskilled',
       designation: capVal('cap-designation'),
       photo: CAP_STATE.photo, mobile: mobile,
@@ -15330,7 +15480,7 @@ function __kvOnReady(fn) {
       pan: (capVal('cap-pan') || '').toUpperCase(),
       panVerified: !!CAP_STATE.panVerified,
       gender: capVal('cap-gender'), dob: capVal('cap-dob'), emergency: capVal('cap-emergency'),
-      route: capVal('cap-route'), shift: capVal('cap-shift'),
+      route: capVal('cap-route'), routeNo: capRouteNoValue(), shift: capVal('cap-shift'),
       address: { addr1: capVal('cap-addr1'), addr2: capVal('cap-addr2'), city: capVal('cap-city'), district: capVal('cap-district'), pin: capVal('cap-pin'), state: capVal('cap-homestate') },
       migrant: getC('cap-migrant'),
       nightShiftConsent: getC('cap-nightconsent'),
@@ -15446,12 +15596,14 @@ function __kvOnReady(fn) {
   function capReset(keep) {
     ['cap-name','cap-dob','cap-mobile','cap-aadhaar','cap-pan','cap-emergency',
      'cap-addr1','cap-addr2','cap-city','cap-district','cap-pin',
-     'cap-spoken','cap-clra','cap-doj','cap-uan','cap-esi','cap-designation'].forEach(function (id) {
+     'cap-spoken','cap-clra','cap-doj','cap-uan','cap-esi','cap-designation','cap-empid'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['cap-posid','cap-workorder','cap-manager','cap-vendor','cap-department'].forEach(function (id) {
+    ['cap-posid','cap-workorder','cap-manager','cap-vendor','cap-department','cap-route'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+    /* the route number follows the route, so clearing the route clears it */
+    if (typeof capPickRoute === 'function') capPickRoute();
     const mig = document.getElementById('cap-migrant'); if (mig) mig.checked = false;
     const ack = document.getElementById('cap-ppe-ack'); if (ack) ack.checked = false;
     const nc = document.getElementById('cap-nightconsent'); if (nc) nc.checked = false;
@@ -15519,19 +15671,25 @@ function __kvOnReady(fn) {
   function capDownloadTemplate() {
     /* Route is intentionally NOT a column — the transport route is assigned and
        updated by HR after upload, so the agency does not provide it here. */
-    var headers = ['name', 'type', 'mobile', 'aadhaar', 'pan', 'gender', 'shift', 'language', 'category', 'contractor', 'uniform', 'shoe'];
+    var headers = ['employee id', 'name', 'type', 'mobile', 'aadhaar', 'pan', 'gender', 'shift', 'language', 'category', 'contractor', 'uniform', 'shoe'];
     var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
     var sample = [
-      ['Ramesh Naidu', 'direct', '9876543210', '123456789012', 'ABCDE1234F', 'Male', 'Morning', 'Telugu', 'Skilled', (scope || ''), 'L', '9'],
-      ['Lalita Devi', 'contract', '9811122233', '234567890123', 'PQRSX6789K', 'Female', 'Night', 'Hindi', 'Semi-skilled', (scope || 'Ark HR'), 'M', '6']
+      ['EMP-1001', 'Ramesh Naidu', 'direct', '9876543210', '123456789012', 'ABCDE1234F', 'Male', 'Morning', 'Telugu', 'Skilled', (scope || ''), 'L', '9'],
+      ['EMP-1002', 'Lalita Devi', 'contract', '9811122233', '234567890123', 'PQRSX6789K', 'Female', 'Night', 'Hindi', 'Semi-skilled', (scope || 'Ark HR'), 'M', '6']
     ];
     if (typeof XLSX !== 'undefined') {
       var wb = XLSX.utils.book_new();
       var ws = XLSX.utils.aoa_to_sheet([headers].concat(sample));
-      /* force the aadhaar column to TEXT so Excel never renders it as 7.85E+14 */
-      sample.forEach(function (_, r) {
-        var addr = XLSX.utils.encode_cell({ c: 3, r: r + 1 });
-        if (ws[addr]) { ws[addr].t = 's'; ws[addr].z = '@'; }
+      /* force the employee-id and aadhaar columns to TEXT so Excel never renders
+         a 12-digit aadhaar as 7.85E+14 or strips a leading zero from an id.
+         Indices are resolved from the header row so adding a column ahead of
+         them cannot silently point this at the wrong cells. */
+      [headers.indexOf('employee id'), headers.indexOf('aadhaar')].forEach(function (col) {
+        if (col < 0) return;
+        sample.forEach(function (_, r) {
+          var addr = XLSX.utils.encode_cell({ c: col, r: r + 1 });
+          if (ws[addr]) { ws[addr].t = 's'; ws[addr].z = '@'; ws[addr].v = String(ws[addr].v); }
+        });
       });
       ws['!cols'] = headers.map(function () { return { wch: 16 }; });
       XLSX.utils.book_append_sheet(wb, ws, 'Workers');
@@ -15597,6 +15755,8 @@ function __kvOnReady(fn) {
   function capBuildRow(get) {
     var type = (String(get('type') || 'direct').toLowerCase() === 'contract') ? 'contract' : 'direct';
     return {
+      /* the employee id the wage register and ESIC upload key on */
+      employeeId: get('employee id') || get('employeeid') || get('emp id') || '',
       name: get('name'),
       type: type,
       mobile: get('mobile'),
@@ -15753,9 +15913,12 @@ function __kvOnReady(fn) {
       var wid = (type === 'direct' ? 'WRK-' : 'CWK-') + Math.floor(2000 + Math.random() * 7999);
       var femaleNight = r.gender === 'Female' && r.shift === 'Night';
       var rec = {
-        id: wid, name: r.name, type: type, lang: r.language,
+        id: wid, employeeId: r.employeeId || '', name: r.name, type: type, lang: r.language,
         category: r.category, designation: r.category, photo: null, mobile: r.mobile, status: 'sent',
-        gender: r.gender, route: r.route, shift: r.shift,
+        gender: r.gender, route: r.route,
+        /* the route number follows whichever route the row resolved to */
+        routeNo: (typeof capRouteNosFor === 'function' ? (capRouteNosFor(r.route)[0] || '') : ''),
+        shift: r.shift,
         pan: (r.pan || '').toUpperCase(), panVerified: false,
         aadhaarLast4: String(r.aadhaar || '').replace(/\D/g, '').slice(-4), aadhaarVerified: false,
         nightShiftConsent: femaleNight ? !!r.nightConsent : false,
@@ -15910,7 +16073,73 @@ function __kvOnReady(fn) {
     if (!el) return;
     var opts = (typeof capRouteOptions === 'function') ? capRouteOptions() : [];
     el.innerHTML = '<option value="">Select a route…</option>' +
-      opts.map(function (o) { return '<option value="' + o.label.replace(/"/g, '&quot;') + '">' + o.label + '</option>'; }).join('');
+      opts.map(function (o) {
+        /* show the route number in the label too — it is the identifier the
+           boarding, consent and reassignment records are all keyed to */
+        var lbl = (o.routeNo ? o.routeNo + ' · ' : '') + o.label;
+        return '<option value="' + o.label.replace(/"/g, '&quot;') + '">' + kvEsc(lbl) + '</option>';
+      }).join('');
+    capPickRoute();
+  }
+  /* ── Route number for the picked route ───────────────────────────────────
+     A route carries exactly one route number (CR-3 enforces uniqueness and
+     flags collisions), so for HR there is nothing to choose: the number is
+     shown in a locked box the moment the route is picked.
+
+     It is still written as a picker for the case where a route legitimately
+     carries more than one number — then the box becomes a real <select>. That
+     branch does not fire on today's data; it exists so the form does not have
+     to be rewritten if it ever does.
+     ──────────────────────────────────────────────────────────────────────── */
+  function capRouteNosFor(routeLabel) {
+    var v = String(routeLabel || '').trim();
+    if (!v) return [];
+    var opts = (typeof capRouteOptions === 'function') ? capRouteOptions() : [];
+    var nos = opts.filter(function (o) { return o.label === v; })
+                  .map(function (o) { return o.routeNo; })
+                  .filter(function (n, i, a) { return n && a.indexOf(n) === i; });
+    return nos;
+  }
+  function capPickRoute() {
+    var routeEl = document.getElementById('cap-route');
+    var sel = document.getElementById('cap-routeno');
+    var fixed = document.getElementById('cap-routeno-fixed');
+    var note = document.getElementById('cap-routeno-note');
+    if (!routeEl || !sel || !fixed) return;
+    var nos = capRouteNosFor(routeEl.value);
+    if (nos.length > 1) {
+      /* more than one number on this route — HR chooses */
+      sel.style.display = '';
+      fixed.style.display = 'none';
+      var cur = sel.value;
+      sel.innerHTML = nos.map(function (n) {
+        return '<option value="' + kvEsc(n) + '"' + (n === cur ? ' selected' : '') + '>' + kvEsc(n) + '</option>';
+      }).join('');
+      if (note) note.textContent = 'This route carries ' + nos.length + ' route numbers — pick the one this worker travels on.';
+    } else {
+      /* the normal case: exactly one, so it is displayed and not asked for */
+      sel.style.display = 'none';
+      sel.innerHTML = nos.length ? '<option value="' + kvEsc(nos[0]) + '" selected>' + kvEsc(nos[0]) + '</option>' : '';
+      fixed.style.display = '';
+      fixed.value = nos.length ? nos[0] : '';
+      fixed.placeholder = routeEl.value ? 'No route number on this route' : 'Select a route first';
+      if (note) {
+        note.textContent = !routeEl.value
+          ? 'Set automatically from the route — one route, one route number.'
+          : (nos.length ? 'Set automatically from ' + routeEl.value + ' — this route has one route number.'
+                        : 'This route has no route number on record. Transport must assign one.');
+      }
+    }
+    if (typeof capSync === 'function') capSync();
+  }
+  /* the value to persist, whichever of the two controls is in play */
+  function capRouteNoValue() {
+    var sel = document.getElementById('cap-routeno');
+    if (sel && sel.style.display !== 'none' && sel.value) return sel.value;
+    var fixed = document.getElementById('cap-routeno-fixed');
+    if (fixed && fixed.value) return fixed.value;
+    if (sel && sel.value) return sel.value;
+    return '';
   }
   /* an agency (contractor login) only onboards contract workers — hide the
      Direct option and lock the type to contract. */
@@ -21035,7 +21264,11 @@ function __kvOnReady(fn) {
     var canVerify = kvIsHR();
     var canSubmit = kvIsHR() || (kvIsAgency() && String(kvAgencyFirm()).trim().toLowerCase() === String(c.name).trim().toLowerCase());
     host.innerHTML = '<div class="tiny muted">Loading EPF / ESIC submissions…</div>';
-    epfLoad(c.name).then(function (rows) {
+    /* the worker-level ESIC files are loaded alongside the firm-month rows so
+       the card renders once with both, rather than flashing in two stages */
+    if (ESIC_UP.contractor !== c.name) { ESIC_UP.contractor = c.name; ESIC_UP.rows = []; ESIC_UP.fileName = ''; ESIC_UP.fileSize = 0; }
+    Promise.all([epfLoad(c.name), esicLoadUploads(c.name)]).then(function (both) {
+      var rows = both[0];
       EPF_STATE.contractor = c.name;
       EPF_STATE.rows = rows;
       var head =
@@ -21057,8 +21290,26 @@ function __kvOnReady(fn) {
         ? rows.map(function (r) { return epfRowHtml(r, st, c, canVerify); }).join('')
         : '<div class="note amber" style="font-size:0.76rem">No EPF/ESIC payment has been submitted for ' + kvEsc(c.name) +
           '. Until a submission is verified against the deployed headcount, the principal employer holds an undischarged joint liability for this agency.</div>';
-      host.innerHTML = head + summary + (canSubmit ? epfSubmitFormHtml(c, st) : '') + list;
+      host.innerHTML = head + summary + (canSubmit ? epfSubmitFormHtml(c, st) : '') +
+        (canSubmit ? esicUploadPanelHtml(c) : esicUploadPanelReadOnlyHtml()) + list;
     });
+  }
+  /* someone who may read the card but not submit still sees which files the
+     ESIC record was built from — the provenance is the point */
+  function esicUploadPanelReadOnlyHtml() {
+    var ups = ESIC_UP.uploads || [];
+    if (!ups.length) return '';
+    return '<div class="card" style="margin:12px 0;padding:12px">' +
+      '<div class="card-h-title" style="font-size:0.85rem">ESIC · worker level</div>' +
+      '<div class="card-h-sub" style="margin-bottom:6px">Files this agency\'s per-employee ESIC record was built from.</div>' +
+      '<div class="tbl-wrap"><table class="tbl tiny"><thead><tr><th>File</th><th>Covering</th><th>Rows</th><th>Total</th><th>Uploaded</th></tr></thead><tbody>' +
+      ups.slice(0, 8).map(function (u) {
+        return '<tr><td class="t-strong">' + kvEsc(u.fileName) + '</td>' +
+          '<td class="mono">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</td>' +
+          '<td class="mono">' + u.acceptedCount + '</td>' +
+          '<td class="mono">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</td>' +
+          '<td class="tiny">' + kvDateTime(u.uploadedAt) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
   }
   function epfSubmit(contractorId) {
     var c = ctByName(contractorId);
@@ -21099,6 +21350,309 @@ function __kvOnReady(fn) {
     if (document.getElementById('ct-epf-host')) { var f = kvAgencyFirm() || (typeof CT_ACTIVE !== 'undefined' ? CT_ACTIVE : null); if (f) epfRenderInto('ct-epf-host', f); }
     if (document.getElementById('epf-rollup-body')) initEpfRollup();
   }
+  /* ════════════════════════════════════════════════════════════════════════
+     ESIC AT WORKER LEVEL · EXCEL UPLOAD
+     The submission above is one amount for the whole firm-month. It proves the
+     agency paid something; it cannot tell any individual worker whether THEIR
+     ESIC was paid. So ESIC is also carried per employee, uploaded as the
+     spreadsheet the agency already produces for the ESIC portal.
+
+     Parsed here in the browser (SheetJS is already loaded for the worker
+     onboarding template) and posted as rows, together with the file's own
+     details — name, size, sheet — because a payment record shown to a worker
+     needs to be traceable to the document it came from.
+     ════════════════════════════════════════════════════════════════════════ */
+  var ESIC_UP = { contractor: null, rows: [], fileName: '', fileSize: 0, sheetName: '', uploads: [] };
+  /* the sheet columns, in order. employeeId is first because it is the column
+     that ties an ESIC line to a person in this platform. */
+  var ESIC_COLS = ['employeeId', 'workerName', 'esiNumber', 'month', 'wages',
+                   'employeeContribution', 'employerContribution', 'amount',
+                   'challanNo', 'paidOn', 'status'];
+  var ESIC_COL_LABEL = {
+    employeeId: 'employee id', workerName: 'worker name', esiNumber: 'esic number',
+    month: 'month', wages: 'wages', employeeContribution: 'employee contribution',
+    employerContribution: 'employer contribution', amount: 'total amount',
+    challanNo: 'challan no', paidOn: 'paid on', status: 'status'
+  };
+  /* Excel hands back whatever the cell held — a serial number for a date, a
+     string for text. Both are normalised here rather than at the server, so the
+     preview the uploader signs off on is the value that will be stored. */
+  function esicExcelDate(n) {
+    var d = new Date(Math.round((Number(n) - 25569) * 86400 * 1000));
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  }
+  var ESIC_MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function esicMonthNorm(v) {
+    if (v == null || v === '') return '';
+    if (typeof v === 'number' && v > 20000 && v < 80000) return esicExcelDate(v).slice(0, 7);
+    var s = String(v).trim();
+    if (/^\d{4}-\d{2}$/.test(s)) return s;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 7);
+    var m = s.match(/^(\d{1,2})[\/\-](\d{4})$/);            // 07/2026
+    if (m) return m[2] + '-' + ('0' + m[1]).slice(-2);
+    m = s.match(/^([A-Za-z]{3,})[\s\-]+(\d{4})$/);          // Jul 2026 / July 2026
+    if (m) {
+      var i = ESIC_MONTH_NAMES.indexOf(m[1].slice(0, 3).toLowerCase());
+      if (i !== -1) return m[2] + '-' + ('0' + (i + 1)).slice(-2);
+    }
+    return s;
+  }
+  function esicDateNorm(v) {
+    if (v == null || v === '') return '';
+    if (typeof v === 'number' && v > 20000 && v < 80000) return esicExcelDate(v);
+    return String(v).trim();
+  }
+  function esicNum(v) {
+    var n = Number(String(v == null ? '' : v).replace(/[,\s₹]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
+  /* mirrors the server's acceptance rule, so the preview cannot promise a row
+     the server will reject */
+  function esicRowIssue(r) {
+    if (!r.employeeId && !r.workerCode && !r.esiNumber) return 'no employee id / ESIC number';
+    if (!/^\d{4}-\d{2}$/.test(String(r.month || ''))) return 'month must be YYYY-MM';
+    return '';
+  }
+
+  function esicDownloadTemplate() {
+    var headers = ESIC_COLS.map(function (k) { return ESIC_COL_LABEL[k]; });
+    var scope = (typeof kvOnboardScope === 'function') ? kvOnboardScope() : null;
+    var thisMonth = new Date().toISOString().slice(0, 7);
+    var sample = [
+      ['EMP-1001', 'Ramesh Naidu', '5201234567', thisMonth, 18500, 138.75, 601.25, 740, 'CHL-88213', thisMonth + '-12', 'paid'],
+      ['EMP-1002', 'Lalita Devi', '5201234568', thisMonth, 16000, 120, 520, 640, 'CHL-88213', thisMonth + '-12', 'paid']
+    ];
+    if (typeof XLSX !== 'undefined') {
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet([headers].concat(sample));
+      /* employee id, ESIC number, month and challan must stay TEXT — Excel will
+         otherwise turn a long insurance number into 5.2E+09 and a month into a
+         date serial, and both come back unusable */
+      [0, 2, 3, 8, 9].forEach(function (col) {
+        sample.forEach(function (_, r) {
+          var addr = XLSX.utils.encode_cell({ c: col, r: r + 1 });
+          if (ws[addr]) { ws[addr].t = 's'; ws[addr].z = '@'; ws[addr].v = String(ws[addr].v); }
+        });
+      });
+      ws['!cols'] = headers.map(function (h) { return { wch: Math.max(14, h.length + 2) }; });
+      ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+      XLSX.utils.book_append_sheet(wb, ws, 'ESIC');
+      var ref = [
+        ['WORKER-LEVEL ESIC UPLOAD · ' + (scope || 'agency') ],
+        [''],
+        ['One row per employee per month.'],
+        ['Re-uploading the same employee + month CORRECTS that row — it does not add a second one.'],
+        [''],
+        ['employee id', 'The id this worker carries in Karya Vaani (wage register / onboarding).'],
+        ['esic number', 'The ESIC insurance number. Either this or the employee id must be present.'],
+        ['month', 'YYYY-MM, e.g. ' + thisMonth + '. "Jul 2026" and 07/2026 are also accepted.'],
+        ['total amount', 'Leave blank to have it computed as employee + employer contribution.'],
+        ['paid on', 'The date the challan was paid, YYYY-MM-DD.'],
+        [''],
+        ['ALLOWED STATUS'], ['paid'], ['pending'], ['exempt']
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'How to fill');
+      XLSX.writeFile(wb, 'karya-vaani-esic-worker-template.xlsx');
+      toast('ESIC upload template downloaded (.xlsx)', 'green');
+      return;
+    }
+    var csv = headers.join(',') + '\n' + sample.map(function (r) { return r.join(','); }).join('\n') + '\n';
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'karya-vaani-esic-worker-template.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('ESIC upload template downloaded', 'green');
+  }
+
+  function esicPickFile(ev) {
+    var f = ev && ev.target && ev.target.files && ev.target.files[0];
+    if (f) esicReadFile(f);
+    if (ev && ev.target) ev.target.value = '';
+  }
+  function esicReadFile(file) {
+    if (!file) return;
+    ESIC_UP.fileName = file.name || 'esic-upload.xlsx';
+    ESIC_UP.fileSize = file.size || 0;
+    var isXlsx = /\.(xlsx|xls)$/i.test(ESIC_UP.fileName);
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var matrix;
+        if (isXlsx) {
+          if (typeof XLSX === 'undefined') { toast('Excel library not loaded — save as CSV and retry', 'red'); return; }
+          var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          ESIC_UP.sheetName = wb.SheetNames[0] || '';
+          matrix = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+        } else {
+          ESIC_UP.sheetName = '';
+          matrix = String(e.target.result).split(/\r?\n/).filter(function (l) { return l.trim(); })
+            .map(function (l) { return l.split(','); });
+        }
+        esicParseMatrix(matrix);
+      } catch (err) { toast('Could not read file: ' + (err && err.message || err), 'red'); }
+    };
+    if (isXlsx) reader.readAsArrayBuffer(file); else reader.readAsText(file);
+  }
+  /* header-driven, so column order in the agency's own file does not matter */
+  function esicParseMatrix(matrix) {
+    if (!matrix || !matrix.length) { toast('The file is empty', 'red'); return; }
+    var head = (matrix[0] || []).map(function (h) { return String(h == null ? '' : h).trim().toLowerCase(); });
+    var idx = function (key) {
+      var label = ESIC_COL_LABEL[key];
+      var i = head.indexOf(label);
+      if (i !== -1) return i;
+      /* tolerate the field name itself and a few common spellings */
+      var alts = [key.toLowerCase(), label.replace(/\s+/g, ''), label.replace(/\s+/g, '_')];
+      if (key === 'employeeId') alts.push('emp id', 'empid', 'employee code', 'employee number');
+      if (key === 'esiNumber') alts.push('esi number', 'esi no', 'ip number', 'insurance number');
+      if (key === 'workerName') alts.push('name', 'employee name');
+      if (key === 'amount') alts.push('total', 'total contribution', 'contribution');
+      if (key === 'challanNo') alts.push('challan', 'challan number');
+      if (key === 'paidOn') alts.push('paid date', 'payment date', 'date');
+      for (var a = 0; a < alts.length; a++) { var j = head.indexOf(alts[a]); if (j !== -1) return j; }
+      return -1;
+    };
+    var map = {};
+    ESIC_COLS.forEach(function (k) { map[k] = idx(k); });
+    if (map.employeeId === -1 && map.esiNumber === -1) {
+      toast('No “employee id” or “esic number” column found — download the template', 'red'); return;
+    }
+    var rows = [];
+    for (var r = 1; r < matrix.length; r++) {
+      var line = matrix[r] || [];
+      var get = function (k) { return map[k] === -1 ? '' : line[map[k]]; };
+      /* skip fully blank lines rather than reporting them as errors */
+      if (!String(line.join('')).trim()) continue;
+      var rec = {
+        employeeId: String(get('employeeId') == null ? '' : get('employeeId')).trim(),
+        workerName: String(get('workerName') == null ? '' : get('workerName')).trim(),
+        esiNumber: String(get('esiNumber') == null ? '' : get('esiNumber')).trim(),
+        month: esicMonthNorm(get('month')),
+        wages: esicNum(get('wages')),
+        employeeContribution: esicNum(get('employeeContribution')),
+        employerContribution: esicNum(get('employerContribution')),
+        challanNo: String(get('challanNo') == null ? '' : get('challanNo')).trim(),
+        paidOn: esicDateNorm(get('paidOn')),
+        status: String(get('status') == null ? '' : get('status')).trim().toLowerCase() || 'paid'
+      };
+      rec.amount = esicNum(get('amount')) || (rec.employeeContribution + rec.employerContribution);
+      rec._issue = esicRowIssue(rec);
+      rows.push(rec);
+    }
+    ESIC_UP.rows = rows;
+    var bad = rows.filter(function (x) { return x._issue; }).length;
+    toast(rows.length + ' row(s) read from ' + ESIC_UP.fileName + (bad ? ' · ' + bad + ' need attention' : ''), bad ? 'amber' : 'green');
+    epfRefreshAll();
+  }
+  function esicClearUpload() { ESIC_UP.rows = []; ESIC_UP.fileName = ''; ESIC_UP.fileSize = 0; epfRefreshAll(); }
+
+  function esicFmtSize(n) {
+    n = Number(n) || 0;
+    return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+  }
+  function esicStatusPill(s) {
+    var v = String(s || 'paid').toLowerCase();
+    var cls = v === 'paid' ? 'green' : v === 'pending' ? 'amber' : 'outline';
+    return '<span class="pill ' + cls + ' tiny">' + kvEsc(v) + '</span>';
+  }
+
+  /* the upload panel, rendered inside the EPF/ESIC card for whoever may submit */
+  function esicUploadPanelHtml(c) {
+    var rows = ESIC_UP.rows || [];
+    var ok = rows.filter(function (r) { return !r._issue; });
+    var bad = rows.filter(function (r) { return r._issue; });
+    var total = ok.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
+    var html =
+      '<div class="card" style="margin:12px 0;padding:12px">' +
+        '<div class="card-h" style="padding:0">' +
+          '<div><div class="card-h-title" style="font-size:0.85rem">ESIC · worker level</div>' +
+          '<div class="card-h-sub">One row per employee per month, uploaded as Excel. The firm-month figure above proves a payment was made; ' +
+          'this is what lets an individual worker see that <strong>their</strong> ESIC was paid.</div></div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+            '<button class="btn tiny" onclick="esicDownloadTemplate()">⬇ Template</button>' +
+            '<button class="btn tiny primary" onclick="document.getElementById(\'esic-up-input\').click()">Choose file…</button>' +
+          '</div>' +
+        '</div>' +
+        '<input type="file" id="esic-up-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="esicPickFile(event)">';
+
+    if (ESIC_UP.fileName) {
+      html += '<div class="note ' + (bad.length ? 'amber' : 'green') + '" style="font-size:0.74rem;margin-top:10px">' +
+        '<strong>📄 ' + kvEsc(ESIC_UP.fileName) + '</strong>' +
+        (ESIC_UP.fileSize ? ' · ' + esicFmtSize(ESIC_UP.fileSize) : '') +
+        (ESIC_UP.sheetName ? ' · sheet “' + kvEsc(ESIC_UP.sheetName) + '”' : '') +
+        ' · ' + rows.length + ' row(s) read · <strong>' + ok.length + '</strong> ready' +
+        (bad.length ? ' · <strong>' + bad.length + '</strong> will be skipped' : '') +
+        (total ? ' · ₹' + total.toLocaleString('en-IN') + ' total' : '') +
+        '</div>';
+    }
+    if (rows.length) {
+      var preview = rows.slice(0, 12);
+      html += '<div class="tbl-wrap" style="margin-top:8px"><table class="tbl tiny"><thead><tr>' +
+        '<th>Employee</th><th>ESIC no</th><th>Month</th><th>Amount</th><th>Challan</th><th>Paid on</th><th>Status</th></tr></thead><tbody>' +
+        preview.map(function (r) {
+          return '<tr' + (r._issue ? ' style="background:var(--red-bg,#fff5f5)"' : '') + '>' +
+            '<td><span class="t-strong">' + kvEsc(r.workerName || '—') + '</span>' +
+              '<div class="t-mute mono" style="font-size:0.7rem">' + kvEsc(r.employeeId || '—') + '</div></td>' +
+            '<td class="mono">' + kvEsc(r.esiNumber || '—') + '</td>' +
+            '<td class="mono">' + kvEsc(r.month || '—') + '</td>' +
+            '<td class="mono">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
+            '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
+            '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
+            '<td>' + (r._issue ? '<span class="pill red tiny" title="' + kvEsc(r._issue) + '">' + kvEsc(r._issue) + '</span>' : esicStatusPill(r.status)) + '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        (rows.length > preview.length ? '<div class="tiny muted" style="margin-top:4px">Showing first ' + preview.length + ' of ' + rows.length + ' — all ready rows are uploaded.</div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">' +
+          '<button class="btn primary tiny"' + (ok.length ? '' : ' disabled') +
+            ' onclick="esicUploadSend(\'' + kvEsc(c.id) + '\')">Upload ' + ok.length + ' row(s)</button>' +
+          '<button class="btn tiny" onclick="esicClearUpload()">Clear</button>' +
+          (bad.length ? '<span class="tiny muted">Rows flagged above are skipped — fix them in the file and re-upload.</span>' : '') +
+        '</div>';
+    }
+    /* provenance — which files this agency's ESIC record was actually built from */
+    var ups = ESIC_UP.uploads || [];
+    html += '<div class="card-h-title" style="font-size:0.8rem;margin:14px 0 4px">Uploaded files</div>';
+    html += ups.length
+      ? '<div class="tbl-wrap"><table class="tbl tiny"><thead><tr><th>File</th><th>Covering</th><th>Rows</th><th>Total</th><th>Uploaded</th></tr></thead><tbody>' +
+        ups.slice(0, 8).map(function (u) {
+          return '<tr><td><span class="t-strong">' + kvEsc(u.fileName) + '</span>' +
+              (u.fileSize ? '<div class="t-mute" style="font-size:0.7rem">' + esicFmtSize(u.fileSize) + '</div>' : '') + '</td>' +
+            '<td class="mono">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</td>' +
+            '<td class="mono">' + u.acceptedCount + (u.rejectedCount ? ' <span style="color:var(--red-dk)">(' + u.rejectedCount + ' skipped)</span>' : '') + '</td>' +
+            '<td class="mono">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</td>' +
+            '<td class="tiny">' + kvDateTime(u.uploadedAt) + '<div class="t-mute">by ' + kvEsc(u.uploadedBy || '—') + '</div></td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="tiny muted">No worker-level ESIC file uploaded for this agency yet.</div>';
+    return html + '</div>';
+  }
+
+  function esicUploadSend(contractorId) {
+    var c = ctByName(contractorId);
+    if (!c) return;
+    var ok = (ESIC_UP.rows || []).filter(function (r) { return !r._issue; })
+      .map(function (r) {
+        var o = {}; ESIC_COLS.forEach(function (k) { o[k] = r[k]; }); return o;
+      });
+    if (!ok.length) { toast('No valid rows to upload', 'red'); return; }
+    kvJson('/api/esic-contributions/upload', 'POST', {
+      contractorId: c.id, contractor: c.name, actorContractor: kvAgencyFirm() || undefined,
+      fileName: ESIC_UP.fileName, fileSize: ESIC_UP.fileSize, sheetName: ESIC_UP.sheetName,
+      rows: ok
+    }).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Upload failed', 'red'); return; }
+      toast('ESIC uploaded · ' + j.accepted + ' employee row(s) recorded from ' + ESIC_UP.fileName, 'green');
+      ESIC_UP.rows = []; ESIC_UP.fileName = ''; ESIC_UP.fileSize = 0;
+      epfRefreshAll();
+      if (typeof kvLoadHrInbox === 'function') kvLoadHrInbox(true);
+    }).catch(function (e) { toast('Upload failed: ' + e.message, 'red'); });
+  }
+  function esicLoadUploads(contractorName) {
+    return kvJson('/api/esic-uploads?contractor=' + encodeURIComponent(contractorName))
+      .then(function (j) { ESIC_UP.uploads = (j && j.uploads) || []; return ESIC_UP.uploads; })
+      .catch(function () { ESIC_UP.uploads = []; return []; });
+  }
+
   /* jump straight from the HR inbox to the contractor's payment tab */
   function epfOpenForContractor(id) {
     if (typeof nav === 'function') nav('vendor', (typeof kvNavEl === 'function' ? kvNavEl('vendor') : null));
@@ -21347,12 +21901,23 @@ function __kvOnReady(fn) {
   }
   /* every worker the register can be written for — onboarded captures first
      (they carry a category and an employer), then the OM roster */
+  /* The employee id for a payroll row. Stored on the row when the entry was
+     saved, but resolved from the worker pool as a fallback so rows written
+     before the field existed still show it rather than a blank column. */
+  function payEmployeeId(r) {
+    if (!r) return '';
+    if (r.employeeId) return r.employeeId;
+    var code = String(r.workerCode || '').toLowerCase();
+    if (!code) return '';
+    var w = payWorkerPool().find(function (x) { return String(x.code || '').toLowerCase() === code; });
+    return (w && w.employeeId) || '';
+  }
   function payWorkerPool() {
     var out = (typeof CAP_STATE !== 'undefined' ? (CAP_STATE.recent || []) : [])
       .filter(function (r) { return kvStatusOf(r) !== 'exited'; })
       .map(function (r) {
         return {
-          code: r.id, name: r.name, category: r.category || 'Unskilled',
+          code: r.id, employeeId: r.employeeId || '', name: r.name, category: r.category || 'Unskilled',
           type: r.type || 'contract', department: (r.employment || {}).dept || '',
           contractor: r.type === 'direct' ? 'Daikin (direct)' : ((r.employment || {}).contractor || ''),
           baseWage: payBaseFor(r)
@@ -21360,7 +21925,8 @@ function __kvOnReady(fn) {
       });
     (typeof OM_MAPPING !== 'undefined' ? OM_MAPPING : []).forEach(function (r) {
       out.push({
-        code: r.code, name: r.name, category: 'Semi-skilled', type: 'contract',
+        /* the OM roster's own code doubles as its employee id */
+        code: r.code, employeeId: r.code || '', name: r.name, category: 'Semi-skilled', type: 'contract',
         department: r.dept || '', contractor: 'OM Manpower', baseWage: PAY_BASE_BY_CATEGORY['Semi-skilled']
       });
     });
@@ -21425,11 +21991,14 @@ function __kvOnReady(fn) {
     }
     KVTABLE.set({
       key: 'pay', tbody: 'pay-body', count: 'pay-count', noun: 'entry', pager: 'pay-pagination',
-      pageSize: 12, cols: 10, rows: rows,
-      text: function (r) { return [r.workerName, r.workerCode, r.contractor, r.department, r.category].join(' '); },
+      pageSize: 12, cols: 11, rows: rows,
+      /* the employee id is searchable — it is the number an auditor or a payroll
+         query actually arrives with */
+      text: function (r) { return [r.workerName, r.workerCode, payEmployeeId(r), r.contractor, r.department, r.category].join(' '); },
       row: function (r) {
         return '<tr style="cursor:pointer" onclick="payOpenEntry(\'' + kvEsc(r.workerCode) + '\')">' +
           '<td class="t-strong">' + kvEsc(r.workerName) + '<div class="t-mute mono tiny">' + kvEsc(r.workerCode) + '</div></td>' +
+          '<td class="mono tiny">' + kvEsc(payEmployeeId(r) || '—') + '</td>' +
           '<td class="tiny">' + kvEsc(r.contractor || '—') + '</td>' +
           '<td class="mono tiny">' + kvMoney(r.baseWage) + '</td>' +
           '<td class="mono">' + kvNum(r.otHours) + ' h</td>' +
@@ -21553,6 +22122,9 @@ function __kvOnReady(fn) {
     var w = payWorkerPool().find(function (x) { return String(x.code) === String(f.workerCode); }) || {};
     kvJson('/api/payroll/monthly', 'POST', Object.assign({}, f, {
       workerName: w.name || f.workerCode, workerType: w.type || 'contract',
+      /* stamped onto the row so the register keeps the id it was filed under,
+         even if the worker record is later edited */
+      employeeId: w.employeeId || '',
       contractor: w.contractor || '', department: w.department || '', category: w.category || ''
     })).then(function (j) {
       if (!j || !j.ok) { toast((j && j.error) || 'Could not save the entry', 'red'); return; }
@@ -21579,11 +22151,11 @@ function __kvOnReady(fn) {
     });
   }
   function payExport() {
-    var headers = ['Month', 'Worker', 'Code', 'Employer', 'Category', 'Base wage', 'OT hours',
+    var headers = ['Month', 'Worker', 'Employee ID', 'Code', 'Employer', 'Category', 'Base wage', 'OT hours',
                    'Ordinary hourly', 'OT hourly @125%', 'OT amount', 'LOP days', 'LOP amount',
                    'Variable allowances', 'Allowance total', 'Gross wages', 'ESIC status', 'Recorded by', 'Recorded at'];
     var rows = PAY_STATE.rows.map(function (r) {
-      return [kvMonthLabel(r.month), r.workerName, r.workerCode, r.contractor, r.category,
+      return [kvMonthLabel(r.month), r.workerName, payEmployeeId(r), r.workerCode, r.contractor, r.category,
               r.baseWage, r.otHours, r.ordinaryHourly, r.otHourly, r.otAmount, r.lopDays, r.lopAmount,
               (r.allowances || []).map(function (a) { return a.label + ' ' + a.amount; }).join('; '),
               r.allowanceTotal, r.grossWages,

@@ -166,6 +166,28 @@ export default function SecEmpHome() {
             {' '}
             <div id="emp-travel-list" />
           </div>
+          {' '}
+          {/*  ESIC contributions · the worker's own payment history. ESIC is
+               deducted every month but the worker never sees where it went;
+               this is the per-employee record uploaded by the agency, one row
+               per month with the challan it was paid on.  */}
+          {' '}
+          <div className="card" id="emp-esic-card">
+            <div className="card-h">
+              <div>
+                <div className="card-h-title">Your ESIC contributions</div>
+                {' '}
+                <div className="card-h-sub" id="emp-esic-sub">
+                  Month by month — what was contributed, the challan it was paid on, and whether it has been paid
+                </div>
+              </div>
+              {' '}
+              <select id="emp-esic-year" className="sel" style={{ maxWidth: "130px", fontSize: "0.78rem" }}
+                onChange={(event) => { window.empEsicSetYear(event.currentTarget.value) }} />
+            </div>
+            {' '}
+            <div id="emp-esic-list" />
+          </div>
         </div>
         {' '}
         {/*  RIGHT · personal analytics + identity + actions  */}

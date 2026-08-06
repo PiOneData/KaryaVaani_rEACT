@@ -79,7 +79,17 @@ const COLLECTIONS = {
   /* CR-8 · licence-utilisation alerts raised when an agency's deployed
      headcount reaches its warning threshold (75% by default) of the CLRA
      licensed maximum, with the agency's notes appended to each alert */
-  licenceAlerts:       { table: 'licence_alerts',        kind: 'array', id: (r) => r.id }
+  licenceAlerts:       { table: 'licence_alerts',        kind: 'array', id: (r) => r.id },
+  /* ESIC at worker level · statutoryPayments above records what the agency paid
+     as ONE figure for the whole firm-month, which cannot answer "was MY ESIC
+     paid?". These two carry the per-employee breakdown:
+       esicUploads       — one row per Excel file submitted (the provenance:
+                           filename, size, who, when, how many rows landed)
+       esicContributions — one row per employee-month, each carrying the id of
+                           the upload it arrived on, so any figure a worker is
+                           shown can be traced back to the file it came from. */
+  esicUploads:         { table: 'esic_uploads',          kind: 'array', id: (r) => r.id },
+  esicContributions:   { table: 'esic_contributions',    kind: 'array', id: (r) => r.id }
 };
 const META_TABLE = 'store_meta';
 

@@ -792,6 +792,24 @@ export default function SecOnboarding() {
                 </div>
                 {' '}
                 <div className="g2" style={{ gap: "10px 14px" }}>
+                  {/*  Employee ID · the identifier the wage register, the ESIC
+                       upload and the statutory returns all key on. Captured at
+                       onboarding because assigning it later means the worker's
+                       first month cannot be reconciled against anything.  */}
+                  <div className="field">
+                    <label className="field-l">
+                      {"Employee ID "}
+                      <span className="cap-req">*</span>
+                    </label>
+                    {' '}
+                    <input className="input" id="cap-empid" placeholder="e.g. EMP-1001"
+                      onInput={(event) => { window.capSync() }} />
+                    {' '}
+                    <div className="tiny muted" style={{ marginTop: "3px" }}>
+                      Used by the wage register and the worker-level ESIC upload — keep it the same in both.
+                    </div>
+                  </div>
+                  {' '}
                   <div className="field cap-only-direct">
                     <label className="field-l">
                       {"Approved Position ID "}
@@ -911,9 +929,27 @@ export default function SecOnboarding() {
                   <div className="field">
                     <label className="field-l">Transport route</label>
                     {' '}
-                    <select className="sel" id="cap-route">
+                    <select className="sel" id="cap-route" onChange={(event) => { window.capPickRoute() }}>
                       <option value="">Select a route…</option>
                     </select>
+                  </div>
+                  {' '}
+                  {/*  Route number · a route carries exactly one, so once the
+                       route is chosen there is nothing to decide and the box is
+                       locked rather than offered as a choice. It becomes a real
+                       selector only if a route ever carries more than one.  */}
+                  <div className="field">
+                    <label className="field-l">Route number</label>
+                    {' '}
+                    <select className="sel" id="cap-routeno" style={{ display: "none" }}
+                      onChange={(event) => { window.capSync() }} />
+                    {' '}
+                    <input className="input" id="cap-routeno-fixed" readOnly disabled
+                      placeholder="Select a route first" />
+                    {' '}
+                    <div className="tiny muted" id="cap-routeno-note" style={{ marginTop: "3px" }}>
+                      Set automatically from the route — one route, one route number.
+                    </div>
                   </div>
                 </div>
               </div>
