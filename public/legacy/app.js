@@ -14081,22 +14081,8 @@ function __kvOnReady(fn) {
           '<div class="sd-mini-v" style="color:' + (pending ? 'var(--amber-dk)' : 'var(--ink-3)') + '">' + pending + '</div>' +
           '<div class="sd-mini-s">' + (pending ? 'raise with your employer' : 'nothing outstanding') + '</div></div>' +
       '</div>' +
-      '<div class="tbl-wrap"><table class="tbl tiny"><thead><tr>' +
-        '<th>Month</th><th>Paid on</th><th>Challan</th><th>Your share</th><th>Employer</th><th>Total</th><th>Status</th>' +
-      '</tr></thead><tbody>' +
-      rows.map(function (r) {
-        return '<tr>' +
-          '<td class="t-strong">' + kvEsc(kvMonthLabel ? kvMonthLabel(r.month) : r.month) + '</td>' +
-          '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
-          '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
-          '<td class="mono">' + (r.employeeContribution ? '₹' + Number(r.employeeContribution).toLocaleString('en-IN') : '—') + '</td>' +
-          '<td class="mono">' + (r.employerContribution ? '₹' + Number(r.employerContribution).toLocaleString('en-IN') : '—') + '</td>' +
-          '<td class="mono t-strong">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
-          '<td>' + esicStatusPill(r.status) + '</td>' +
-        '</tr>';
-      }).join('') +
-      '</tbody></table></div>' +
-      '<div class="tiny muted" style="margin-top:6px">Recorded by your employer from the ESIC portal return. ' +
+      esicHistoryTableHtml(rows, 'worker') +
+      '<div class="tiny muted" style="margin-top:8px;line-height:1.5">Recorded by your employer from the ESIC portal return. ' +
         'If a month is missing or marked pending, raise it with your employer or Plant HR.</div>';
   }
 
@@ -19326,7 +19312,13 @@ function __kvOnReady(fn) {
         { id: 'status', label: 'Status & access', html: kvStatusPanelHtml(rec, i) },
         { id: 'ident', label: 'Identification', html: identification },
         { id: 'documents', label: 'Documents', html: documents },
-        { id: 'compliance', label: 'Compliance', html: compliance }
+        { id: 'compliance', label: 'Compliance', html: compliance },
+        /* the per-worker ESIC record — filled in after the modal mounts, since
+           it is fetched per worker rather than shipped with the bootstrap */
+        { id: 'esic', label: 'ESIC', html:
+          '<div class="cap-hint" style="margin-bottom:10px">What was actually contributed for this worker, month by month, ' +
+          'from the agency\'s worker-level ESIC upload. This is the same record the worker sees on their own portal.</div>' +
+          '<div id="ob-esic-host"><div class="tiny muted">Loading ESIC contributions…</div></div>' }
       ],
       footer: '<div class="modal-footer-left"><span class="tiny muted">' + (rec.mobile ? 'Worker mobile ' + rec.mobile : '') + '</span></div>' +
         '<div class="modal-footer-right">' +
@@ -19338,6 +19330,7 @@ function __kvOnReady(fn) {
     });
     obLoadDocs(docKey);   // fill the documents list once the modal DOM exists
     kvLoadStatusHistory(rec);   // status & access tab · immutable change log
+    esicRenderWorkerHistory('ob-esic-host', rec);   // ESIC tab · per-worker contributions
   }
 
   /* ── worker documents · upload / list / view / delete (stored in DB) ───── */
@@ -21415,17 +21408,11 @@ function __kvOnReady(fn) {
   function esicUploadPanelReadOnlyHtml() {
     var ups = ESIC_UP.uploads || [];
     if (!ups.length) return '';
-    return '<div class="card" style="margin:12px 0;padding:12px">' +
-      '<div class="card-h-title" style="font-size:0.85rem">ESIC · worker level</div>' +
-      '<div class="card-h-sub" style="margin-bottom:6px">Files this agency\'s per-employee ESIC record was built from.</div>' +
-      '<div class="tbl-wrap"><table class="tbl tiny"><thead><tr><th>File</th><th>Covering</th><th>Rows</th><th>Total</th><th>Uploaded</th></tr></thead><tbody>' +
-      ups.slice(0, 8).map(function (u) {
-        return '<tr><td class="t-strong">' + kvEsc(u.fileName) + '</td>' +
-          '<td class="mono">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</td>' +
-          '<td class="mono">' + u.acceptedCount + '</td>' +
-          '<td class="mono">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</td>' +
-          '<td class="tiny">' + kvDateTime(u.uploadedAt) + '</td></tr>';
-      }).join('') + '</tbody></table></div></div>';
+    return '<div class="card" style="margin:16px 0;padding:16px">' +
+      '<div class="card-h-title" style="font-size:0.88rem">ESIC · worker level</div>' +
+      '<div class="card-h-sub" style="margin-top:4px">Files this agency\'s per-employee ESIC record was built from.</div>' +
+      esicUploadsTableHtml(ups) +
+    '</div>';
   }
   function epfSubmit(contractorId) {
     var c = ctByName(contractorId);
@@ -21672,6 +21659,127 @@ function __kvOnReady(fn) {
     return '<span class="pill ' + cls + ' tiny">' + kvEsc(v) + '</span>';
   }
 
+  /* Scroll wrapper for every table in this module. The app's table styling is
+     `table.t` — an earlier version of this panel used `.tbl`, which does not
+     exist in the stylesheet, so the tables rendered with browser defaults: no
+     cell padding, no header rule, nothing aligned. */
+  function esicTable(headers, bodyHtml) {
+    return '<div style="overflow-x:auto;margin-top:10px">' +
+      '<table class="t"><thead><tr>' +
+        headers.map(function (h) { return '<th' + (h.align ? ' style="text-align:' + h.align + '"' : '') + '>' + h.label + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + bodyHtml + '</tbody></table></div>';
+  }
+  /* One ESIC history table, used by the worker's own view and by the ESIC tab
+     on the worker record HR and the agency open. `audience` only changes the
+     column wording ("Your share" vs "Employee share") — never the figures. */
+  function esicHistoryTableHtml(rows, audience) {
+    var mine = audience === 'worker';
+    return esicTable(
+      [{ label: 'Month' }, { label: 'Paid on' }, { label: 'Challan' },
+       { label: mine ? 'Your share' : 'Employee share', align: 'right' },
+       { label: 'Employer share', align: 'right' },
+       { label: 'Total', align: 'right' }, { label: 'Status' }],
+      rows.map(function (r) {
+        return '<tr>' +
+          '<td class="t-strong">' + kvEsc(kvMonthLabel(r.month)) + '</td>' +
+          '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
+          '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
+          '<td class="mono" style="text-align:right">' + (r.employeeContribution ? '₹' + Number(r.employeeContribution).toLocaleString('en-IN') : '—') + '</td>' +
+          '<td class="mono" style="text-align:right">' + (r.employerContribution ? '₹' + Number(r.employerContribution).toLocaleString('en-IN') : '—') + '</td>' +
+          '<td class="mono t-strong" style="text-align:right">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
+          '<td>' + esicStatusPill(r.status) + '</td>' +
+        '</tr>';
+      }).join('')
+    );
+  }
+
+  /* ── A single worker's ESIC history, for HR and the agency ───────────────
+     The worker sees this on their own portal. HR and the agency need the same
+     answer about a worker they are looking at — "has this person's ESIC
+     actually been paid, and on which challan?" — so it hangs off the worker
+     record as its own tab rather than living only on the worker's login.
+     ──────────────────────────────────────────────────────────────────────── */
+  function esicWorkerKeysFor(rec) {
+    if (!rec) return [];
+    var keys = [rec.employeeId, rec.id, rec.esi].filter(Boolean);
+    return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
+  }
+  function esicRenderWorkerHistory(hostId, rec) {
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    var keys = esicWorkerKeysFor(rec);
+    if (!keys.length) {
+      host.innerHTML = '<div class="note amber" style="font-size:0.76rem">This worker has no Employee ID or ESIC number on record, ' +
+        'so no ESIC contribution can be matched to them. Add one on the Identification tab.</div>';
+      return;
+    }
+    host.innerHTML = '<div class="tiny muted">Loading ESIC contributions…</div>';
+    Promise.all(keys.map(function (k) {
+      return kvJson('/api/esic-contributions?worker=' + encodeURIComponent(k))
+        .then(function (j) { return (j && j.contributions) || []; })
+        .catch(function () { return []; });
+    })).then(function (lists) {
+      var seen = {}, merged = [];
+      lists.forEach(function (list) {
+        list.forEach(function (r) { if (!seen[r.id]) { seen[r.id] = 1; merged.push(r); } });
+      });
+      merged.sort(function (a, b) { return String(b.month).localeCompare(String(a.month)); });
+      if (!merged.length) {
+        host.innerHTML = '<div class="note indigo" style="font-size:0.76rem">' +
+          'No worker-level ESIC contribution has been uploaded for <strong>' + kvEsc(rec.name) + '</strong> yet' +
+          (rec.employeeId ? ' (employee id <span class="mono">' + kvEsc(rec.employeeId) + '</span>)' : '') + '. ' +
+          'The agency uploads these from the <strong>ESIC · worker level</strong> panel on its EPF/ESIC page.</div>';
+        return;
+      }
+      var total = merged.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
+      var paid = merged.filter(function (r) { return (r.status || 'paid') === 'paid'; }).length;
+      var pending = merged.filter(function (r) { return r.status === 'pending'; }).length;
+      var years = {};
+      merged.forEach(function (r) { years[String(r.month).slice(0, 4)] = 1; });
+      host.innerHTML =
+        '<div class="sd-mini-grid">' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Months on record</div>' +
+            '<div class="sd-mini-v">' + merged.length + '</div>' +
+            '<div class="sd-mini-s">' + Object.keys(years).sort().join(', ') + '</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Total contributed</div>' +
+            '<div class="sd-mini-v">₹' + total.toLocaleString('en-IN') + '</div>' +
+            '<div class="sd-mini-s">employee + employer</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Paid</div>' +
+            '<div class="sd-mini-v" style="color:var(--green-dk)">' + paid + '</div>' +
+            '<div class="sd-mini-s">of ' + merged.length + ' months</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Pending</div>' +
+            '<div class="sd-mini-v" style="color:' + (pending ? 'var(--amber-dk)' : 'var(--ink-3)') + '">' + pending + '</div>' +
+            '<div class="sd-mini-s">' + (pending ? 'not yet paid' : 'nothing outstanding') + '</div></div>' +
+        '</div>' +
+        esicHistoryTableHtml(merged, 'hr') +
+        '<div class="tiny muted" style="margin-top:8px;line-height:1.5">Matched on ' +
+          keys.map(function (k) { return '<span class="mono">' + kvEsc(k) + '</span>'; }).join(' / ') +
+          '. Uploaded by the agency from its ESIC portal return — the same rows this worker sees on their own portal.</div>';
+    });
+  }
+
+  /* the uploaded-files table, shared by the editable and read-only panels */
+  function esicUploadsTableHtml(ups) {
+    if (!ups || !ups.length) {
+      return '<div class="tiny muted" style="margin-top:8px">No worker-level ESIC file uploaded for this agency yet.</div>';
+    }
+    return esicTable(
+      [{ label: 'File' }, { label: 'Covering' }, { label: 'Employees', align: 'right' },
+       { label: 'Total', align: 'right' }, { label: 'Uploaded' }],
+      ups.slice(0, 8).map(function (u) {
+        return '<tr>' +
+          '<td><span class="t-strong">' + kvEsc(u.fileName) + '</span>' +
+            (u.fileSize ? '<div class="t-mute">' + esicFmtSize(u.fileSize) + '</div>' : '') + '</td>' +
+          '<td class="mono">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</td>' +
+          '<td class="mono" style="text-align:right">' + u.acceptedCount +
+            (u.rejectedCount ? '<div class="t-mute" style="color:var(--red-dk)">' + u.rejectedCount + ' skipped</div>' : '') + '</td>' +
+          '<td class="mono" style="text-align:right">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</td>' +
+          '<td>' + kvDateTime(u.uploadedAt) + '<div class="t-mute">by ' + kvEsc(u.uploadedBy || '—') + '</div></td>' +
+        '</tr>';
+      }).join('')
+    );
+  }
+
   /* the upload panel, rendered inside the EPF/ESIC card for whoever may submit */
   function esicUploadPanelHtml(c) {
     var rows = ESIC_UP.rows || [];
@@ -21679,12 +21787,16 @@ function __kvOnReady(fn) {
     var bad = rows.filter(function (r) { return r._issue; });
     var total = ok.reduce(function (n, r) { return n + Number(r.amount || 0); }, 0);
     var html =
-      '<div class="card" style="margin:12px 0;padding:12px">' +
-        '<div class="card-h" style="padding:0">' +
-          '<div><div class="card-h-title" style="font-size:0.85rem">ESIC · worker level</div>' +
-          '<div class="card-h-sub">One row per employee per month, uploaded as Excel. The firm-month figure above proves a payment was made; ' +
-          'this is what lets an individual worker see that <strong>their</strong> ESIC was paid.</div></div>' +
-          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+      '<div class="card" style="margin:16px 0;padding:16px">' +
+        /* header: title + intent on the left, the two actions on the right */
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
+          '<div style="flex:1 1 320px;min-width:0">' +
+            '<div class="card-h-title" style="font-size:0.88rem">ESIC · worker level</div>' +
+            '<div class="card-h-sub" style="margin-top:4px;line-height:1.5">One row per employee per month, uploaded as Excel. ' +
+            'The firm-month figure above proves a payment was made; this is what lets an individual worker see that ' +
+            '<strong>their</strong> ESIC was paid.</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">' +
             '<button class="btn tiny" onclick="esicDownloadTemplate()">⬇ Template</button>' +
             '<button class="btn tiny primary" onclick="document.getElementById(\'esic-up-input\').click()">Choose file…</button>' +
           '</div>' +
@@ -21692,54 +21804,56 @@ function __kvOnReady(fn) {
         '<input type="file" id="esic-up-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="esicPickFile(event)">';
 
     if (ESIC_UP.fileName) {
-      html += '<div class="note ' + (bad.length ? 'amber' : 'green') + '" style="font-size:0.74rem;margin-top:10px">' +
-        '<strong>📄 ' + kvEsc(ESIC_UP.fileName) + '</strong>' +
-        (ESIC_UP.fileSize ? ' · ' + esicFmtSize(ESIC_UP.fileSize) : '') +
-        (ESIC_UP.sheetName ? ' · sheet “' + kvEsc(ESIC_UP.sheetName) + '”' : '') +
-        ' · ' + rows.length + ' row(s) read · <strong>' + ok.length + '</strong> ready' +
-        (bad.length ? ' · <strong>' + bad.length + '</strong> will be skipped' : '') +
-        (total ? ' · ₹' + total.toLocaleString('en-IN') + ' total' : '') +
-        '</div>';
+      /* the file being staged — name on its own line, the counts beneath it,
+         so a long filename cannot push the numbers out of view */
+      html += '<div class="note ' + (bad.length ? 'amber' : 'green') + '" style="margin-top:14px">' +
+        '<div style="font-size:0.8rem;word-break:break-all"><strong>📄 ' + kvEsc(ESIC_UP.fileName) + '</strong></div>' +
+        '<div class="tiny" style="margin-top:5px;line-height:1.6">' +
+          [(ESIC_UP.fileSize ? esicFmtSize(ESIC_UP.fileSize) : ''),
+           (ESIC_UP.sheetName ? 'sheet “' + kvEsc(ESIC_UP.sheetName) + '”' : ''),
+           rows.length + ' row' + (rows.length === 1 ? '' : 's') + ' read',
+           '<strong>' + ok.length + '</strong> ready to upload',
+           (bad.length ? '<strong>' + bad.length + '</strong> will be skipped' : ''),
+           (total ? '₹' + total.toLocaleString('en-IN') + ' total' : '')
+          ].filter(Boolean).join(' &nbsp;·&nbsp; ') +
+        '</div>' +
+      '</div>';
     }
     if (rows.length) {
       var preview = rows.slice(0, 12);
-      html += '<div class="tbl-wrap" style="margin-top:8px"><table class="tbl tiny"><thead><tr>' +
-        '<th>Employee</th><th>ESIC no</th><th>Month</th><th>Amount</th><th>Challan</th><th>Paid on</th><th>Status</th></tr></thead><tbody>' +
+      html += esicTable(
+        [{ label: 'Employee' }, { label: 'ESIC no' }, { label: 'Month' },
+         { label: 'Amount', align: 'right' }, { label: 'Challan' }, { label: 'Paid on' }, { label: 'Status' }],
         preview.map(function (r) {
-          return '<tr' + (r._issue ? ' style="background:var(--red-bg,#fff5f5)"' : '') + '>' +
+          return '<tr' + (r._issue ? ' style="background:var(--red-soft)"' : '') + '>' +
             '<td><span class="t-strong">' + kvEsc(r.workerName || '—') + '</span>' +
-              '<div class="t-mute mono" style="font-size:0.7rem">' + kvEsc(r.employeeId || '—') + '</div></td>' +
+              '<div class="t-mute mono">' + kvEsc(r.employeeId || '—') + '</div></td>' +
             '<td class="mono">' + kvEsc(r.esiNumber || '—') + '</td>' +
             '<td class="mono">' + kvEsc(r.month || '—') + '</td>' +
-            '<td class="mono">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
+            '<td class="mono" style="text-align:right">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
             '<td class="mono">' + kvEsc(r.challanNo || '—') + '</td>' +
             '<td class="mono">' + kvEsc(r.paidOn || '—') + '</td>' +
             '<td>' + (r._issue ? '<span class="pill red tiny" title="' + kvEsc(r._issue) + '">' + kvEsc(r._issue) + '</span>' : esicStatusPill(r.status)) + '</td>' +
           '</tr>';
-        }).join('') +
-        '</tbody></table></div>' +
-        (rows.length > preview.length ? '<div class="tiny muted" style="margin-top:4px">Showing first ' + preview.length + ' of ' + rows.length + ' — all ready rows are uploaded.</div>' : '') +
-        '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">' +
-          '<button class="btn primary tiny"' + (ok.length ? '' : ' disabled') +
-            ' onclick="esicUploadSend(\'' + kvEsc(c.id) + '\')">Upload ' + ok.length + ' row(s)</button>' +
-          '<button class="btn tiny" onclick="esicClearUpload()">Clear</button>' +
-          (bad.length ? '<span class="tiny muted">Rows flagged above are skipped — fix them in the file and re-upload.</span>' : '') +
+        }).join('')
+      );
+      if (rows.length > preview.length) {
+        html += '<div class="tiny muted" style="margin-top:6px">Showing the first ' + preview.length + ' of ' + rows.length +
+          ' — every ready row is uploaded, not just those shown.</div>';
+      }
+      html += '<div style="display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
+          '<button class="btn primary"' + (ok.length ? '' : ' disabled') +
+            ' onclick="esicUploadSend(\'' + kvEsc(c.id) + '\')">Upload ' + ok.length + ' row' + (ok.length === 1 ? '' : 's') + '</button>' +
+          '<button class="btn" onclick="esicClearUpload()">Clear</button>' +
+          (bad.length ? '<span class="tiny muted" style="flex:1 1 220px">Flagged rows are skipped — correct them in the file and upload again.</span>' : '') +
         '</div>';
     }
     /* provenance — which files this agency's ESIC record was actually built from */
-    var ups = ESIC_UP.uploads || [];
-    html += '<div class="card-h-title" style="font-size:0.8rem;margin:14px 0 4px">Uploaded files</div>';
-    html += ups.length
-      ? '<div class="tbl-wrap"><table class="tbl tiny"><thead><tr><th>File</th><th>Covering</th><th>Rows</th><th>Total</th><th>Uploaded</th></tr></thead><tbody>' +
-        ups.slice(0, 8).map(function (u) {
-          return '<tr><td><span class="t-strong">' + kvEsc(u.fileName) + '</span>' +
-              (u.fileSize ? '<div class="t-mute" style="font-size:0.7rem">' + esicFmtSize(u.fileSize) + '</div>' : '') + '</td>' +
-            '<td class="mono">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</td>' +
-            '<td class="mono">' + u.acceptedCount + (u.rejectedCount ? ' <span style="color:var(--red-dk)">(' + u.rejectedCount + ' skipped)</span>' : '') + '</td>' +
-            '<td class="mono">₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + '</td>' +
-            '<td class="tiny">' + kvDateTime(u.uploadedAt) + '<div class="t-mute">by ' + kvEsc(u.uploadedBy || '—') + '</div></td></tr>';
-        }).join('') + '</tbody></table></div>'
-      : '<div class="tiny muted">No worker-level ESIC file uploaded for this agency yet.</div>';
+    html += '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--line)">' +
+      '<div class="card-h-title" style="font-size:0.82rem">Uploaded files</div>' +
+      '<div class="card-h-sub">Every worker-level figure on this agency traces back to one of these.</div>' +
+      esicUploadsTableHtml(ESIC_UP.uploads) +
+    '</div>';
     return html + '</div>';
   }
 
