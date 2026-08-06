@@ -15492,14 +15492,21 @@ function __kvOnReady(fn) {
     CAP_STATE.recent.unshift(rec);
     capRenderRecent();
     if (typeof obRenderDirectory === 'function') obRenderDirectory();
-    toast('Profile saved · confirmation link sent to ' + name + ' on WhatsApp (' + capLangName() + ')', 'green');
+    /* NOTE: no success message here. The row is added optimistically so the UI
+       stays responsive, but the save is not confirmed until the server accepts
+       it — and the server is the only party that can enforce the CLRA ceiling
+       against the true deployed headcount. Announcing "saved" before that reply
+       is what let a licence-blocked onboarding look like it had succeeded. */
 
-    /* record the night-shift transport consent (OSHC Rule 83) as the single
-       source of truth, so it shows on the transport board + employee detail. */
-    fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: wid, name: name, consented: getC('cap-nightconsent'), method: 'onboarding', by: (window.__KVUSER && window.__KVUSER.name) || 'HR' })
-    }).catch(function () {});
+    /* the night-shift transport consent (OSHC Rule 83) is written once the
+       worker exists — recording a consent for a worker the server refused
+       would leave a statutory record with nobody behind it */
+    const capWriteConsent = function () {
+      fetch((window.__KV_API_BASE || '') + '/api/transport/consent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: wid, name: name, consented: getC('cap-nightconsent'), method: 'onboarding', by: (window.__KVUSER && window.__KVUSER.name) || 'HR' })
+      }).catch(function () {});
+    };
 
     /* persist the full onboarding profile to the backend (Aadhaar privacy-gated) */
     fetch((window.__KV_API_BASE || '') + '/api/onboarding-captures', {
@@ -15510,6 +15517,17 @@ function __kvOnReady(fn) {
         if (j && j.ok && j.capture) {
           rec.backendId = j.capture.id;
           rec.createdAt = j.capture.createdAt || rec.createdAt;
+          capWriteConsent();
+          /* confirmed by the server — only now is it true */
+          toast('Profile saved · confirmation link sent to ' + name + ' on WhatsApp (' + capLangName() + ')', 'green');
+          /* the confirmation link goes out only once the worker actually exists.
+             Sending it alongside the request meant a worker rejected at the
+             CLRA ceiling still received "please confirm your profile". */
+          if (window.KVWhatsApp && mobile) {
+            window.KVWhatsApp.send(mobile,
+              'Namaste ' + name + ', please confirm your Karya Vaani worker profile: ' +
+              'https://karyavaani.app/confirm/' + wid);
+          }
           /* CR-8a · this onboarding may have taken the agency past its licence
              warning threshold — the server says where it now stands */
           if (j.licence && typeof licAfterOnboarding === 'function') licAfterOnboarding(j.licence);
@@ -15527,23 +15545,42 @@ function __kvOnReady(fn) {
             }).catch(function () {});
           });
         } else if (j && j.error) {
-          // backend rejected the save (e.g. duplicate mobile) — roll back the
-          // optimistically-added record so the UI matches the DB.
+          // backend rejected the save (e.g. duplicate mobile, or the CLRA
+          // licence ceiling) — roll back the optimistically-added record so the
+          // UI matches the DB.
           const ix = CAP_STATE.recent.indexOf(rec);
           if (ix !== -1) CAP_STATE.recent.splice(ix, 1);
           capRenderRecent();
           if (typeof obRenderDirectory === 'function') obRenderDirectory();
-          toast(j.error, 'red');
+          if (j.code === 'CLRA_CEILING') {
+            /* the statutory block gets a modal with the numbers, not a toast:
+               it is the one rejection that means "this cannot be done at all"
+               rather than "fix a field and retry" */
+            capShowCeilingBlock(j);
+            if (typeof capLicenceSync === 'function') capLicenceSync();
+          } else {
+            toast(j.error, 'red');
+          }
+        } else {
+          /* an unparseable or empty reply is still a failed save — do not leave
+             a row on screen that is not in the database */
+          const ix2 = CAP_STATE.recent.indexOf(rec);
+          if (ix2 !== -1) CAP_STATE.recent.splice(ix2, 1);
+          capRenderRecent();
+          if (typeof obRenderDirectory === 'function') obRenderDirectory();
+          toast('The server did not confirm this save — the worker was not onboarded. Try again.', 'red');
         }
       })
-      .catch(function () { /* offline — kept in session */ });
+      .catch(function () {
+        /* network failure — the row is not in the database, so it must not be
+           left looking as though it is */
+        const ix = CAP_STATE.recent.indexOf(rec);
+        if (ix !== -1) CAP_STATE.recent.splice(ix, 1);
+        capRenderRecent();
+        if (typeof obRenderDirectory === 'function') obRenderDirectory();
+        toast('Could not reach the server — this worker was not onboarded. Check the connection and try again.', 'red');
+      });
 
-    /* real WhatsApp confirmation link via the communication gateway */
-    if (window.KVWhatsApp && mobile) {
-      window.KVWhatsApp.send(mobile,
-        'Namaste ' + name + ', please confirm your Karya Vaani worker profile: ' +
-        'https://karyavaani.app/confirm/' + wid);
-    }
     CAP_STATE.aadhaarVerified = false;
     CAP_STATE.panVerified = false;
     CAP_STATE.docs = [];
@@ -20893,14 +20930,38 @@ function __kvOnReady(fn) {
   }
 
   /* live headroom note under the contractor picker on the capture form */
+  /* Disable the save button while the selected agency is at its ceiling, so the
+     block is visible BEFORE the form is filled in rather than arriving as a
+     rejection afterwards. Re-enabled for every other state — including a
+     contractor with no ceiling on record, which is not a block. */
+  function capSetSaveBlocked(blocked, why) {
+    var btn = document.getElementById('cap-save-btn');
+    if (!btn) return;
+    btn.disabled = !!blocked;
+    btn.classList.toggle('disabled', !!blocked);
+    btn.title = blocked ? (why || 'Blocked by the CLRA licence ceiling') : '';
+    btn.textContent = blocked ? 'Blocked · CLRA licence ceiling reached' : 'Save & send confirmation link';
+  }
   function capLicenceSync() {
     var host = document.getElementById('cap-licence-note');
     if (!host) return;
-    if (CAP_STATE.type !== 'contract') { host.innerHTML = ''; return; }
+    if (CAP_STATE.type !== 'contract') { host.innerHTML = ''; capSetSaveBlocked(false); return; }
     var name = (document.getElementById('cap-contractor') || {}).value || '';
-    if (!name) { host.innerHTML = '<div class="tiny muted">Select the vendor to see its CLRA licence headroom.</div>'; return; }
+    if (!name) {
+      host.innerHTML = '<div class="tiny muted">Select the vendor to see its CLRA licence headroom.</div>';
+      capSetSaveBlocked(false); return;
+    }
     var st = ctLicenceState(name);
-    if (!st) { host.innerHTML = ''; return; }
+    if (!st) {
+      /* the picked vendor has no contractor record, so no ceiling can be
+         checked — say so rather than leaving the field silently unvalidated */
+      host.innerHTML = '<div class="note amber" style="font-size:0.74rem">No contractor record found for ' + kvEsc(name) +
+        ', so its CLRA licence ceiling cannot be checked. Ask HR to add the vendor before onboarding against it.</div>';
+      capSetSaveBlocked(false); return;
+    }
+    capSetSaveBlocked(!!st.blocked, st.blocked
+      ? st.contractorName + ' is at its CLRA licensed headcount (' + st.used + ' of ' + st.max + ')'
+      : '');
     var lines = '';
     if (st.max === null) {
       lines += '<div class="note amber" style="font-size:0.74rem">No CLRA licence ceiling recorded for ' + kvEsc(st.contractorName) +
@@ -20943,13 +21004,68 @@ function __kvOnReady(fn) {
      Returns true when onboarding may proceed. */
   function capLicenceAllows(contractorName, adding) {
     var st = ctLicenceState(contractorName);
-    if (!st || st.max === null) return true;
-    if (st.used + (adding || 1) > st.max) {
+    /* No contractor record, or no ceiling recorded against it — nothing to
+       enforce here. Say so rather than passing silently: an unchecked
+       onboarding is the case most worth being told about, and the server still
+       has the final word. */
+    if (!st) {
+      toast('No contractor record for “' + contractorName + '” — its CLRA ceiling could not be checked.', 'amber');
+      return true;
+    }
+    if (st.max === null) {
+      toast('No CLRA licence ceiling on record for ' + st.contractorName + ' — onboarding is not being checked against one.', 'amber');
+      return true;
+    }
+    var n = adding || 1;
+    if (st.used + n > st.max) {
       toast('CLRA licence ceiling · ' + st.contractorName + ' is licensed for ' + st.max +
-            ' workers and has ' + st.used + ' deployed. Onboarding is blocked until the licence is amended.', 'red');
+            ' workers and has ' + st.used + ' deployed' +
+            (n > 1 ? ', so ' + n + ' more cannot be added' : '') +
+            '. Onboarding is blocked until the licence is amended.', 'red');
       return false;
     }
     return true;
+  }
+  /* The ceiling rejection the SERVER returns (HTTP 409 · CLRA_CEILING).
+     The client pre-check runs against whatever this browser has loaded, which
+     can trail the server — another HR user onboarding at the same time, or a
+     session opened before the last few captures landed. So the server's word is
+     the one that decides, and when it says no it has to be as visible as the
+     pre-check would have been: a modal, not a toast that scrolls away under an
+     optimistic "saved" message. */
+  function capShowCeilingBlock(j) {
+    var st = (j && j.licence) || null;
+    var msg = (j && j.error) || 'This onboarding would breach the agency’s CLRA licensed headcount.';
+    if (st && typeof licRefreshSurfaces === 'function') {
+      /* pull every ceiling surface back in line with what the server just said */
+      if (typeof licLoadAlerts === 'function') licLoadAlerts({ quiet: true }).then(licRefreshSurfaces);
+      else licRefreshSurfaces();
+    }
+    if (typeof omModal === 'function') {
+      omModal(
+        '<div class="modal-h"><div class="modal-h-left">' +
+          '<span class="modal-h-eye">Blocked · CLRA licensed headcount</span>' +
+          '<span class="modal-h-title">' + kvEsc(st ? st.contractorName : 'Licence ceiling reached') + '</span></div>' +
+          '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+        '<div class="modal-body">' +
+          '<div class="note red" style="font-size:0.78rem">' + kvEsc(msg) + '</div>' +
+          (st ? '<div class="sd-mini-grid" style="margin-top:12px">' +
+            '<div class="sd-mini"><div class="sd-mini-eye">Deployed</div><div class="sd-mini-v">' + st.used + '</div>' +
+              '<div class="sd-mini-s">' + st.base + ' on roster + ' + st.onboarded + ' onboarded</div></div>' +
+            '<div class="sd-mini"><div class="sd-mini-eye">Licensed cap</div><div class="sd-mini-v">' + st.max + '</div>' +
+              '<div class="sd-mini-s">statutory · enforced</div></div>' +
+            '<div class="sd-mini"><div class="sd-mini-eye">Places left</div>' +
+              '<div class="sd-mini-v" style="color:var(--red-dk)">' + Math.max(0, st.headroom) + '</div>' +
+              '<div class="sd-mini-s">onboarding stops here</div></div>' +
+          '</div>' + (typeof ctLicenceBar === 'function' ? ctLicenceBar(st) : '') : '') +
+          '<div class="tiny muted" style="margin-top:12px">This worker was <strong>not</strong> saved. ' +
+            'The agency must have its CLRA licence amended, and Plant HR must record the new licensed headcount, ' +
+            'before another worker can be onboarded under it.</div>' +
+        '</div>' +
+        '<div class="modal-footer"><div class="modal-footer-right">' +
+          '<button class="btn" onclick="omCloseModal()">Close</button></div></div>', 620);
+    }
+    toast(msg, 'red');
   }
 
   /* HR-only licence editor — an agency must never be able to raise the number

@@ -1123,7 +1123,10 @@ export default function SecOnboarding() {
                 <div className="cap-action-r">
                   <button className="btn" onClick={(event) => { window.capReset() }} data-onclick="capReset()">Clear</button>
                   {' '}
-                  <button className="btn primary" onClick={(event) => { window.capSubmit() }} data-onclick="capSubmit()">
+                  {/*  disabled by capLicenceSync() while the selected agency is
+                       at its CLRA ceiling — the block is shown before the form
+                       is filled in, not after it is submitted  */}
+                  <button className="btn primary" id="cap-save-btn" onClick={(event) => { window.capSubmit() }} data-onclick="capSubmit()">
                     Save & send confirmation link
                   </button>
                 </div>
