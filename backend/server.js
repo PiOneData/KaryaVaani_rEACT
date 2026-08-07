@@ -2552,7 +2552,18 @@ function contribGetUploads(req, res) {
                               String(u.contractorId || '').toLowerCase() === k);
   }
   list.sort((a, b) => String(b.uploadedAt).localeCompare(String(a.uploadedAt)));
-  res.json({ ok: true, uploads: list });
+  /* How many of this file's rows are STILL the ones in force. Re-uploading a
+     month moves its rows onto the new file, which leaves the old one with none
+     — superseded, not outstanding. Without this an obsolete file sits in HR's
+     verification queue for ever, asking to be verified when the figures it
+     carried are no longer the record. */
+  const live = {};
+  contribList(store).forEach((r) => { live[r.uploadId] = (live[r.uploadId] || 0) + 1; });
+  const out = list.map((u) => Object.assign({}, u, {
+    activeRows: live[u.id] || 0,
+    superseded: (live[u.id] || 0) === 0
+  }));
+  res.json({ ok: true, uploads: out });
 }
 
 function contribPostUpload(req, res) {

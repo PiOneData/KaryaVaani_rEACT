@@ -21394,7 +21394,10 @@ function __kvOnReady(fn) {
         ? rows.map(function (r) { return epfRowHtml(r, st, c, canVerify); }).join('')
         : '<div class="note amber" style="font-size:0.76rem">No EPF/ESIC payment has been submitted for ' + kvEsc(c.name) +
           '. Until a submission is verified against the deployed headcount, the principal employer holds an undischarged joint liability for this agency.</div>';
-      host.innerHTML = head + summary + (canSubmit ? epfSubmitFormHtml(c, st) : '') +
+      /* the verification queue goes ABOVE everything the agency submits — it is
+         the action HR opens this page to take */
+      host.innerHTML = head + contribVerifyQueueHtml() + summary +
+        (canSubmit ? epfSubmitFormHtml(c, st) : '') +
         contribPanelsHtml(c, canSubmit) + list;
     });
   }
@@ -21740,15 +21743,15 @@ function __kvOnReady(fn) {
     return '<span class="pill ' + cls + ' tiny">' + kvEsc(v) + '</span>';
   }
   var CONTRIB_VERDICTS = {
-    full:    { label: 'Verified · fully paid', cls: 'green' },
-    partial: { label: 'Verified · partly paid', cls: 'amber' },
-    none:    { label: 'Verified · not paid', cls: 'red' }
+    full:    { label: '✓ Verified · fully paid', short: 'verified', cls: 'green' },
+    partial: { label: '✓ Verified · partly paid', short: 'partly paid', cls: 'amber' },
+    none:    { label: '✓ Verified · not paid', short: 'not paid', cls: 'red' }
   };
   function contribVerdictPill(u) {
     var v = u && u.verification;
-    if (!v || !v.status) return '<span class="pill amber tiny" title="Uploaded but not yet checked by Plant HR — an unverified upload is not evidence of payment">Awaiting HR verification</span>';
+    if (!v || !v.status) return '<span class="pill amber tiny" title="Uploaded but not yet checked by Plant HR — an unverified upload is not evidence of payment">⧗ Awaiting HR verification</span>';
     var m = CONTRIB_VERDICTS[v.status] || CONTRIB_VERDICTS.partial;
-    return '<span class="pill ' + m.cls + ' tiny" title="' + kvEsc(v.note || m.label) + ' — ' + kvEsc(v.by || '') + '">' + m.label + '</span>';
+    return '<span class="pill ' + m.cls + ' tiny" title="' + kvEsc(v.note || m.label) + ' — verified by ' + kvEsc(v.by || '') + '">' + m.label + '</span>';
   }
   /* the money-vs-formula line, shown wherever an upload is listed */
   function contribReconcileNote(u) {
@@ -21875,6 +21878,91 @@ function __kvOnReady(fn) {
     });
   }
 
+  /* ── HR's verification queue ─────────────────────────────────────────────
+     The per-file Verify button sits in the last column of the uploads table,
+     which scrolls horizontally — on a normal viewport it is off-screen, so the
+     one action HR has to take was the hardest thing on the page to find. This
+     puts every file still awaiting a verdict at the TOP of the card, across
+     both schemes, with the action on it.
+
+     Rendered only for HR, and only while something is actually pending: once
+     everything is verified it disappears rather than sitting there as a
+     permanently-empty box. */
+  /* True when the file's declared total agrees with the statutory formula and
+     nothing was rejected — i.e. there is nothing for HR to adjudicate, only to
+     confirm. A file with no wages supplied is NOT a match: there was nothing to
+     check it against, so it needs a human look rather than a one-click pass. */
+  function contribMatchesFormula(u) {
+    if (!u) return false;
+    if (u.rejectedCount) return false;
+    if (!u.checkedRows) return false;
+    return !u.varianceRows && Math.abs(Number(u.totalVariance || 0)) <= 1;
+  }
+  function contribPendingUploads() {
+    var out = [];
+    CONTRIB_ORDER.forEach(function (k) {
+      (CONTRIB_UP[k].uploads || []).forEach(function (u) {
+        if (u.verification && u.verification.status) return;
+        /* a file whose rows have all been replaced by a later upload is
+           superseded, not outstanding — asking HR to verify figures that are no
+           longer the record would be busywork */
+        if (u.superseded) return;
+        out.push(u);
+      });
+    });
+    out.sort(function (a, b) { return String(a.uploadedAt).localeCompare(String(b.uploadedAt)); });
+    return out;
+  }
+  function contribVerifyQueueHtml() {
+    if (!kvIsHR()) return '';
+    var pending = contribPendingUploads();
+    if (!pending.length) return '';
+    return '<div class="note amber" style="margin:14px 0">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<div style="flex:1 1 280px;min-width:0">' +
+          '<div class="t-strong" style="font-size:0.84rem">' + pending.length +
+            ' worker-level payment file' + (pending.length === 1 ? '' : 's') + ' awaiting your verification</div>' +
+          '<div class="tiny" style="margin-top:3px;line-height:1.5">An upload records what the agency says it paid. ' +
+            'Until you verify it, the principal employer\'s joint liability for these workers is undischarged.</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">' +
+        pending.map(function (u) {
+          var s = CONTRIB_SCHEMES[u.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
+          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;' +
+                 'background:var(--paper-1,#fff);border:1px solid var(--line);border-radius:8px;padding:9px 11px">' +
+            '<div style="flex:1 1 260px;min-width:0">' +
+              '<span class="pill outline tiny">' + kvEsc(s.label) + '</span> ' +
+              '<span class="t-strong" style="word-break:break-all">' + kvEsc(u.fileName) + '</span>' +
+              '<div class="tiny t-mute" style="margin-top:3px">' +
+                u.acceptedCount + ' employee' + (u.acceptedCount === 1 ? '' : 's') +
+                ' · ' + kvEsc((u.months || []).join(', ') || u.month || '—') +
+                ' · ₹' + Number(u.totalAmount || 0).toLocaleString('en-IN') + ' declared' +
+                ' · ' + contribReconcileNote(u) +
+                ' · uploaded by ' + kvEsc(u.uploadedBy || '—') +
+              '</div>' +
+            '</div>' +
+            /* A file whose declared total matches the statutory formula has
+               nothing to adjudicate, so it verifies in one click. One that does
+               NOT match can only be verified through the review modal, which
+               forces a note saying what was short — a discrepancy signed off
+               without a reason is not a compliance record. */
+            '<div style="display:flex;gap:8px;flex-shrink:0">' +
+              (contribMatchesFormula(u)
+                ? '<button class="btn green" onclick="contribQuickVerify(\'' + kvEsc(u.id) + '\')" ' +
+                    'title="Declared total matches the ' + kvEsc(s.label) + ' formula — records this as fully paid">' +
+                    '✓ Mark verified</button>'
+                : '') +
+              '<button class="btn' + (contribMatchesFormula(u) ? '' : ' primary') +
+                '" onclick="contribOpenVerify(\'' + kvEsc(u.id) + '\')">' +
+                (contribMatchesFormula(u) ? 'Review' : 'Review & verify') + '</button>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  }
+
   /* the uploaded-files table, shared by the editable and read-only panels */
   function esicUploadsTableHtml(ups, scheme, canVerify) {
     if (!ups || !ups.length) {
@@ -21896,14 +21984,22 @@ function __kvOnReady(fn) {
             (u.checkedRows ? '<div class="t-mute">vs ₹' + Number(u.totalExpected || 0).toLocaleString('en-IN') + ' due</div>' : '') + '</td>' +
           '<td class="tiny">' + contribReconcileNote(u) + '</td>' +
           '<td>' + kvDateTime(u.uploadedAt) + '<div class="t-mute">by ' + kvEsc(u.uploadedBy || '—') + '</div></td>' +
-          '<td>' + contribVerdictPill(u) +
+          '<td>' +
+            (u.superseded && !(u.verification && u.verification.status)
+              ? '<span class="pill outline tiny" title="Every row from this file was replaced by a later upload — it is no longer the record in force">Superseded</span>'
+              : contribVerdictPill(u)) +
             (u.verification && u.verification.note
               ? '<div class="t-mute" style="margin-top:3px">“' + kvEsc(String(u.verification.note).slice(0, 90)) + '”</div>' : '') +
             (u.verification && u.verification.by
               ? '<div class="t-mute">' + kvEsc(u.verification.by) + ' · ' + kvDateTime(u.verification.at) + '</div>' : '') +
-            (canVerify
-              ? '<div style="margin-top:6px"><button class="btn tiny" onclick="contribOpenVerify(\'' + kvEsc(u.id) + '\')">' +
-                (u.verification && u.verification.status ? 'Re-verify' : 'Verify') + '</button></div>'
+            /* an unverified file gets the primary treatment — it is an
+               outstanding action, not a neutral one. A superseded file needs no
+               action at all. */
+            (canVerify && !(u.superseded && !(u.verification && u.verification.status))
+              ? '<div style="margin-top:6px"><button class="btn tiny' +
+                ((u.verification && u.verification.status) ? '' : ' primary') +
+                '" onclick="contribOpenVerify(\'' + kvEsc(u.id) + '\')">' +
+                (u.verification && u.verification.status ? 'Re-verify' : 'Verify payment') + '</button></div>'
               : '') +
           '</td>' +
         '</tr>';
@@ -21914,12 +22010,16 @@ function __kvOnReady(fn) {
   /* HR's verdict on one uploaded file. The upload is the agency's claim; this
      is the principal employer's record that it was checked — without which the
      joint liability stays undischarged, exactly as for the firm-month figure. */
+  function contribFindUpload(uploadId) {
+    var found = null;
+    CONTRIB_ORDER.forEach(function (k) {
+      (CONTRIB_UP[k].uploads || []).forEach(function (x) { if (x.id === uploadId) found = x; });
+    });
+    return found;
+  }
   function contribOpenVerify(uploadId) {
     if (!kvHrOnly('Only HR can verify a worker-level contribution upload.')) return;
-    var u = null;
-    CONTRIB_ORDER.forEach(function (k) {
-      (CONTRIB_UP[k].uploads || []).forEach(function (x) { if (x.id === uploadId) u = x; });
-    });
+    var u = contribFindUpload(uploadId);
     if (!u) { toast('Upload not found', 'red'); return; }
     var s = CONTRIB_SCHEMES[u.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
     omModal(
@@ -21962,6 +22062,26 @@ function __kvOnReady(fn) {
           '<button class="btn amber" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'partial\')">Partly paid</button>' +
           '<button class="btn danger" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'none\')">Not paid</button>' +
           '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>', 720);
+  }
+  /* One-click "verified" for a file that already reconciles. Offered only where
+     contribMatchesFormula() holds, so this can never wave through a shortfall —
+     that path goes to the modal and needs a note. */
+  function contribQuickVerify(uploadId) {
+    if (!kvHrOnly('Only HR can verify a worker-level contribution upload.')) return;
+    var u = contribFindUpload(uploadId);
+    if (!u) { toast('Upload not found', 'red'); return; }
+    if (!contribMatchesFormula(u)) { contribOpenVerify(uploadId); return; }
+    var s = CONTRIB_SCHEMES[u.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
+    kvJson('/api/contribution-uploads/' + encodeURIComponent(uploadId) + '/verify', 'POST', {
+      status: 'full',
+      note: 'Declared total matches the ' + s.label + ' formula for all ' + u.acceptedCount +
+            ' employee(s). Verified from the queue.'
+    }).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || 'Verification failed', 'red'); return; }
+      toast('✓ Verified · ' + s.label + ' · ' + u.fileName + ' recorded as fully paid', 'green');
+      epfRefreshAll();
+      if (typeof kvLoadHrInbox === 'function') kvLoadHrInbox(true);
+    }).catch(function (e) { toast('Verification failed: ' + e.message, 'red'); });
   }
   function contribVerify(uploadId, status) {
     if (!kvHrOnly('Only HR can verify a worker-level contribution upload.')) return;
