@@ -21786,6 +21786,8 @@ function __kvOnReady(fn) {
      and has to navigate in again for the next one. Null when the verdict was
      given from a page rather than a modal, which only needs a repaint. */
   var CONTRIB_RETURN = null;
+  /* a confirmation line to show once, on the next modal render */
+  var CONTRIB_FLASH = null;
 
   /* One contribution-history table, used by the worker's own view and by the
      ESIC / EPF tab on the worker record HR and the agency open. `audience` only
@@ -21849,8 +21851,26 @@ function __kvOnReady(fn) {
       '<div class="modal-h"><div class="modal-h-left">' +
         '<span class="modal-h-eye">' + kvEsc(s.label) + ' · ' + kvEsc(kvMonthLabel(r.month)) + ' · verify this worker</span>' +
         '<span class="modal-h-title">' + kvEsc(r.workerName || r.employeeId || r.memberId || 'Worker') + '</span></div>' +
-        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+        '<span class="modal-h-close" onclick="contribCloseWorkerVerify()">Close ✕</span></div>' +
       '<div class="modal-body">' +
+        /* the status as it stands right now, at the top where the eye lands —
+           after verifying, this is the change the click was for */
+        '<div class="note ' + (vr && vr.status ? (CONTRIB_VERDICTS[vr.status] || CONTRIB_VERDICTS.partial).cls : 'indigo') +
+          '" style="margin-bottom:12px">' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+            '<span class="t-strong" style="font-size:0.82rem">Current status</span>' +
+            (vr && vr.status
+              ? '<span class="pill ' + (CONTRIB_VERDICTS[vr.status] || CONTRIB_VERDICTS.partial).cls + ' tiny">' +
+                (CONTRIB_VERDICTS[vr.status] || CONTRIB_VERDICTS.partial).label + '</span>'
+              : '<span class="pill amber tiny">⧗ Not yet verified</span>') +
+          '</div>' +
+          (vr && vr.status
+            ? '<div class="tiny" style="margin-top:4px">by ' + kvEsc(vr.by) + ' on ' + kvDateTime(vr.at) +
+              (vr.via === 'upload' ? ' · carried from verifying the whole file' : ' · recorded against this worker') +
+              (vr.note ? '<div style="margin-top:3px">“' + kvEsc(vr.note) + '”</div>' : '') + '</div>'
+            : '<div class="tiny" style="margin-top:4px">Record a verdict below. It is stored against this employee alone.</div>') +
+          contribFlashHtml() +
+        '</div>' +
         '<div class="sd-mini-grid">' +
           '<div class="sd-mini"><div class="sd-mini-eye">Declared</div><div class="sd-mini-v">₹' + declared.toLocaleString('en-IN') + '</div>' +
             '<div class="sd-mini-s">' + kvEsc(r.challanNo ? 'challan ' + r.challanNo : 'no challan on the row') + '</div></div>' +
@@ -21871,18 +21891,39 @@ function __kvOnReady(fn) {
           '<textarea class="input" id="contrib-row-note" rows="3" placeholder="Required for a partial or not-paid verdict">' +
           kvEsc((vr && vr.note) || '') + '</textarea></div>' +
         (vr && vr.status
-          ? '<div class="tiny muted" style="margin-top:8px">Currently ' +
-            kvEsc((CONTRIB_VERDICTS[vr.status] || {}).label || vr.status) + ' by ' + kvEsc(vr.by) +
-            ' on ' + kvDateTime(vr.at) + (vr.via === 'upload' ? ' (carried from verifying the file)' : '') + '.</div>'
+          ? '<div class="tiny muted" style="margin-top:8px">Recording a different verdict replaces the one above.</div>'
           : '') +
       '</div>' +
       '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">' +
           kvEsc(r.contractorName || '') + '</span></div>' +
         '<div class="modal-footer-right">' +
-          '<button class="btn green" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'full\')">Fully paid</button>' +
-          '<button class="btn amber" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'partial\')">Partly paid</button>' +
-          '<button class="btn danger" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'none\')">Not paid</button>' +
-          '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>', 700);
+          '<button class="btn green" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'full\')">' +
+            (vr && vr.status === 'full' ? 'Keep · fully paid' : 'Fully paid') + '</button>' +
+          '<button class="btn amber" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'partial\')">' +
+            (vr && vr.status === 'partial' ? 'Keep · partly paid' : 'Partly paid') + '</button>' +
+          '<button class="btn danger" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'none\')">' +
+            (vr && vr.status === 'none' ? 'Keep · not paid' : 'Not paid') + '</button>' +
+          /* once a verdict is recorded the modal has done its job, so the exit
+             reads "Done" rather than "Cancel" — cancelling something already
+             saved would be a lie */
+          '<button class="btn" onclick="contribCloseWorkerVerify()">' +
+            (vr && vr.status ? (CONTRIB_RETURN ? 'Back to file' : 'Done') : 'Cancel') + '</button>' +
+        '</div></div>', 700);
+  }
+  /* Closing the per-worker modal returns to the file's worker list when that is
+     where it was opened from, so HR lands back where they were rather than out
+     on the page behind. */
+  function contribCloseWorkerVerify() {
+    if (typeof CONTRIB_RETURN === 'function') { CONTRIB_RETURN(); return; }
+    omCloseModal();
+  }
+  /* a one-shot confirmation line inside the modal, cleared as it is drawn so it
+     shows for the verdict that produced it and not the next render */
+  function contribFlashHtml() {
+    if (!CONTRIB_FLASH) return '';
+    var msg = CONTRIB_FLASH;
+    CONTRIB_FLASH = null;
+    return '<div class="tiny t-strong" style="margin-top:6px;color:var(--green-dk)">' + msg + '</div>';
   }
   /* The employees inside one uploaded file, each with its own verify action.
      "Verify all" settles a clean file in one act; this is for the file where
@@ -21935,14 +21976,20 @@ function __kvOnReady(fn) {
     kvJson('/api/contributions/' + encodeURIComponent(rowId) + '/verify', 'POST', { status: status, note: note })
       .then(function (j) {
         if (!j || !j.ok) { toast((j && j.error) || 'Verification failed', 'red'); return; }
-        omCloseModal();
         var n = j.contribution || {};
-        toast('✓ ' + ((CONTRIB_VERDICTS[status] || {}).label || status) + ' · ' +
-              (n.workerName || n.employeeId || 'worker') + ' · ' + kvMonthLabel(n.month), 'green');
-        /* back to the file's worker list if that is where this came from,
-           otherwise just repaint the surface underneath */
-        if (typeof CONTRIB_RETURN === 'function') CONTRIB_RETURN();
-        else if (typeof CONTRIB_REPAINT === 'function') CONTRIB_REPAINT();
+        /* Stay in the same window. Closing on success took away the one thing
+           the click was for — seeing the status actually change. The record is
+           updated in place and the modal re-rendered from it, so the new
+           verdict appears where the buttons were. */
+        var i = CONTRIB_ROWS_ON_SCREEN.findIndex(function (x) { return x.id === rowId; });
+        if (i !== -1) CONTRIB_ROWS_ON_SCREEN[i] = Object.assign({}, CONTRIB_ROWS_ON_SCREEN[i], n);
+        CONTRIB_FLASH = '✓ ' + ((CONTRIB_VERDICTS[status] || {}).label || status).replace('✓ ', '') +
+          ' · recorded for ' + kvEsc(n.workerName || n.employeeId || 'this worker') +
+          ' · ' + kvEsc(kvMonthLabel(n.month));
+        contribOpenWorkerVerify(rowId);
+        /* refresh whatever is underneath so it is current when the modal is
+           closed — a no-op while its host is off-screen */
+        if (typeof CONTRIB_REPAINT === 'function') CONTRIB_REPAINT();
         epfRefreshAll();
       })
       .catch(function (e) { toast('Verification failed: ' + e.message, 'red'); });
@@ -22186,10 +22233,26 @@ function __kvOnReady(fn) {
         '<span class="modal-h-title">' + kvEsc(u.fileName) + '</span></div>' +
         '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
       '<div class="modal-body">' +
-        '<div class="note indigo" style="font-size:0.76rem;margin-bottom:12px">An upload records what the agency ' +
-          '<em>says</em> it paid. Verifying it is the principal employer\'s own check — until that is on record, the ' +
-          'joint liability for these workers is undischarged. Compare the declared total against the ' + kvEsc(s.label) +
-          ' formula (' + kvEsc(s.rateNote) + ')</div>' +
+        /* current status first — after verifying, this is what changed */
+        '<div class="note ' + (u.verification && u.verification.status
+            ? (CONTRIB_VERDICTS[u.verification.status] || CONTRIB_VERDICTS.partial).cls : 'indigo') +
+          '" style="margin-bottom:12px">' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+            '<span class="t-strong" style="font-size:0.82rem">Current status</span>' +
+            contribVerdictPill(u) +
+            ((u.activeRows) ? '<span class="tiny t-mute">' + (u.verifiedRows || 0) + ' of ' + u.activeRows +
+              ' worker' + (u.activeRows === 1 ? '' : 's') + ' verified</span>' : '') +
+          '</div>' +
+          (u.verification && u.verification.status
+            ? '<div class="tiny" style="margin-top:4px">by ' + kvEsc(u.verification.by) + ' on ' + kvDateTime(u.verification.at) +
+              (u.verification.note ? '<div style="margin-top:3px">“' + kvEsc(u.verification.note) + '”</div>' : '') + '</div>'
+            : '<div class="tiny" style="margin-top:4px">An upload records what the agency <em>says</em> it paid. ' +
+              'Verifying it is the principal employer\'s own check — until that is on record, the joint liability ' +
+              'for these workers is undischarged.</div>') +
+          contribFlashHtml() +
+        '</div>' +
+        '<div class="tiny muted" style="margin-bottom:12px">Compare the declared total against the ' + kvEsc(s.label) +
+          ' formula — ' + kvEsc(s.rateNote) + '</div>' +
         '<div class="sd-mini-grid">' +
           '<div class="sd-mini"><div class="sd-mini-eye">Employees covered</div><div class="sd-mini-v">' + u.acceptedCount + '</div>' +
             '<div class="sd-mini-s">' + kvEsc((u.months || []).join(', ') || u.month || '—') + '</div></div>' +
@@ -22216,10 +22279,19 @@ function __kvOnReady(fn) {
       '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">Recorded against ' +
           kvEsc(u.contractorName) + '</span></div>' +
         '<div class="modal-footer-right">' +
-          '<button class="btn green" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'full\')">Fully paid</button>' +
-          '<button class="btn amber" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'partial\')">Partly paid</button>' +
-          '<button class="btn danger" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'none\')">Not paid</button>' +
-          '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>', 720);
+          '<button class="btn green" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'full\')">' +
+            (u.verification && u.verification.status === 'full' ? 'Keep · fully paid' : 'Fully paid') + '</button>' +
+          '<button class="btn amber" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'partial\')">' +
+            (u.verification && u.verification.status === 'partial' ? 'Keep · partly paid' : 'Partly paid') + '</button>' +
+          '<button class="btn danger" onclick="contribVerify(\'' + kvEsc(u.id) + '\',\'none\')">' +
+            (u.verification && u.verification.status === 'none' ? 'Keep · not paid' : 'Not paid') + '</button>' +
+          (u.activeRows ? '<button class="btn" onclick="contribOpenWorkers(\'' + kvEsc(u.id) + '\')" ' +
+            'title="Verify the employees in this file one at a time">Workers…</button>' : '') +
+          /* a verdict is already saved by the time this reads "Done" —
+             offering "Cancel" would imply it could still be undone */
+          '<button class="btn" onclick="omCloseModal()">' +
+            (u.verification && u.verification.status ? 'Done' : 'Cancel') + '</button>' +
+        '</div></div>', 720);
   }
   /* One-click "verified" for a file that already reconciles. Offered only where
      contribMatchesFormula() holds, so this can never wave through a shortfall —
@@ -22250,8 +22322,21 @@ function __kvOnReady(fn) {
     kvJson('/api/contribution-uploads/' + encodeURIComponent(uploadId) + '/verify', 'POST', { status: status, note: note })
       .then(function (j) {
         if (!j || !j.ok) { toast((j && j.error) || 'Verification failed', 'red'); return; }
-        omCloseModal();
-        toast('Recorded · ' + ((CONTRIB_VERDICTS[status] || {}).label || status), 'green');
+        /* stay open and show the result, including how many workers it settled
+           and how many individual verdicts it deliberately left alone */
+        var u = contribFindUpload(uploadId);
+        if (u && j.upload) {
+          /* j.upload is the stored record; activeRows / verifiedRows are added
+             by the list endpoint, so carry them forward rather than letting the
+             merge blank them. After a file verdict every active row is settled
+             — stamped by it, or already carrying its own. */
+          var active = u.activeRows;
+          Object.assign(u, j.upload, { activeRows: active, verifiedRows: active });
+        }
+        CONTRIB_FLASH = '✓ ' + ((CONTRIB_VERDICTS[status] || {}).label || status).replace('✓ ', '') +
+          ' · ' + (j.workersStamped || 0) + ' worker' + ((j.workersStamped === 1) ? '' : 's') + ' updated' +
+          (j.workersKeptIndividual ? ' · ' + j.workersKeptIndividual + ' kept their own verdict' : '');
+        contribOpenVerify(uploadId);
         epfRefreshAll();
         if (typeof kvLoadHrInbox === 'function') kvLoadHrInbox(true);
       })
