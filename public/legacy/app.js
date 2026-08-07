@@ -19306,7 +19306,8 @@ function __kvOnReady(fn) {
            it is fetched per worker rather than shipped with the bootstrap */
         { id: 'esic', label: 'ESIC / PF', html:
           '<div class="cap-hint" style="margin-bottom:10px">What was actually contributed for this worker, month by month, ' +
-          'from the agency\'s worker-level ESIC and EPF uploads — with Plant HR\'s verdict on each file. ' +
+          'from the agency\'s worker-level ESIC and EPF uploads. Plant HR verifies each month <strong>for this worker</strong> — ' +
+          'the verdict is recorded against the employee, not just the file they arrived in. ' +
           'This is the same record the worker sees on their own portal.</div>' +
           '<div id="ob-esic-host"><div class="tiny muted">Loading ESIC / PF contributions…</div></div>' }
       ],
@@ -21774,16 +21775,33 @@ function __kvOnReady(fn) {
       '</tr></thead><tbody>' + bodyHtml + '</tbody></table></div>';
   }
 
+  /* The rows currently on screen, so a per-worker verify modal can find the one
+     it was opened for without threading the record through an onclick string.
+     Set by whichever surface last drew a history table. */
+  var CONTRIB_ROWS_ON_SCREEN = [];
+  var CONTRIB_REPAINT = null;
+  /* Where to go back to after a per-worker verdict. Opening the single-worker
+     modal from inside the worker list REPLACES that list, so verifying has to
+     put it back — otherwise HR is dropped out of the file after every employee
+     and has to navigate in again for the next one. Null when the verdict was
+     given from a page rather than a modal, which only needs a repaint. */
+  var CONTRIB_RETURN = null;
+
   /* One contribution-history table, used by the worker's own view and by the
      ESIC / EPF tab on the worker record HR and the agency open. `audience` only
-     changes the column wording — never the figures. */
+     changes the column wording — never the figures. HR additionally gets the
+     per-worker verify action, because the verdict is recorded per worker. */
   function esicHistoryTableHtml(rows, audience) {
     var mine = audience === 'worker';
+    var canVerify = !mine && kvIsHR();
+    /* register these rows for the verify modal */
+    CONTRIB_ROWS_ON_SCREEN = rows.slice();
     return esicTable(
       [{ label: 'Scheme' }, { label: 'Month' }, { label: 'Paid on' }, { label: 'Challan' },
        { label: mine ? 'Your share' : 'Employee share', align: 'right' },
        { label: 'Employer share', align: 'right' },
-       { label: 'Total', align: 'right' }, { label: 'Status' }, { label: 'HR verified' }],
+       { label: 'Total', align: 'right' }, { label: 'Status' },
+       { label: canVerify ? 'HR verification' : 'HR verified' }],
       rows.map(function (r) {
         var s = CONTRIB_SCHEMES[r.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
         var vr = r.verification;
@@ -21797,11 +21815,137 @@ function __kvOnReady(fn) {
           '<td class="mono" style="text-align:right">' + (r.employerContribution ? '₹' + Number(r.employerContribution).toLocaleString('en-IN') : '—') + '</td>' +
           '<td class="mono t-strong" style="text-align:right">' + (r.amount ? '₹' + Number(r.amount).toLocaleString('en-IN') : '—') + '</td>' +
           '<td>' + contribStatusPill(r.status) + '</td>' +
-          '<td>' + (vm ? '<span class="pill ' + vm.cls + ' tiny" title="' + kvEsc(vr.note || '') + '">' + vm.label.replace('Verified · ', '') + '</span>'
-                       : '<span class="pill amber tiny" title="Plant HR has not yet checked the file this row came from">awaiting HR</span>') + '</td>' +
+          '<td>' +
+            (vm ? '<span class="pill ' + vm.cls + ' tiny" title="' + kvEsc(vr.note || '') +
+                    (vr.by ? ' — ' + kvEsc(vr.by) : '') + '">' + vm.label.replace('✓ Verified · ', '✓ ') + '</span>' +
+                  (vr.via === 'upload' ? '<div class="t-mute" style="font-size:0.68rem">with the file</div>' : '') +
+                  (vr.by ? '<div class="t-mute" style="font-size:0.68rem">' + kvEsc(vr.by) + '</div>' : '')
+                : '<span class="pill amber tiny" title="Plant HR has not yet checked this worker\'s contribution">⧗ awaiting HR</span>') +
+            /* the verdict is per worker, so the action is too — HR can settle
+               one employee without touching the rest of the file */
+            (canVerify
+              ? '<div style="margin-top:5px"><button class="btn tiny' + (vm ? '' : ' primary') +
+                  '" onclick="contribOpenWorkerVerify(\'' + kvEsc(r.id) + '\')">' +
+                  (vm ? 'Re-verify' : 'Verify') + '</button></div>'
+              : '') +
+          '</td>' +
         '</tr>';
       }).join('')
     );
+  }
+  /* HR's verdict on ONE worker's contribution — the record that answers "was
+     MY PF paid?", which a file-level tick cannot answer for the one employee
+     who was short. */
+  function contribOpenWorkerVerify(rowId) {
+    if (!kvHrOnly('Only HR can verify a worker\'s contribution.')) return;
+    var r = (CONTRIB_ROWS_ON_SCREEN || []).find(function (x) { return x.id === rowId; });
+    if (!r) { toast('Contribution row not found', 'red'); return; }
+    var s = CONTRIB_SCHEMES[r.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
+    var vr = r.verification;
+    var due = r.expectedTotal == null ? null : Number(r.expectedTotal);
+    var declared = Number(r.amount || 0);
+    var gap = due === null ? null : Math.round((declared - due) * 100) / 100;
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left">' +
+        '<span class="modal-h-eye">' + kvEsc(s.label) + ' · ' + kvEsc(kvMonthLabel(r.month)) + ' · verify this worker</span>' +
+        '<span class="modal-h-title">' + kvEsc(r.workerName || r.employeeId || r.memberId || 'Worker') + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="sd-mini-grid">' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Declared</div><div class="sd-mini-v">₹' + declared.toLocaleString('en-IN') + '</div>' +
+            '<div class="sd-mini-s">' + kvEsc(r.challanNo ? 'challan ' + r.challanNo : 'no challan on the row') + '</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Due on the formula</div>' +
+            '<div class="sd-mini-v">' + (due === null ? '—' : '₹' + due.toLocaleString('en-IN')) + '</div>' +
+            '<div class="sd-mini-s">' + (r.wages ? 'on wages ₹' + Number(r.wages).toLocaleString('en-IN') : 'no wages supplied') + '</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Difference</div>' +
+            '<div class="sd-mini-v" style="color:' + (gap === null ? 'var(--ink-3)' : (Math.abs(gap) <= 1 ? 'var(--green-dk)' : 'var(--red-dk)')) + '">' +
+              (gap === null ? '—' : (Math.abs(gap) <= 1 ? 'nil' : (gap < 0 ? '−₹' : '+₹') + Math.abs(gap).toLocaleString('en-IN'))) + '</div>' +
+            '<div class="sd-mini-s">' + (gap === null ? 'nothing to check against' : (gap < -1 ? 'short' : gap > 1 ? 'overpaid' : 'matches')) + '</div></div>' +
+          '<div class="sd-mini"><div class="sd-mini-eye">Employee id</div>' +
+            '<div class="sd-mini-v" style="font-size:0.95rem">' + kvEsc(r.employeeId || '—') + '</div>' +
+            '<div class="sd-mini-s">' + kvEsc(s.memberIdShort + ' ' + (r.memberId || '—')) + '</div></div>' +
+        '</div>' +
+        '<div class="tiny muted" style="margin-top:10px">From <strong>' + kvEsc(r.uploadFileName || 'an uploaded file') + '</strong>. ' +
+          'This verdict is recorded against this worker alone — verifying the whole file separately will not overwrite it.</div>' +
+        '<div class="field" style="margin-top:12px"><label class="field-l">What did you check, and what was short?</label>' +
+          '<textarea class="input" id="contrib-row-note" rows="3" placeholder="Required for a partial or not-paid verdict">' +
+          kvEsc((vr && vr.note) || '') + '</textarea></div>' +
+        (vr && vr.status
+          ? '<div class="tiny muted" style="margin-top:8px">Currently ' +
+            kvEsc((CONTRIB_VERDICTS[vr.status] || {}).label || vr.status) + ' by ' + kvEsc(vr.by) +
+            ' on ' + kvDateTime(vr.at) + (vr.via === 'upload' ? ' (carried from verifying the file)' : '') + '.</div>'
+          : '') +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">' +
+          kvEsc(r.contractorName || '') + '</span></div>' +
+        '<div class="modal-footer-right">' +
+          '<button class="btn green" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'full\')">Fully paid</button>' +
+          '<button class="btn amber" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'partial\')">Partly paid</button>' +
+          '<button class="btn danger" onclick="contribVerifyWorker(\'' + kvEsc(r.id) + '\',\'none\')">Not paid</button>' +
+          '<button class="btn" onclick="omCloseModal()">Cancel</button></div></div>', 700);
+  }
+  /* The employees inside one uploaded file, each with its own verify action.
+     "Verify all" settles a clean file in one act; this is for the file where
+     one employee is short and the rest are fine — the case a single blanket
+     verdict cannot express. */
+  function contribOpenWorkers(uploadId) {
+    if (!kvHrOnly('Only HR can verify worker contributions.')) return;
+    var u = contribFindUpload(uploadId);
+    if (!u) { toast('Upload not found', 'red'); return; }
+    var s = CONTRIB_SCHEMES[u.scheme || 'esic'] || CONTRIB_SCHEMES.esic;
+    var draw = function () {
+      kvJson('/api/contributions?upload=' + encodeURIComponent(uploadId)).then(function (j) {
+        var rows = (j && j.contributions) || [];
+        var host = document.getElementById('contrib-workers-host');
+        if (!host) return;
+        var done = rows.filter(function (r) { return r.verification && r.verification.status; }).length;
+        var cnt = document.getElementById('contrib-workers-count');
+        if (cnt) cnt.textContent = done + ' of ' + rows.length + ' verified';
+        host.innerHTML = rows.length
+          ? esicHistoryTableHtml(rows, 'hr')
+          : '<div class="tiny muted">This file has no rows still in force — they were replaced by a later upload.</div>';
+      });
+    };
+    /* verifying from inside this modal comes back to it, so HR can work down
+       the file employee by employee without navigating in again each time */
+    CONTRIB_REPAINT = draw;
+    CONTRIB_RETURN = function () { contribOpenWorkers(uploadId); };
+    omModal(
+      '<div class="modal-h"><div class="modal-h-left">' +
+        '<span class="modal-h-eye">' + kvEsc(s.label) + ' · verify worker by worker · ' +
+          '<span id="contrib-workers-count">loading…</span></span>' +
+        '<span class="modal-h-title">' + kvEsc(u.fileName) + '</span></div>' +
+        '<span class="modal-h-close" onclick="omCloseModal()">Close ✕</span></div>' +
+      '<div class="modal-body">' +
+        '<div class="note indigo" style="font-size:0.76rem;margin-bottom:10px">Each verdict is recorded against that ' +
+          'employee alone. Verifying the whole file will not overwrite a worker you have settled here.</div>' +
+        '<div id="contrib-workers-host"><div class="tiny muted">Loading employees…</div></div>' +
+      '</div>' +
+      '<div class="modal-footer"><div class="modal-footer-left"><span class="tiny muted">' +
+        kvEsc(u.contractorName) + ' · ' + kvEsc((u.months || []).join(', ') || u.month || '') + '</span></div>' +
+        '<div class="modal-footer-right"><button class="btn" onclick="omCloseModal()">Close</button></div></div>', 940);
+    draw();
+  }
+  function contribVerifyWorker(rowId, status) {
+    if (!kvHrOnly('Only HR can verify a worker\'s contribution.')) return;
+    var note = ((document.getElementById('contrib-row-note') || {}).value || '').trim();
+    if (status !== 'full' && !note) {
+      toast('Record what was short or missing — a partial or not-paid verdict needs a note', 'red'); return;
+    }
+    kvJson('/api/contributions/' + encodeURIComponent(rowId) + '/verify', 'POST', { status: status, note: note })
+      .then(function (j) {
+        if (!j || !j.ok) { toast((j && j.error) || 'Verification failed', 'red'); return; }
+        omCloseModal();
+        var n = j.contribution || {};
+        toast('✓ ' + ((CONTRIB_VERDICTS[status] || {}).label || status) + ' · ' +
+              (n.workerName || n.employeeId || 'worker') + ' · ' + kvMonthLabel(n.month), 'green');
+        /* back to the file's worker list if that is where this came from,
+           otherwise just repaint the surface underneath */
+        if (typeof CONTRIB_RETURN === 'function') CONTRIB_RETURN();
+        else if (typeof CONTRIB_REPAINT === 'function') CONTRIB_REPAINT();
+        epfRefreshAll();
+      })
+      .catch(function (e) { toast('Verification failed: ' + e.message, 'red'); });
   }
 
   /* ── A single worker's contribution history, for HR and the agency ───────
@@ -21860,6 +22004,11 @@ function __kvOnReady(fn) {
       return;
     }
     host.innerHTML = '<div class="tiny muted">Loading ESIC / EPF contributions…</div>';
+    /* re-running this render is how the tab refreshes after a per-worker
+       verdict, so the row updates in place rather than needing a reopen. No
+       return target: this is a page, not a modal to come back to. */
+    CONTRIB_REPAINT = function () { esicRenderWorkerHistory(hostId, rec); };
+    CONTRIB_RETURN = null;
     contribLoadForKeys(keys).then(function (merged) {
       if (!merged.length) {
         host.innerHTML = '<div class="note indigo" style="font-size:0.76rem">' +
@@ -21995,11 +22144,20 @@ function __kvOnReady(fn) {
             /* an unverified file gets the primary treatment — it is an
                outstanding action, not a neutral one. A superseded file needs no
                action at all. */
+            /* how far through this file's workers HR has got — the verdict is
+               recorded per worker, so a file can legitimately be part done */
+            (u.activeRows
+              ? '<div class="t-mute" style="margin-top:3px">' + (u.verifiedRows || 0) + ' of ' + u.activeRows +
+                ' worker' + (u.activeRows === 1 ? '' : 's') + ' verified</div>'
+              : '') +
             (canVerify && !(u.superseded && !(u.verification && u.verification.status))
-              ? '<div style="margin-top:6px"><button class="btn tiny' +
-                ((u.verification && u.verification.status) ? '' : ' primary') +
-                '" onclick="contribOpenVerify(\'' + kvEsc(u.id) + '\')">' +
-                (u.verification && u.verification.status ? 'Re-verify' : 'Verify payment') + '</button></div>'
+              ? '<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">' +
+                '<button class="btn tiny' + ((u.verification && u.verification.status) ? '' : ' primary') +
+                  '" onclick="contribOpenVerify(\'' + kvEsc(u.id) + '\')">' +
+                  (u.verification && u.verification.status ? 'Re-verify all' : 'Verify all') + '</button>' +
+                '<button class="btn tiny" onclick="contribOpenWorkers(\'' + kvEsc(u.id) + '\')" ' +
+                  'title="Verify the employees in this file one at a time">Workers…</button>' +
+                '</div>'
               : '') +
           '</td>' +
         '</tr>';

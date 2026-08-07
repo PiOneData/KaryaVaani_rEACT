@@ -2522,21 +2522,68 @@ function contribGetContributions(req, res) {
                               String(r.contractorId || '').toLowerCase() === k);
   }
   if (req.query.month) list = list.filter((r) => r.month === req.query.month);
+  /* ?upload=<id> — the employees in one uploaded file, for verifying it worker
+     by worker rather than as a whole */
+  if (req.query.upload) list = list.filter((r) => r.uploadId === req.query.upload);
   /* ?year=2026 — the worker view is a year at a time with the prior years kept */
   if (req.query.year) list = list.filter((r) => String(r.month || '').slice(0, 4) === String(req.query.year));
   list.sort((a, b) => String(b.month).localeCompare(String(a.month)));
-  /* the verdict lives on the upload, but every caller that shows a contribution
-     wants to know whether it has been verified — carry it onto the row */
+  /* Each row carries its OWN verdict — verification is per worker, because
+     "was this worker's PF paid?" is the question that has to be answerable, and
+     a file-level tick cannot answer it for the one employee who was short.
+     Verifying a whole file stamps every row in it (see contribPostVerify), so
+     the two are the same act at different granularity rather than rival
+     records. The file's own verdict rides along for context. */
   const ups = {};
   contribUploadList(store).forEach((u) => { ups[u.id] = u; });
   const out = list.map((r) => {
     const u = ups[r.uploadId];
     return Object.assign({}, r, {
       uploadFileName: u ? u.fileName : '',
-      verification: u ? (u.verification || null) : null
+      verification: r.verification || null,
+      uploadVerification: u ? (u.verification || null) : null
     });
   });
   res.json({ ok: true, contributions: out });
+}
+
+/* HR's verdict on ONE worker's contribution. The per-file verdict below is a
+   convenience for the common case; this is the record that actually answers a
+   worker's question, and the one an inspector asks for. */
+function contribPostRowVerify(req, res) {
+  const store = storeOr503(res); if (!store) return;
+  if (!requireHR(req, res)) return;
+  const rec = contribList(store).find((x) => x.id === req.params.id);
+  if (!rec) return res.status(404).json({ ok: false, error: 'contribution not found' });
+  const p = req.body || {};
+  if (CONTRIB_VERDICTS.indexOf(String(p.status)) === -1) {
+    return res.status(400).json({ ok: false, error: 'status must be one of full | partial | none' });
+  }
+  const note = String(p.note || '').trim();
+  if (String(p.status) !== 'full' && !note) {
+    return res.status(400).json({ ok: false, error: 'a partial or not-paid verdict needs a note saying what was short' });
+  }
+  const actor = actorOf(req);
+  rec.verification = contribRowVerdict(rec, String(p.status), note, actor.name, 'row');
+  rec.verifiedAt = rec.verification.at;
+  dbPut('workerContributions', rec.id, rec);
+  res.json({ ok: true, contribution: rec });
+}
+/* the verdict block written onto a worker's row, whether stamped one at a time
+   or by verifying the file it came in on */
+function contribRowVerdict(rec, status, note, by, via) {
+  return {
+    status,
+    note,
+    /* the figures the verdict was reached against, frozen so a later correction
+       to the row cannot silently re-base what HR signed off */
+    declaredAmount: Number(rec.amount || 0),
+    expectedAmount: rec.expectedTotal == null ? null : Number(rec.expectedTotal),
+    /* 'row' — HR verified this worker specifically.
+       'upload' — carried from verifying the whole file. */
+    via: via || 'row',
+    by, at: new Date().toISOString()
+  };
 }
 
 function contribGetUploads(req, res) {
@@ -2558,10 +2605,17 @@ function contribGetUploads(req, res) {
      verification queue for ever, asking to be verified when the figures it
      carried are no longer the record. */
   const live = {};
-  contribList(store).forEach((r) => { live[r.uploadId] = (live[r.uploadId] || 0) + 1; });
+  const verifiedRows = {};
+  contribList(store).forEach((r) => {
+    live[r.uploadId] = (live[r.uploadId] || 0) + 1;
+    if (r.verification && r.verification.status) verifiedRows[r.uploadId] = (verifiedRows[r.uploadId] || 0) + 1;
+  });
   const out = list.map((u) => Object.assign({}, u, {
     activeRows: live[u.id] || 0,
-    superseded: (live[u.id] || 0) === 0
+    superseded: (live[u.id] || 0) === 0,
+    /* how far through the workers in this file HR has got — a file can be part
+       verified when individual workers were checked one at a time */
+    verifiedRows: verifiedRows[u.id] || 0
   }));
   res.json({ ok: true, uploads: out });
 }
@@ -2742,7 +2796,22 @@ function contribPostVerify(req, res) {
   rec.verifiedAt = rec.verification.at;
   rec.verificationHistory = (rec.verificationHistory || []).concat(prior ? [prior] : []);
   dbPut('contributionUploads', rec.id, rec);
-  res.json({ ok: true, upload: rec });
+  /* Verifying the file IS verifying its workers — stamp every row it is still
+     the record for, so a worker's own view can answer "was mine checked?"
+     without HR having to click through a hundred employees. A row HR verified
+     individually is left alone: a deliberate per-worker verdict outranks a
+     blanket one, and silently overwriting it would lose the more specific
+     finding. */
+  let stamped = 0, kept = 0;
+  contribList(store).forEach((r) => {
+    if (r.uploadId !== rec.id) return;
+    if (r.verification && r.verification.via === 'row') { kept++; return; }
+    r.verification = contribRowVerdict(r, String(p.status), note, actor.name, 'upload');
+    r.verifiedAt = r.verification.at;
+    dbPut('workerContributions', r.id, r);
+    stamped++;
+  });
+  res.json({ ok: true, upload: rec, workersStamped: stamped, workersKeptIndividual: kept });
 }
 
 /* HR-only correction path — a single contribution row can be re-stated without
@@ -2777,6 +2846,9 @@ app.get('/api/contributions', contribGetContributions);
 app.get('/api/contribution-uploads', contribGetUploads);
 app.post('/api/contributions/upload', contribPostUpload);
 app.post('/api/contribution-uploads/:id/verify', contribPostVerify);
+/* per-worker verification — registered BEFORE the row-edit route so the more
+   specific path wins; '/:id' would otherwise swallow '/:id/verify' */
+app.post('/api/contributions/:id/verify', contribPostRowVerify);
 app.post('/api/contributions/:id', contribPostRowEdit);
 
 /* ── Compatibility · the ESIC-only routes this feature shipped with ─────────
