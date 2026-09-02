@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const HTMLtoDOCX = require('html-to-docx');
 const JSZip = require('jszip');
+const { TENANT } = require('../backend/tenant');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = path.join(ROOT, 'public', 'legacy', 'knowledge-docs.json');
@@ -40,7 +41,7 @@ function docHtml(d) {
     '<p class="meta">' + meta + '</p>' +
     (d.summary ? '<p class="summary">' + d.summary + '</p>' : '') +
     (d.body || '<p>(No content.)</p>') +
-    '<p class="foot">Karya Vaani · Knowledge Center · Daikin Sricity · AP — controlled document, ' + (d.version || 'v1.0') + '</p>' +
+    '<p class="foot">Karya Vaani · Knowledge Center · ' + TENANT.label + ' — controlled document, ' + (d.version || 'v1.0') + '</p>' +
     '</body></html>';
 }
 

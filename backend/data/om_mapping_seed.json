@@ -2,7 +2,7 @@
  {
   "code": "OMC0002",
   "name": "E Pavithra",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -14,7 +14,7 @@
  {
   "code": "OMC0030",
   "name": "Uthukota Sravani",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -26,7 +26,7 @@
  {
   "code": "OMC0066",
   "name": "K Naveen",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -38,7 +38,7 @@
  {
   "code": "OMC0123",
   "name": "Vadakodi Rithka",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -50,7 +50,7 @@
  {
   "code": "OMC0149",
   "name": "M Sandhya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -62,7 +62,7 @@
  {
   "code": "OMC0181",
   "name": "P Janakiramaiah",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Towcar",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -74,7 +74,7 @@
  {
   "code": "OMC0195",
   "name": "Kataboyina Munisekhar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -86,7 +86,7 @@
  {
   "code": "OMC0200",
   "name": "N Amulya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -98,7 +98,7 @@
  {
   "code": "OMC0245",
   "name": "Savara Narasamma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -110,7 +110,7 @@
  {
   "code": "OMC0335",
   "name": "Koppala Sivakumari",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -122,7 +122,7 @@
  {
   "code": "OMC0336",
   "name": "Ponkam Shoba",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -134,7 +134,7 @@
  {
   "code": "OMC0373",
   "name": "Ranigitha",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -146,7 +146,7 @@
  {
   "code": "OMC0381",
   "name": "Pooja Jangde",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -158,7 +158,7 @@
  {
   "code": "OMC0397",
   "name": "Karakadu Gayatri",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -170,7 +170,7 @@
  {
   "code": "OMC0401",
   "name": "Sanagari Saran",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -182,7 +182,7 @@
  {
   "code": "OMC0454",
   "name": "Khandavalli Mownika",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -194,7 +194,7 @@
  {
   "code": "OMC0480",
   "name": "Rowthu Kamalakr Rao",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Towcar",
   "department": "Production",
   "managerName": "Naveen",
@@ -206,7 +206,7 @@
  {
   "code": "OMC0586",
   "name": "Kaduru Ganesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Towcar",
   "department": "Production",
   "managerName": "Vikram",
@@ -218,7 +218,7 @@
  {
   "code": "OMC0621",
   "name": "Vanka Sarita",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -230,7 +230,7 @@
  {
   "code": "OMC0622",
   "name": "Orinala Deepthi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -242,7 +242,7 @@
  {
   "code": "OMC0124",
   "name": "D. Rajendran",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -254,7 +254,7 @@
  {
   "code": "OMC0649",
   "name": "Gollapalli Vishnuvardahn",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Forklift Operator",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -266,7 +266,7 @@
  {
   "code": "OMC0617",
   "name": "Bansetti Anil",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -278,7 +278,7 @@
  {
   "code": "OMC0618",
   "name": "D.Roshini",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -290,7 +290,7 @@
  {
   "code": "OMC0714",
   "name": "Sandinti Harish",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Quality Control",
   "managerName": "Sai Sudha",
@@ -302,7 +302,7 @@
  {
   "code": "OMC0700",
   "name": "Ponakam Mun Sekhar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -314,7 +314,7 @@
  {
   "code": "OMC0701",
   "name": "Maharala Vivek",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -326,7 +326,7 @@
  {
   "code": "OMC0730",
   "name": "Budduru Vamsi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -338,7 +338,7 @@
  {
   "code": "OMC0744",
   "name": "Gonnabatthula Pavani",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -350,7 +350,7 @@
  {
   "code": "OMC0747",
   "name": "Chokka Srinivas",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -362,7 +362,7 @@
  {
   "code": "OMC0783",
   "name": "Panabaka Srinivasulu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Towcar",
   "department": "Production",
   "managerName": "Hemraj",
@@ -374,7 +374,7 @@
  {
   "code": "OMC0827",
   "name": "Charulata Kaser",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -386,7 +386,7 @@
  {
   "code": "OMC0825",
   "name": "E Baby",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -398,7 +398,7 @@
  {
   "code": "OMC0849",
   "name": "Reddy Uma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -410,7 +410,7 @@
  {
   "code": "OMC0873",
   "name": "Govindu Kumari",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -422,7 +422,7 @@
  {
   "code": "OMC0885",
   "name": "K Reshma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -434,7 +434,7 @@
  {
   "code": "OMC0803",
   "name": "Elapa Muni Rathnam",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -446,7 +446,7 @@
  {
   "code": "OMC0899",
   "name": "Yerra Kumari",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -458,7 +458,7 @@
  {
   "code": "OMC0900",
   "name": "Reddathotti Nagaraju",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Utility",
   "managerName": "Gopinath",
@@ -470,7 +470,7 @@
  {
   "code": "OMC0902",
   "name": "Yarrabothu Nagaraju",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -482,7 +482,7 @@
  {
   "code": "OMC0904",
   "name": "Agaram Raja",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -494,7 +494,7 @@
  {
   "code": "OMC0910",
   "name": "Dara Amesh Babu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -506,7 +506,7 @@
  {
   "code": "OMC0913",
   "name": "Pellakuru Sai Lakshmi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -518,7 +518,7 @@
  {
   "code": "OMC0914",
   "name": "Kummari Rushmitha",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -530,7 +530,7 @@
  {
   "code": "OMC0917",
   "name": "Marri Mahesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -542,7 +542,7 @@
  {
   "code": "OMC0918",
   "name": "Gurram Mahesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -554,7 +554,7 @@
  {
   "code": "OMC0919",
   "name": "Talari Madan Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Utility",
   "managerName": "Gopinath",
@@ -566,7 +566,7 @@
  {
   "code": "OMC0920",
   "name": "Sriram B",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -578,7 +578,7 @@
  {
   "code": "OMC0921",
   "name": "Thallam Naveen",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -590,7 +590,7 @@
  {
   "code": "OMC0925",
   "name": "Dhiyanesh G",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -602,7 +602,7 @@
  {
   "code": "OMC0926",
   "name": "Dega Sai Kishore",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -614,7 +614,7 @@
  {
   "code": "OMC0929",
   "name": "Bollu Manikanta",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -626,7 +626,7 @@
  {
   "code": "OMC0930",
   "name": "V Manoj Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -638,7 +638,7 @@
  {
   "code": "OMC0932",
   "name": "Kalluru",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -650,7 +650,7 @@
  {
   "code": "OMC0933",
   "name": "Allladi Geethika",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -662,7 +662,7 @@
  {
   "code": "OMC0934",
   "name": "Galam Kavyasri",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -674,7 +674,7 @@
  {
   "code": "OMC0945",
   "name": "Bandila Bhuvanesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -686,7 +686,7 @@
  {
   "code": "OMC0948",
   "name": "Chitteti Venkatesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -698,7 +698,7 @@
  {
   "code": "OMC0954",
   "name": "Jagarapu Mohan Rao",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -710,7 +710,7 @@
  {
   "code": "OMC0955",
   "name": "Koncha Prasad",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -722,7 +722,7 @@
  {
   "code": "OMC0957",
   "name": "Vatambeti Swapna",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -734,7 +734,7 @@
  {
   "code": "OMC0963",
   "name": "Mangli Kashyap",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -746,7 +746,7 @@
  {
   "code": "OMC0969",
   "name": "Pulluru Lokesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -758,7 +758,7 @@
  {
   "code": "OMC0972",
   "name": "Chittiboyina Muniprasanna",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -770,7 +770,7 @@
  {
   "code": "OMC0976",
   "name": "Manne Chenchamma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -782,7 +782,7 @@
  {
   "code": "OMC0052",
   "name": "Devendra",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Welder",
   "department": "Production",
   "managerName": "Naveen",
@@ -794,7 +794,7 @@
  {
   "code": "OMC0979",
   "name": "Madiga Prasad",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -806,7 +806,7 @@
  {
   "code": "OMC0985",
   "name": "Sodavaram Sai Kiran",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -818,7 +818,7 @@
  {
   "code": "OMC0987",
   "name": "Janni Gopinath",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -830,7 +830,7 @@
  {
   "code": "OMC0989",
   "name": "Ayinambakam Sreenivasulu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -842,7 +842,7 @@
  {
   "code": "OMC0992",
   "name": "Erugu Sowmya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -854,7 +854,7 @@
  {
   "code": "OMC0187",
   "name": "Thonda Surendra Babu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Towcar",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -866,7 +866,7 @@
  {
   "code": "OMC1001",
   "name": "D Sreenu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -878,7 +878,7 @@
  {
   "code": "OMC1003",
   "name": "J Saraswathi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -890,7 +890,7 @@
  {
   "code": "OMC1006",
   "name": "Burlu Naga Raju",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -902,7 +902,7 @@
  {
   "code": "OMC1013",
   "name": "Udduru Manikanta",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -914,7 +914,7 @@
  {
   "code": "OMC1017",
   "name": "Asi Puspha Nadh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -926,7 +926,7 @@
  {
   "code": "OMC1018",
   "name": "Hari S",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -938,7 +938,7 @@
  {
   "code": "OMC1021",
   "name": "Nakkina Somaraju",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -950,7 +950,7 @@
  {
   "code": "OMC1023",
   "name": "Kondapuram Mahesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -962,7 +962,7 @@
  {
   "code": "OMC1029",
   "name": "M Haricharan",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -974,7 +974,7 @@
  {
   "code": "OMC1034",
   "name": "Karijatha Mokshadri",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -986,7 +986,7 @@
  {
   "code": "OMC1037",
   "name": "Madiki Kishore",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -998,7 +998,7 @@
  {
   "code": "OMC1045",
   "name": "Volipi Chenchulakshmi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1010,7 +1010,7 @@
  {
   "code": "OMC1057",
   "name": "Adi Jana Rdhan",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1022,7 +1022,7 @@
  {
   "code": "OMC1058",
   "name": "Pandi Sivaiah",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1034,7 +1034,7 @@
  {
   "code": "OMC1060",
   "name": "Muthukuru Vikkee",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1046,7 +1046,7 @@
  {
   "code": "OMC1061",
   "name": "Dasari Kiran Teja",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1058,7 +1058,7 @@
  {
   "code": "OMC1065",
   "name": "Mandala Uday Kiran",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -1070,7 +1070,7 @@
  {
   "code": "OMC1068",
   "name": "Pagala Mohan",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1082,7 +1082,7 @@
  {
   "code": "OMC1070",
   "name": "Amarambedu Ajith",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1094,7 +1094,7 @@
  {
   "code": "OMC1082",
   "name": "Thumma Sumathi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1106,7 +1106,7 @@
  {
   "code": "OMC1087",
   "name": "Devarakonda Siddu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1118,7 +1118,7 @@
  {
   "code": "OMC1093",
   "name": "Yarrabothu Dinesh Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1130,7 +1130,7 @@
  {
   "code": "OMC1094",
   "name": "Batta Guna Sekhar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1142,7 +1142,7 @@
  {
   "code": "OMC1105",
   "name": "Gandi Chandu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1154,7 +1154,7 @@
  {
   "code": "OMC1111",
   "name": "Soumya Ranjan Behera",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1166,7 +1166,7 @@
  {
   "code": "OMC0952",
   "name": "Sogala Kalyan Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Towcar",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -1178,7 +1178,7 @@
  {
   "code": "OMC0956",
   "name": "Yella Pranaykumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -1190,7 +1190,7 @@
  {
   "code": "OMC0684",
   "name": "Chinmoy Samanta",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1202,7 +1202,7 @@
  {
   "code": "OMC1127",
   "name": "Madem Satish Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -1214,7 +1214,7 @@
  {
   "code": "OMC0965",
   "name": "Ambati Suryateja",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Supervisor",
   "department": "GA",
   "managerName": "Prakash",
@@ -1226,7 +1226,7 @@
  {
   "code": "OMC1133",
   "name": "Panabaka Teja",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1238,7 +1238,7 @@
  {
   "code": "OMC1139",
   "name": "Pelluru Lakshmipathi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1250,7 +1250,7 @@
  {
   "code": "OMC1143",
   "name": "Srinagadevi Govindan",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1262,7 +1262,7 @@
  {
   "code": "OMC1144",
   "name": "K Jeeva",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Naveen",
@@ -1274,7 +1274,7 @@
  {
   "code": "OMC1150",
   "name": "Dadi Bhargav",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1286,7 +1286,7 @@
  {
   "code": "OMC1152",
   "name": "Mavillapati Uday Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -1298,7 +1298,7 @@
  {
   "code": "OMC1153",
   "name": "Pamanji Nandini",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1310,7 +1310,7 @@
  {
   "code": "OMC1154",
   "name": "Bikki Venkata Hemanth Babu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1322,7 +1322,7 @@
  {
   "code": "OMC1155",
   "name": "Thokala Vamsi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1334,7 +1334,7 @@
  {
   "code": "OMC1157",
   "name": "Sadik Sammi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1346,7 +1346,7 @@
  {
   "code": "OMC1162",
   "name": "Santoshpuram Tanuja",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -1358,7 +1358,7 @@
  {
   "code": "OMC1164",
   "name": "Akkiligunta Ramesh Babu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -1370,7 +1370,7 @@
  {
   "code": "OMC1168",
   "name": "Devarakonda Hasini",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1382,7 +1382,7 @@
  {
   "code": "OMC1171",
   "name": "Sola Surya Narayana",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1394,7 +1394,7 @@
  {
   "code": "OMC1172",
   "name": "Gudari Kiran Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1406,7 +1406,7 @@
  {
   "code": "OMC1175",
   "name": "Padaveti Devendra Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -1418,7 +1418,7 @@
  {
   "code": "OMC1176",
   "name": "Nandagopal",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1430,7 +1430,7 @@
  {
   "code": "OMC1177",
   "name": "Kavali Badri",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Warehouse",
   "managerName": "Narishma",
@@ -1442,7 +1442,7 @@
  {
   "code": "OMC1179",
   "name": "Grandhi Surya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1454,7 +1454,7 @@
  {
   "code": "OMC1186",
   "name": "Gonji Vamsi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1466,7 +1466,7 @@
  {
   "code": "OMC1189",
   "name": "Kumbala Ravi Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1478,7 +1478,7 @@
  {
   "code": "OMC1190",
   "name": "Elapa Vinay Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -1490,7 +1490,7 @@
  {
   "code": "OMC1184",
   "name": "Kanna Vijaya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1502,7 +1502,7 @@
  {
   "code": "OMC1191",
   "name": "Veluru Sai Krishna",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1514,7 +1514,7 @@
  {
   "code": "OMC1193",
   "name": "Pygala Rahul",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1526,7 +1526,7 @@
  {
   "code": "OMC1194",
   "name": "Gampala Karthik",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1538,7 +1538,7 @@
  {
   "code": "OMC1198",
   "name": "Damayi Venkata Ramanaiah",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1550,7 +1550,7 @@
  {
   "code": "OMC1202",
   "name": "Adduru Giri",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1562,7 +1562,7 @@
  {
   "code": "OMC1203",
   "name": "Yata Prasanth",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1574,7 +1574,7 @@
  {
   "code": "OMC1205",
   "name": "Dasari Rambabu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1586,7 +1586,7 @@
  {
   "code": "OMC1206",
   "name": "Siddamsetti Sarath Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1598,7 +1598,7 @@
  {
   "code": "OMC0890",
   "name": "Karei Manoj",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1610,7 +1610,7 @@
  {
   "code": "OMC1213",
   "name": "Muchakala Suneel",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1622,7 +1622,7 @@
  {
   "code": "OMC1217",
   "name": "P. Pavan Kalyan",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1634,7 +1634,7 @@
  {
   "code": "OMC1219",
   "name": "Yarrabothu Saikumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1646,7 +1646,7 @@
  {
   "code": "OMC1221",
   "name": "Buduru Vinodh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -1658,7 +1658,7 @@
  {
   "code": "OMC1225",
   "name": "Rayapu Rubin",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1670,7 +1670,7 @@
  {
   "code": "OMC1233",
   "name": "Endukuri Kishor Varma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1682,7 +1682,7 @@
  {
   "code": "OMC1234",
   "name": "Duba Chandu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Narishma",
@@ -1694,7 +1694,7 @@
  {
   "code": "OMC1235",
   "name": "Yarram Setti Sandeep Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1706,7 +1706,7 @@
  {
   "code": "OMC1236",
   "name": "Sagili Indraja",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1718,7 +1718,7 @@
  {
   "code": "OMC1237",
   "name": "Ambati Rajeswari",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1730,7 +1730,7 @@
  {
   "code": "OMC1238",
   "name": "Mamidi Neelaveni",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1742,7 +1742,7 @@
  {
   "code": "OMC1241",
   "name": "Anbarasan D",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1754,7 +1754,7 @@
  {
   "code": "OMC1243",
   "name": "Devarala Eswar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1766,7 +1766,7 @@
  {
   "code": "OMC1244",
   "name": "Vinitha",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1778,7 +1778,7 @@
  {
   "code": "OMC1246",
   "name": "Thirumalasetty Venkateswararao",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1790,7 +1790,7 @@
  {
   "code": "OMC1248",
   "name": "Puvvada Sandhya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -1802,7 +1802,7 @@
  {
   "code": "OMC1249",
   "name": "Nagudasari Vasntha",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1814,7 +1814,7 @@
  {
   "code": "OMC1251",
   "name": "Gollakuppa Vennkata Lakshmi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1826,7 +1826,7 @@
  {
   "code": "OMC1252",
   "name": "Birre .Aneel Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1838,7 +1838,7 @@
  {
   "code": "OMC1255",
   "name": "Bandi Indu",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1850,7 +1850,7 @@
  {
   "code": "OMC1256",
   "name": "Anapalli Lalitha",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -1862,7 +1862,7 @@
  {
   "code": "OMC1257",
   "name": "Gummidi Vinod",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -1874,7 +1874,7 @@
  {
   "code": "OMC1259",
   "name": "Chintala Smaily",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1886,7 +1886,7 @@
  {
   "code": "OMC1260",
   "name": "Palakala Karthik",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1898,7 +1898,7 @@
  {
   "code": "OMC1262",
   "name": "Puli Munivarma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -1910,7 +1910,7 @@
  {
   "code": "OMC1264",
   "name": "Gunapati Murali Krishna",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1922,7 +1922,7 @@
  {
   "code": "OMC1265",
   "name": "Kuthala Srichandra",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1934,7 +1934,7 @@
  {
   "code": "OMC1266",
   "name": "Venkates",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1946,7 +1946,7 @@
  {
   "code": "OMC1270",
   "name": "Andalamala Lohitha Naga Jyothi",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -1958,7 +1958,7 @@
  {
   "code": "OMC1271",
   "name": "Bandikalla Ratna Madhuri",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -1970,7 +1970,7 @@
  {
   "code": "OMC1272",
   "name": "Madde Siva Karthik",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Naveen",
@@ -1982,7 +1982,7 @@
  {
   "code": "OMC1273",
   "name": "Anpalli  Chaithanya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -1994,7 +1994,7 @@
  {
   "code": "OMC1276",
   "name": "Inguluri Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -2006,7 +2006,7 @@
  {
   "code": "OMC1278",
   "name": "Vallam Rajesh",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -2018,7 +2018,7 @@
  {
   "code": "OMC1279",
   "name": "Ponthagani Yuvaraju",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -2030,7 +2030,7 @@
  {
   "code": "OMC1281",
   "name": "Yenneti Ramya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Hemraj",
@@ -2042,7 +2042,7 @@
  {
   "code": "OMC1282",
   "name": "K.Munemma",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -2054,7 +2054,7 @@
  {
   "code": "OMC1283",
   "name": "Kapuluri Vasanth Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vinod Kumar",
@@ -2066,7 +2066,7 @@
  {
   "code": "OMC1286",
   "name": "Tripurari Monisha",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "C. Naresh",
@@ -2078,7 +2078,7 @@
  {
   "code": "OMC1287",
   "name": "Bandi Prasanth",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vignesh",
@@ -2090,7 +2090,7 @@
  {
   "code": "OMC1288",
   "name": "Parvathareddy Venkata Divya",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Vikram",
@@ -2102,7 +2102,7 @@
  {
   "code": "OMC1289",
   "name": "Osuru Nanda Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -2114,7 +2114,7 @@
  {
   "code": "OMC1299",
   "name": "Ragiri Mani Sekhar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Krishna Mohan Pandey",
@@ -2126,7 +2126,7 @@
  {
   "code": "OMC1301",
   "name": "Thonda Pavan Kalyan",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -2138,7 +2138,7 @@
  {
   "code": "OMC1302",
   "name": "Deyyala Murali",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "B. Venkatesh",
@@ -2150,7 +2150,7 @@
  {
   "code": "OMC1298",
   "name": "Palakala Manikanta",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Anvesh",
@@ -2162,7 +2162,7 @@
  {
   "code": "OMC1300",
   "name": "Dana Madan Kumar",
-  "location": "SRICITY-FG",
+  "location": "PLANT-FG",
   "designation": "Helper",
   "department": "Production",
   "managerName": "Narishma",

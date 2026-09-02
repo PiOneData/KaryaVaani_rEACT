@@ -11,6 +11,7 @@ const path = require('path');
 const fs = require('fs');
 const { writeStore, STORE_PATH } = require('../db');
 const { licenceCeilingFor } = require('../licence-policy');
+const { TENANT } = require('../tenant');
 
 const PARENT = path.join(__dirname, '..', '..');
 const ODS_PATH = path.join(PARENT, 'OM Manpower_Attendance_Mapping Data.ods');
@@ -107,6 +108,20 @@ function main() {
   const demo = readJson('demo_seed.json');
   sources.demo = 'data/demo_seed.json';
 
+  /* The real source spreadsheets are the customer's own export, so they carry
+     the customer's site code and name the in-house trainee pool after the
+     company itself. Karya Vaani ships single-tenant but the codebase must not
+     be branded, so both are normalised on the way in — otherwise re-seeding
+     silently undoes the de-branding and puts the client's name back on screen.
+
+     The roster is single-site (every row shares one Location), so collapsing a
+     non-empty code onto the tenant's own is lossless; set TENANT_LOCATION_CODE
+     to carry a customer's real code through. The in-house vendor is the sole
+     'Trainees' row — every other vendor is '3rd Party' — and is labelled
+     'In-house', which vmCompliance() in the legacy bundle matches on. */
+  (omMapping || []).forEach((r) => { if (r.location) r.location = TENANT.locationCode; });
+  (vendors || []).forEach((v) => { if (/^trainees$/i.test(String(v.grade || '').trim())) v.company = 'In-house'; });
+
   /* CR-3 · guarantee a unique routeNo even when routes come from the committed
      seed file (which predates the field). */
   const usedRouteNos = {};
@@ -121,7 +136,7 @@ function main() {
   });
 
   /* CR-8 · the CLRA licence ceiling is a statutory limit and is tracked as its
-     own field; commercialHeadcount is Daikin's commercial supply agreement and
+     own field; commercialHeadcount is the customer's commercial supply agreement and
      is deliberately kept separate (advisory only, never a compliance block). */
   /* An agency applies for a licence with room to grow into, and how much room
      differs by agency — so the ceilings are spread across the bands the
@@ -137,7 +152,7 @@ function main() {
     const pinned = licenceCeilingFor(c.name);
     c.clraLicence = Object.assign({
       number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
-      authority: 'Licensing Officer · Sricity, Andhra Pradesh',
+      authority: TENANT.licensingAuthority,
       validTill: (c.clra && c.clra.expiresOn) || '',
       /* licences are applied for in round numbers, always above the headcount
          actually deployed under them */

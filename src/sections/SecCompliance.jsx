@@ -1,4 +1,6 @@
 /* SecCompliance — converted 1:1 from karya-vaani_v3.html · <section id="sec-compliance"> */
+import { TENANT } from '../config/tenant.js';
+
 export default function SecCompliance() {
   return (
     <section id="sec-compliance" className="section">
@@ -237,8 +239,8 @@ export default function SecCompliance() {
             <div className="card-h-title">Contractor deployment ceilings · CLRA licence</div>
             <div className="card-h-sub">
               OSHC Rules 86–90 — a contractor licence specifies a maximum authorised deployment headcount, and it is
-              enforced as a hard block on onboarding. Daikin's commercial contracted headcount is shown alongside it
-              as an advisory number, never merged with the statutory limit.
+              enforced as a hard block on onboarding. {TENANT.name}'s commercial contracted headcount is shown alongside
+              it as an advisory number, never merged with the statutory limit.
             </div>
           </div>
           <span className="pill red tiny">Hard block on onboarding</span>

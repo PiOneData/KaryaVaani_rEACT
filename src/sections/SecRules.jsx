@@ -1,4 +1,6 @@
 /* SecRules — converted 1:1 from karya-vaani_v3.html · <section id="sec-rules"> */
+import { TENANT, TENANT_SITE } from '../config/tenant.js';
+
 export default function SecRules() {
   return (
     <section id="sec-rules" className="section">
@@ -134,9 +136,9 @@ export default function SecRules() {
               <div>
                 <span className="rule-id">RL-DK-COC-014</span>
                 {' '}
-                <div className="rule-title">Daikin Supplier Code of Conduct · living wage clause</div>
+                <div className="rule-title">{`${TENANT.name} Supplier Code of Conduct · living wage clause`}</div>
                 {' '}
-                <div className="rule-src">Source · customer policy · Daikin Global Supplier CoC 2024 §6.2</div>
+                <div className="rule-src">{`Source · customer policy · ${TENANT.name} Global Supplier CoC 2024 §6.2`}</div>
               </div>
               {' '}
               <span className="locale-status approved">Customer policy</span>
@@ -145,7 +147,7 @@ export default function SecRules() {
             <div className="rule-meta">
               <span className="pill amber">Layer · customer policy</span>
               {' '}
-              <span className="pill outline">Tenant · Daikin Sricity</span>
+              <span className="pill outline">{`Tenant · ${TENANT_SITE}`}</span>
               {' '}
               <span className="pill outline mono">Last verified · 2 May 2026</span>
               {' '}

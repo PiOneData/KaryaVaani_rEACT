@@ -1,4 +1,6 @@
 /* SecLocale — converted 1:1 from karya-vaani_v3.html · <section id="sec-locale"> */
+import { TENANT } from '../config/tenant.js';
+
 export default function SecLocale() {
   return (
     <section id="sec-locale" className="section">
@@ -44,7 +46,7 @@ export default function SecLocale() {
         <div className="kpi">
           <div className="kpi-eye">Approved · 30d</div>
           <div className="kpi-val">38</div>
-          <div className="kpi-sub">Daikin · Sato-san</div>
+          <div className="kpi-sub">{`${TENANT.name} · group reviewer`}</div>
         </div>
         {' '}
         <div className="kpi">
@@ -66,7 +68,7 @@ export default function SecLocale() {
       <div className="card" style={{ marginBottom: "16px" }}>
         <div className="card-h">
           <div className="card-h-title">Review queue</div>
-          <span className="pill outline">Reviewer · Sato-san · Daikin Japan</span>
+          <span className="pill outline">{`Reviewer · ${TENANT.hq}`}</span>
         </div>
         {' '}
         <table className="t">
@@ -86,7 +88,7 @@ export default function SecLocale() {
                 {"Q1 OHS exec summary "}
                 <span className="lang-jp" style={{ color: "var(--ink-3)", fontWeight: "400" }}>(四半期OHS要旨)</span>
               </td>
-              <td>Daikin Japan HQ</td>
+              <td>{TENANT.hq}</td>
               <td>EN → JP</td>
               <td>
                 <span className="locale-status review">Awaiting review</span>
@@ -96,7 +98,7 @@ export default function SecLocale() {
             </tr>
             <tr>
               <td className="t-strong">Offer letter · Plant Manager</td>
-              <td>Candidate · Sato-san</td>
+              <td>Candidate · Plant Manager</td>
               <td>EN → JP</td>
               <td>
                 <span className="locale-status review">Awaiting review</span>
@@ -126,7 +128,7 @@ export default function SecLocale() {
             </tr>
             <tr>
               <td className="t-strong">90-day roadmap (board pack)</td>
-              <td>Daikin Japan HQ</td>
+              <td>{TENANT.hq}</td>
               <td>EN → JP</td>
               <td>
                 <span className="locale-status approved">Approved</span>

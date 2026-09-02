@@ -1,4 +1,6 @@
 /* SecEmpHome — converted 1:1 from karya-vaani_v3.html · <section id="sec-emp-home"> */
+import { TENANT_SITE } from '../config/tenant.js';
+
 export default function SecEmpHome() {
   return (
     <section id="sec-emp-home" className="section">
@@ -230,7 +232,7 @@ export default function SecEmpHome() {
           <div className="card emp-id-card">
             <div className="card-h">
               <div>
-                <div className="card-h-title">Your record at Daikin Sricity</div>
+                <div className="card-h-title">{`Your record at ${TENANT_SITE}`}</div>
                 {' '}
                 <div className="card-h-sub">What HR has on file · last refreshed today</div>
               </div>

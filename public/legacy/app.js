@@ -14,6 +14,37 @@ function __kvOnReady(fn) {
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', fn); }
   else { setTimeout(fn, 0); }
 }
+
+/* ── Tenant identity ───────────────────────────────────────────────────────
+   The customer this deployment is branded for. Karya Vaani ships single-tenant,
+   so the client's name reaches generated emails, statutory letterheads and
+   report headers as well as the screen. The React layer resolves the identity
+   (src/config/tenant.js) and publishes it on window.__KV_TENANT before this
+   script is injected; the fallbacks below keep the legacy bundle working if it
+   is ever loaded on its own. Nothing here may name a specific client — set
+   VITE_TENANT_* per deployment instead. */
+const KV_TENANT = (function () {
+  const t = (typeof window !== 'undefined' && window.__KV_TENANT) || {};
+  const pick = function (v, d) { return (v == null || v === '') ? d : String(v); };
+  const o = {
+    name:            pick(t.name, 'Customer'),
+    legalName:       pick(t.legalName, 'Customer Industries Pvt. Ltd.'),
+    site:            pick(t.site, 'Plant'),
+    region:          pick(t.region, ''),
+    regionFull:      pick(t.regionFull, ''),
+    zone:            pick(t.zone, 'Plant SEZ'),
+    address:         pick(t.address, 'Plant SEZ, Plot No. 00, India'),
+    hq:              pick(t.hq, 'Customer HQ'),
+    complianceEmail: pick(t.complianceEmail, 'compliance@customer.example'),
+    helpdeskPhone:   pick(t.helpdeskPhone, '+91-000-0000000')
+  };
+  o.siteLabel      = [o.name, o.site].filter(Boolean).join(' ');
+  o.label          = [o.siteLabel, o.region].filter(Boolean).join(' · ');
+  o.directEmployer = o.name + ' (direct)';
+  /* ", Andhra Pradesh" / "" — appended to establishment addresses. */
+  o.regionSuffix   = o.regionFull ? ', ' + o.regionFull : '';
+  return o;
+})();
   /* ── group → items lookup, so the right group lights up when an item is active ── */
   const GROUP_OF = {
     dashboard:           'grp-overview',
@@ -645,27 +676,27 @@ function __kvOnReady(fn) {
   /* PPE state per worker — keyed by worker name (covers both direct + contract) */
   const PPE_STATE = {
     /* Direct employees */
-    'Arjun Reddy':       { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '22 Apr', deliverBy: '24 Apr',  vendor: 'Sricity Industrial Stores',  receipt: 'PPE-2026-04412' },
-    'Lakshmi N.':        { shoe: 6,  uniform: 'M',  gloves: 'M',  status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr',  vendor: 'Sricity Industrial Stores',  receipt: 'PPE-2026-04388' },
-    'Hiroshi Sato':      { shoe: 10, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '15 Apr', deliverBy: '17 Apr',  vendor: 'Sricity Industrial Stores',  receipt: 'PPE-2026-04341' },
+    'Arjun Reddy':       { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '22 Apr', deliverBy: '24 Apr',  vendor: 'Plant Industrial Stores',  receipt: 'PPE-2026-04412' },
+    'Lakshmi N.':        { shoe: 6,  uniform: 'M',  gloves: 'M',  status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr',  vendor: 'Plant Industrial Stores',  receipt: 'PPE-2026-04388' },
+    'Hiroshi Sato':      { shoe: 10, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '15 Apr', deliverBy: '17 Apr',  vendor: 'Plant Industrial Stores',  receipt: 'PPE-2026-04341' },
     'Padma Vasudevan':   { shoe: 7,  uniform: 'M',  gloves: 'M',  status: 'draft',     orderedOn: null,     deliverBy: '— · trial fitment scheduled 25 Apr', vendor: '—', receipt: null },
-    'Karan Singh':       { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr',  vendor: 'Sricity Industrial Stores',  receipt: 'PPE-2026-04401' },
+    'Karan Singh':       { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr',  vendor: 'Plant Industrial Stores',  receipt: 'PPE-2026-04401' },
 
     /* Contract workers — most confirmed, some missing/draft */
-    'Ravi Kumar':       { shoe: 8,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04421' },
+    'Ravi Kumar':       { shoe: 8,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04421' },
     'Mohan Das':        { shoe: 7,  uniform: 'M',  gloves: 'M',  status: 'draft',     orderedOn: null,     deliverBy: '— · awaiting fitment 24 Apr',         vendor: '—',                                receipt: null },
     'Suresh B.':        { shoe: 8,  uniform: 'M',  gloves: 'M',  status: 'missing',   orderedOn: null,     deliverBy: '— · joining in 1 day · ALERT',         vendor: '—',                                receipt: null },
-    'Anil Kumar':       { shoe: 10, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04408' },
-    'Praveen N.':       { shoe: 8,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04409' },
-    'Mahesh G.':        { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '19 Apr', deliverBy: '21 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04391' },
+    'Anil Kumar':       { shoe: 10, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04408' },
+    'Praveen N.':       { shoe: 8,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04409' },
+    'Mahesh G.':        { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '19 Apr', deliverBy: '21 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04391' },
     'Lalita Devi':      { shoe: 5,  uniform: 'S',  gloves: 'S',  status: 'draft',     orderedOn: null,     deliverBy: '— · trial fitment 25 Apr',             vendor: '—',                                receipt: null },
-    'Vinod K.':         { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04420' },
-    'Naga Babu':        { shoe: 10, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '19 Apr', deliverBy: '21 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04395' },
+    'Vinod K.':         { shoe: 9,  uniform: 'L',  gloves: 'L',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04420' },
+    'Naga Babu':        { shoe: 10, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '19 Apr', deliverBy: '21 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04395' },
     'Devi Prasad':      { shoe: 7,  uniform: 'M',  gloves: 'M',  status: 'missing',   orderedOn: null,     deliverBy: '— · joining done · BREACH',            vendor: '—',                                receipt: null },
-    'Sneha R.':         { shoe: 6,  uniform: 'M',  gloves: 'S',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04425' },
+    'Sneha R.':         { shoe: 6,  uniform: 'M',  gloves: 'S',  status: 'confirmed', orderedOn: '21 Apr', deliverBy: '23 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04425' },
     'Manoj T.':         { shoe: 8,  uniform: 'L',  gloves: 'L',  status: 'draft',     orderedOn: null,     deliverBy: '— · awaiting fitment',                  vendor: '—',                                receipt: null },
-    'Pradeep R.':       { shoe: 7,  uniform: 'M',  gloves: 'M',  status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04405' },
-    'Karthik V.':       { shoe: 11, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '19 Apr', deliverBy: '21 Apr', vendor: 'Sricity Industrial Stores', receipt: 'PPE-2026-04396' },
+    'Pradeep R.':       { shoe: 7,  uniform: 'M',  gloves: 'M',  status: 'confirmed', orderedOn: '20 Apr', deliverBy: '22 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04405' },
+    'Karthik V.':       { shoe: 11, uniform: 'XL', gloves: 'XL', status: 'confirmed', orderedOn: '19 Apr', deliverBy: '21 Apr', vendor: 'Plant Industrial Stores', receipt: 'PPE-2026-04396' },
     'Bharath Singh':    { shoe: 8,  uniform: 'L',  gloves: 'L',  status: 'draft',     orderedOn: null,     deliverBy: '— · trial fitment 25 Apr',             vendor: '—',                                receipt: null },
   };
 
@@ -2460,7 +2491,7 @@ function __kvOnReady(fn) {
       } else {
         html += '<div class="ev-row"><div class="ev-k">Uploaded</div><div class="ev-v">' + (d.uploaded || '—') + '</div></div>';
         html += '<div class="ev-row"><div class="ev-k">Reviewer</div><div class="ev-v plain">' +
-                (d.status === 'done' ? 'HR Operations · Sricity'
+                (d.status === 'done' ? 'HR Operations · ' + KV_TENANT.site
                 : d.status === 'rejected' ? 'HR Operations · returned to worker'
                 : 'pending HR review') + '</div></div>';
         if (d.notes) html += '<div class="ev-row"><div class="ev-k">HR note</div><div class="ev-v plain">' + d.notes + '</div></div>';
@@ -2758,7 +2789,7 @@ function __kvOnReady(fn) {
 
     /* access log */
     const accessRoles = [
-      { role: 'HR Operations · Sricity',    views: 240 + Math.floor(rng(2) * 80), exports: 12 + Math.floor(rng(3) * 8) },
+      { role: 'HR Operations · ' + KV_TENANT.site,    views: 240 + Math.floor(rng(2) * 80), exports: 12 + Math.floor(rng(3) * 8) },
       { role: 'Compliance team · Bangalore',views: 60  + Math.floor(rng(4) * 40), exports: 4 + Math.floor(rng(5) * 6) },
       { role: 'Internal auditor',           views: 18  + Math.floor(rng(6) * 12), exports: 6 + Math.floor(rng(7) * 4) },
       { role: 'System · API integrations',  views: 380 + Math.floor(rng(8) * 200), exports: 0 },
@@ -2914,7 +2945,7 @@ function __kvOnReady(fn) {
     : 'Code on Social Security 2020 + Wages Code 2019 records-retention schedules') + '</td></tr>';
     rh += '<tr><td class="t-strong">Auto-purge job</td><td class="mono tiny">retention.purge.daily · last run today 03:00 IST · ' + Math.floor(d.entries / 240) + ' records purged this month</td></tr>';
     rh += '<tr><td class="t-strong">Legal hold override</td><td>Active worker = no purge · litigation hold = manual override (audit logged)</td></tr>';
-    rh += '<tr><td class="t-strong">Tenant control</td><td>Daikin Sricity policy override available · current policy matches statutory minimum</td></tr>';
+    rh += '<tr><td class="t-strong">Tenant control</td><td>' + KV_TENANT.siteLabel + ' policy override available · current policy matches statutory minimum</td></tr>';
     rh += '</tbody></table>';
     document.getElementById('sd-pane-retention').innerHTML = rh;
 
@@ -2998,7 +3029,7 @@ function __kvOnReady(fn) {
     "United Human Resource": { contact: "Naveen Kumar", email: "naveen@unitedhumanresou.in", cc: "compliance@unitedhumanresou.in" },
     "Yadhuvanshi Technical Training Center": { contact: "Latha Subramanian", email: "latha@yadhuvanshitechn.in", cc: "compliance@yadhuvanshitechn.in" },
   };
-  const CC_INTERNAL = 'compliance.sricity@daikin.co.in';
+  const CC_INTERNAL = KV_TENANT.complianceEmail;
 
   function composeFor(worker) {
     const v = VENDOR_DIRECTORY[worker.contractor] || { contact: 'Vendor contact', email: 'vendor@example.com', cc: '' };
@@ -3014,7 +3045,7 @@ function __kvOnReady(fn) {
       subject = '[URGENT] ESIC 3-day enrolment breach — ' + worker.name + ' (' + worker.category + ')';
       body =
 'Dear ' + v.contact + ',\n\n' +
-'This is a statutory escalation regarding contract worker ' + worker.name + ' (Category: ' + worker.category + ') currently deployed at Daikin Sricity through ' + worker.contractor + '.\n\n' +
+'This is a statutory escalation regarding contract worker ' + worker.name + ' (Category: ' + worker.category + ') currently deployed at ' + KV_TENANT.siteLabel + ' through ' + worker.contractor + '.\n\n' +
 'ESIC enrolment status: ' + worker.esic.label + '\n' +
 '\u00B7 The ESI Act 1948 mandates ESIC enrolment within 3 calendar days of joining\n' +
 '\u00B7 This worker is past the statutory window without a valid ESIC IP number\n' +
@@ -3026,10 +3057,10 @@ function __kvOnReady(fn) {
 'Failure to resolve within 24 hours will trigger:\n' +
 '  \u00B7 Worker deployment suspension at site\n' +
 '  \u00B7 Joint-liability exposure noted against your firm\'s compliance score\n' +
-'  \u00B7 Escalation to your assigned Daikin Compliance lead\n\n' +
-'For assistance, reply to this email or call the Sricity Compliance helpdesk at +91-877-XXXXXXX.\n\n' +
+'  \u00B7 Escalation to your assigned ' + KV_TENANT.name + ' Compliance lead\n\n' +
+'For assistance, reply to this email or call the ' + KV_TENANT.site + ' Compliance helpdesk at ' + KV_TENANT.helpdeskPhone + '.\n\n' +
 'Regards,\n' +
-'Karya Vaani (on behalf of Daikin Sricity HR)\n' +
+'Karya Vaani (on behalf of ' + KV_TENANT.siteLabel + ' HR)\n' +
 'Audit reference: PV-ESIC-' + Date.now().toString().slice(-7) + '\n' +
 'This notice is auto-logged to the Karya Vaani audit chain (SHA-256).';
     } else if (isPending) {
@@ -3044,7 +3075,7 @@ function __kvOnReady(fn) {
 '  2. Upload IP number to the Karya Vaani Contractor portal\n\n' +
 'Note: Failure to close this within the statutory window will trigger an ESIC 3-day breach, halt push-to-HRIS, and affect your compliance score.\n\n' +
 'Regards,\n' +
-'Karya Vaani (on behalf of Daikin Sricity HR)\n' +
+'Karya Vaani (on behalf of ' + KV_TENANT.siteLabel + ' HR)\n' +
 'Audit reference: PV-ESIC-' + Date.now().toString().slice(-7);
     } else if (clraState === 'expired') {
       severity = 'URGENT · CLRA licence expired';
@@ -3056,17 +3087,17 @@ function __kvOnReady(fn) {
 '  1. Apply for licence renewal with the appropriate Labour Commissioner\n' +
 '  2. Upload renewed licence to the Karya Vaani Contractor portal\n' +
 '  3. Submit interim acknowledgement from the licensing authority\n\n' +
-'Until resolved, no new worker deployment will be permitted at Daikin Sricity sites.\n\n' +
-'Regards,\nKarya Vaani (on behalf of Daikin Sricity HR)';
+'Until resolved, no new worker deployment will be permitted at ' + KV_TENANT.siteLabel + ' sites.\n\n' +
+'Regards,\nKarya Vaani (on behalf of ' + KV_TENANT.siteLabel + ' HR)';
     } else if (clraState === 'expiring') {
       severity = 'Medium · CLRA licence expiring soon';
       subject = '[Reminder] CLRA licence expiring within 30 days — ' + worker.contractor;
       body =
 'Dear ' + v.contact + ',\n\n' +
-'Your CLRA licence linked to deployments at Daikin Sricity is expiring within 30 days.\n\n' +
+'Your CLRA licence linked to deployments at ' + KV_TENANT.siteLabel + ' is expiring within 30 days.\n\n' +
 'Worker in scope: ' + worker.name + ' (' + worker.category + ')\nCLRA licence: ' + worker.clra.label + '\n\n' +
 'Please initiate renewal at the earliest. Karya Vaani will block new deployments past the expiry date.\n\n' +
-'Regards,\nKarya Vaani (on behalf of Daikin Sricity HR)';
+'Regards,\nKarya Vaani (on behalf of ' + KV_TENANT.siteLabel + ' HR)';
     } else {
       severity = 'Routine';
       subject = 'Compliance check-in — ' + worker.name;
@@ -3078,7 +3109,7 @@ function __kvOnReady(fn) {
 '  \u00B7 CLRA licence: ' + worker.clra.label + '\n' +
 '  \u00B7 Migrant: ' + worker.migrant + '\n\n' +
 'No action is required at this time. Please reply if you have any updates.\n\n' +
-'Regards,\nKarya Vaani (on behalf of Daikin Sricity HR)';
+'Regards,\nKarya Vaani (on behalf of ' + KV_TENANT.siteLabel + ' HR)';
     }
 
     return { vendor: v, subject, body, severity, worker };
@@ -4238,8 +4269,8 @@ function __kvOnReady(fn) {
             '<td class="right mono">' + fmtLakh(0) + '</td>' +
             '<td class="right mono t-strong">' + fmtLakh(ops) + '</td>' +
             '<td class="right mono">' + fmtLakh(ops * 2) + '</td>' +
-            '<td>Per Sricity production cost model</td></tr>';
-    html += '<tr><td><div class="t-strong">Customer audit failure</div><div class="formula">Daikin customer audit (BRSR / supplier code-of-conduct)</div></td>' +
+            '<td>Per ' + KV_TENANT.site + ' production cost model</td></tr>';
+    html += '<tr><td><div class="t-strong">Customer audit failure</div><div class="formula">' + KV_TENANT.name + ' customer audit (BRSR / supplier code-of-conduct)</div></td>' +
             '<td class="right mono">' + fmtLakh(0) + '</td>' +
             '<td class="right mono t-strong">' + fmtLakh(L.customerAudit) + '</td>' +
             '<td class="right mono">' + fmtLakh(L.customerAudit * 3) + '</td>' +
@@ -4350,21 +4381,21 @@ function __kvOnReady(fn) {
     if (!c) { toast('Contractor not found', 'red'); return; }
     var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
     var row = function (k, v) { return '<div class="row"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>'; };
-    var addr = esc(c.area || 'Sricity SEZ') + ', Andhra Pradesh – 517646';
+    var addr = esc(c.area || KV_TENANT.zone) + KV_TENANT.regionSuffix;
     var refNo = (c.id || 'CT').toUpperCase().replace(/[^A-Z0-9]/g, '') + '-' + (2026);
     var todayLong = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
     /* per-document authority header + title + body */
     var DOCS = {
       'clra': {
-        auth: 'GOVERNMENT OF ANDHRA PRADESH', dept: 'Office of the Licensing Officer · Labour Department',
+        auth: ('GOVERNMENT OF ' + (KV_TENANT.regionFull || 'INDIA')).toUpperCase(), dept: 'Office of the Licensing Officer · Labour Department',
         title: 'LICENCE UNDER THE CONTRACT LABOUR (R&amp;A) ACT, 1970',
         wm: 'CLRA',
         body: row('Licence No.', 'ALC/CLRA/' + refNo + '/438') +
           row('Issued to (Contractor)', c.name) +
           row('Registered address', addr) +
           row('PAN / CIN', c.panCin || 'AAQFS8338K1Z3') +
-          row('Principal Employer', 'Daikin Airconditioning India Pvt. Ltd., Sricity') +
+          row('Principal Employer', KV_TENANT.legalName + ', ' + KV_TENANT.site) +
           row('Nature of work', 'Manpower supply · assembly, material handling, housekeeping') +
           row('Maximum workers permitted', (c.deployed || 0) + ' workmen') +
           row('Date of issue', '18 Jul 2025') +
@@ -4379,9 +4410,9 @@ function __kvOnReady(fn) {
           row('Name of employer', c.name) +
           row('Address of establishment', addr) +
           row('Date of coverage', '01 Apr 2023') +
-          row('Sub-code (Sricity unit)', (c.esicCode || '52000000000').slice(0, 2) + '-SRC-' + c.id.slice(-3)) +
+          row('Sub-code (' + KV_TENANT.site + ' unit)', (c.esicCode || '52000000000').slice(0, 2) + '-SUB-' + c.id.slice(-3)) +
           row('Nature of business', 'Contract manpower services') +
-          row('Regional Office', 'ESIC Regional Office, Guntur, A.P.') +
+          row('Regional Office', 'ESIC Regional Office' + KV_TENANT.regionSuffix) +
           row('Status', (c.esic && c.esic.label) || 'Active &amp; contributing')
       },
       'pf': {
@@ -4394,7 +4425,7 @@ function __kvOnReady(fn) {
           row('Date of coverage', '01 Apr 2023') +
           row('Applicable scheme', 'EPF & MP Act, 1952 · EPF, EPS & EDLI') +
           row('Contribution rate', '12% employee + 12% employer') +
-          row('EPFO Office', 'Regional PF Office, Guntur, A.P.') +
+          row('EPFO Office', 'Regional PF Office' + KV_TENANT.regionSuffix) +
           row('Status', 'Active · ECR filed to date')
       },
       'gst': {
@@ -4411,11 +4442,11 @@ function __kvOnReady(fn) {
           row('Status', 'Active')
       },
       'service': {
-        auth: 'DAIKIN AIRCONDITIONING INDIA PVT. LTD.', dept: 'Contract Labour &amp; Facilities · Sricity Plant',
+        auth: KV_TENANT.legalName.toUpperCase(), dept: 'Contract Labour &amp; Facilities · ' + KV_TENANT.site,
         title: 'MANPOWER SERVICE AGREEMENT',
         wm: 'AGREEMENT',
         body: row('Agreement No.', 'DAI/MSA/' + refNo + '/V3') +
-          row('Between (Principal Employer)', 'Daikin Airconditioning India Pvt. Ltd.') +
+          row('Between (Principal Employer)', KV_TENANT.legalName) +
           row('And (Service Provider)', c.name) +
           row('Scope of services', 'Supply of ' + (c.deployed || 0) + ' contract workmen for plant operations') +
           row('Commencement date', '01 Apr 2024') +
@@ -4429,7 +4460,7 @@ function __kvOnReady(fn) {
         wm: 'INSURED',
         body: row('Policy No.', 'OIC/WC/2026/' + refNo) +
           row('Insured (Contractor)', c.name) +
-          row('Location of risk', 'Daikin Plant, Sricity SEZ, A.P.') +
+          row('Location of risk', KV_TENANT.siteLabel + ', ' + KV_TENANT.zone) +
           row('Number of workmen covered', (c.deployed || 0)) +
           row('Sum insured (per capita)', '₹ 15,00,000 statutory + medical') +
           row('Policy period', '01 Apr 2026 to 31 Mar 2027') +
@@ -4586,7 +4617,7 @@ function __kvOnReady(fn) {
     let html = '<hr class="div">';
     html += '<div style="font-size:0.8rem;color:var(--ink-2);line-height:1.7">';
     html += '  <div class="row-between"><span>Statutory penalty · sum over contractors (mid)</span><span class="mono">₹' + totalStat + ' L</span></div>';
-    html += '  <div class="row-between"><span>Operational disruption (1-day Sricity stop)</span><span class="mono">₹' + sharedOpStop + ' L</span></div>';
+    html += '  <div class="row-between"><span>Operational disruption (1-day ' + KV_TENANT.site + ' stop)</span><span class="mono">₹' + sharedOpStop + ' L</span></div>';
     html += '  <div class="row-between"><span>Customer audit failure · sum</span><span class="mono">₹' + totalCust + ' L</span></div>';
     html += '  <div class="row-between" style="font-weight:600;color:var(--ink);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)"><span>Mid-case total · principal employer</span><span class="mono">₹' + grandTotal + ' L</span></div>';
     html += '  <div class="tiny muted" style="margin-top:8px">Contract value at risk (₹' + totalCV + ' L) tracked separately — realised only if specific contractor licence lapses.</div>';
@@ -4653,7 +4684,7 @@ function __kvOnReady(fn) {
   /* ── Vendor management · manpower-supply vendors + compliance ──────────────
      The manpower vendors (skill-wise deployed headcount from the deployment
      sheet) get a compliance score by matching to their contractor master
-     record; in-house (Daikin trainees) is managed internally; an unmatched
+     record; in-house (the customer's own trainees) is managed internally; an unmatched
      3rd-party vendor gets an estimated statutory-readiness score. Surfaced as a
      searchable, paginated table with a drill-through to contractor compliance. */
   function vmVendors() { return (window.__KVDATA && window.__KVDATA.vendors) || []; }
@@ -4667,7 +4698,10 @@ function __kvOnReady(fn) {
   function vmSkills(v) { return { skilled: (v.fgSkilled || 0) + (v.deviceSkilled || 0), semi: (v.fgSemiSkilled || 0) + (v.deviceSemiSkilled || 0), unskilled: (v.fgUnskilled || 0) + (v.deviceUnskilled || 0) }; }
   function vmBand(score) { return score >= 80 ? 'green' : score >= 60 ? 'amber' : 'red'; }
   function vmCompliance(v) {
-    if (vmNorm(v.company).indexOf('daikin') === 0) return { inhouse: true, matched: null, score: null, band: 'green', status: 'In-house · Daikin managed' };
+    /* The in-house row is the customer's own trainee pool: the seed labels it
+       'In-house', but a client-branded dataset may name the company instead. */
+    const nvc = vmNorm(v.company);
+    if (nvc.indexOf('inhouse') === 0 || nvc.indexOf(vmNorm(KV_TENANT.name)) === 0) return { inhouse: true, matched: null, score: null, band: 'green', status: 'In-house · ' + KV_TENANT.name + ' managed' };
     const c = vmMatch(v);
     if (c) return { inhouse: false, matched: c, score: c.score, band: vmBand(c.score), status: 'From contractor master' };
     let h = 2166136261; const s = vmNorm(v.company); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
@@ -5785,7 +5819,7 @@ function __kvOnReady(fn) {
     kcSend();
   }
 
-  /* English-only input — Daikin office users always work in English.
+  /* English-only input — customer office users always work in English.
      Translation is an output-side action on each result. */
   const KC_SUGGESTIONS = {
     EN: ['What time does my shift bus reach the pickup point?', 'How many casual leaves do I get?', 'What is the AP minimum wage for 2026?'],
@@ -6349,7 +6383,7 @@ function __kvOnReady(fn) {
       'Andhra Pradesh':{ u:11200, ss:14200, sk:18000, hs:24000, status:'Final state rules gazetted. VDA revision due January and July annually.' },
       'Telangana':     { u:11000, ss:14000, sk:17600, hs:23500, status:'Final rules active. Separate wage boards for construction and manufacturing.' },
       'Karnataka':     { u:12200, ss:15000, sk:18800, hs:25000, status:'Final rules gazetted. IT/manufacturing zones have separate wage schedules.' },
-      'Tamil Nadu':    { u:11800, ss:14800, sk:18400, hs:24500, status:'Final rules active. Special economic zone rates apply at Sricity equivalent parks.' },
+      'Tamil Nadu':    { u:11800, ss:14800, sk:18400, hs:24500, status:'Final rules active. Special economic zone rates apply at equivalent parks.' },
       'Gujarat':       { u:10800, ss:13600, sk:17200, hs:22800, status:'Final rules gazetted. Industrial areas under separate schedule.' },
       'Rajasthan':     { u:10200, ss:13000, sk:16400, hs:21500, status:'Final rules active as of April 2026.' },
       'Haryana':       { u:11500, ss:14500, sk:18200, hs:24200, status:'Final rules gazetted. NCR boundary workers entitled to Delhi-rate minimum wages.' },
@@ -11732,7 +11766,7 @@ function __kvOnReady(fn) {
         zone: (rec.employment && rec.employment.dept) || rec.department || '—',
         dept: (rec.employment && rec.employment.dept) || rec.department || '—',
         sup: rec.manager || '—', type: rec.type === 'direct' ? 'Direct' : 'Contract',
-        contractor: (rec.employment && rec.employment.contractor) || (rec.type === 'direct' ? 'Daikin' : '—'),
+        contractor: (rec.employment && rec.employment.contractor) || (rec.type === 'direct' ? KV_TENANT.name : '—'),
         lang: (typeof obLangNameToCode === 'function' ? obLangNameToCode(rec.lang) : 'EN'),
         phone: rec.mobile ? ('••• ••• ' + String(rec.mobile).replace(/\D/g, '').slice(-4)) : '',
         _cap: rec
@@ -12513,7 +12547,7 @@ function __kvOnReady(fn) {
   const CT_ACTIONS = {
     'CT-001': [
       { id: 'CA-101', tier: 'critical', label: 'Critical', subj: 'ESIC shortfall · 4 workers uncovered in May',
-        body: 'Your May ESIC challan covers 138 workers — but 142 were deployed. Reconcile the shortfall before 05 Jun or principal-employer liability transfers to Daikin.',
+        body: 'Your May ESIC challan covers 138 workers — but 142 were deployed. Reconcile the shortfall before 05 Jun or principal-employer liability transfers to the principal employer.',
         sla: '5 days', by: 'Priya Menon · HR Operations', at: '24 May 2026 · 11:02 IST', status: 'pending' },
       { id: 'CA-102', tier: 'urgent', label: 'Urgent', subj: 'CLRA licence renewal · expires in 21 days',
         body: 'Your contract-labour licence expires on 11 Jun 2026. Submit the renewal application + worker register by 04 Jun to avoid a deployment freeze.',
@@ -13001,7 +13035,7 @@ function __kvOnReady(fn) {
           var ok = provided[k];
           return '<span class="pill ' + (ok ? 'green' : 'red') + ' tiny" style="margin:2px" title="' + ctDocTypeLabel(k) + '">' + (ok ? '✓ ' : '✗ ') + ctDocTypeLabel(k).replace(/ .*/, '') + '</span>';
         }).join('') + ' <span class="tiny muted">' + Object.keys(provided).filter(function (k) { return CT_DOC_REQUIRED.indexOf(k) >= 0; }).length + '/' + CT_DOC_REQUIRED.length + ' statutory docs on file</span></div>';
-        if (!docs.length) { host.innerHTML = checklist + '<div class="tiny muted">No documents uploaded yet. Upload your CLRA, ESIC, PF, min-wage, migrant-cover and safety documents above — Daikin HR will see them.</div>'; return; }
+        if (!docs.length) { host.innerHTML = checklist + '<div class="tiny muted">No documents uploaded yet. Upload your CLRA, ESIC, PF, min-wage, migrant-cover and safety documents above — ' + KV_TENANT.name + ' HR will see them.</div>'; return; }
         host.innerHTML = checklist + docs.map(function (d) {
           return '<div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:0.82rem">' +
             '<span><strong>' + ctDocTypeLabel(d.complianceKey || d.docType) + '</strong> · ' + d.name + ' <span class="tiny muted">· ' + new Date(d.uploadedAt).toLocaleDateString('en-IN') + '</span></span>' +
@@ -13023,7 +13057,7 @@ function __kvOnReady(fn) {
       : null;
     return c || { id: id || scope, name: scope };
   }
-  /* Shared document store: an AGENCY login sees its OWN Daikin-required
+  /* Shared document store: an AGENCY login sees its OWN customer-required
      compliance documents (CLRA / ESIC / PF / min-wage / migrant / safety) with
      upload + status — reusing the contractor-documents store — instead of the
      per-worker document-type grid that HR sees. */
@@ -13038,7 +13072,7 @@ function __kvOnReady(fn) {
         '<div class="card">' +
           '<div class="card-h"><div>' +
             '<div class="card-h-title">Your compliance documents · ' + (agency.name || '') + '</div>' +
-            '<div class="card-h-sub">Upload and keep your Daikin-required statutory documents current — CLRA, ESIC, PF, minimum-wage, migrant cover and safety. Daikin HR sees these.</div>' +
+            '<div class="card-h-sub">Upload and keep your ' + KV_TENANT.name + '-required statutory documents current — CLRA, ESIC, PF, minimum-wage, migrant cover and safety. ' + KV_TENANT.name + ' HR sees these.</div>' +
           '</div></div>' +
           '<div id="ct-docs-upload" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px"></div>' +
           '<div id="ct-docs-list" class="tiny muted">Loading documents…</div>' +
@@ -13485,7 +13519,7 @@ function __kvOnReady(fn) {
   const TR_AGENCIES = ['OM Manpower', 'ARK HR Solutions', 'Blue Ocean Personnel', 'CHR Enterprises', 'Casa Grande Propcare', 'Saptagiri Ent.'];
   /* fleet operators — route index i → TR_OPERATORS[i % 4] (identical rule to the
      backend), so each route has one operator and an operator owns fixed routes. */
-  const TR_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'APSRTC Contract Fleet', 'Sricity Logistics'];
+  const TR_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'Metro Contract Fleet', 'Corridor Logistics'];
   /* Per-worker operator override, applied at the ROUTE level (one operator owns
      a route, so this reflects on the worker login AND the transport page for
      that route). E Pavithra's (OMC0002) route is operated by Sri Balaji Travels. */
@@ -13521,10 +13555,10 @@ function __kvOnReady(fn) {
     const pickup = pickups.length ? pickups[pickupIdx].name : (route.stops[0] && route.stops[0].name) || town;
     const shift = ((h >>> 9) % 10) < 6 ? 'morning' : 'general';   // ~60% morning
     const mobile = '9' + String(700000000 + (h % 89999999));
-    const type = ((h >>> 12) % 4 === 0) ? 'emp' : 'ctr';          // ~25% Daikin direct
+    const type = ((h >>> 12) % 4 === 0) ? 'emp' : 'ctr';          // ~25% directly employed
     const gender = ((h >>> 15) % 5) < 2 ? 'F' : 'M';              // ~40% women
     const plate = 'AP-29-' + (3800 + (h % 1099));
-    const agency = type === 'emp' ? 'Daikin direct' : TR_AGENCIES[(h >>> 18) % TR_AGENCIES.length];
+    const agency = type === 'emp' ? KV_TENANT.name + ' direct' : TR_AGENCIES[(h >>> 18) % TR_AGENCIES.length];
     const operator = trRouteOperator(route.code);
     // OSHC Rule 83 night-shift consent — applies ONLY to women on the NIGHT shift
     // (Shift C). General/morning-shift women are 'na'. Base is deterministic
@@ -13869,7 +13903,7 @@ function __kvOnReady(fn) {
         type: rec.type === 'direct' ? 'emp' : 'ctr',
         gender: rec.gender === 'Female' ? 'F' : 'M',
         plate: 'Bus ' + ro.code,
-        agency: rec.type === 'direct' ? 'Daikin (direct)' : (contractor || '—'),
+        agency: rec.type === 'direct' ? KV_TENANT.directEmployer : (contractor || '—'),
         operator: (typeof trRouteOperator === 'function' ? trRouteOperator(ro.code) : ''),
         nightConsent: (rec.gender === 'Female' && shift === 'night') ? (rec.nightShiftConsent ? 'yes' : 'pending') : 'na',
         _onboarded: true, _ci: i
@@ -14690,11 +14724,11 @@ function __kvOnReady(fn) {
       '.foot{margin-top:20px;font-size:9px;color:#8A8578;border-top:1px solid #DDD;padding-top:8px;}' +
       '@media print{body{margin:14mm;}}' +
       '</style></head><body>' +
-      '<div class="eyebrow">Daikin Sricity · Karya Vaani</div>' +
+      '<div class="eyebrow">' + KV_TENANT.siteLabel + ' · Karya Vaani</div>' +
       '<h1>Module Health Report<span class="hi">' + DASH_HI.title + '</span></h1>' +
       '<div class="sub">Unified Workforce Governance · Defensible Audit Readiness</div>' +
       '<div class="sub hi">' + DASH_HI.sub + '</div>' +
-      '<div class="meta">Tenant: Daikin Sricity · Andhra Pradesh &nbsp;|&nbsp; ' + DASH_HI.tenant +
+      '<div class="meta">Tenant: ' + KV_TENANT.label + ' &nbsp;|&nbsp; ' + DASH_HI.tenant +
         ' &nbsp;·&nbsp; Generated / ' + DASH_HI.generated + ': ' + stamp + '</div>' +
       '<div class="kpis">' +
         '<div class="kpi"><div class="k-eye">Compliance score<span class="hi">' + DASH_HI.score + '</span></div><div class="k-val">72 / 100</div></div>' +
@@ -16811,14 +16845,14 @@ function __kvOnReady(fn) {
           ? [
               { k: 'Employer code', v: value },
               { k: 'Establishment', v: name },
-              { k: 'Region', v: 'Andhra Pradesh · Sri City sub-office' },
+              { k: 'Region', v: (KV_TENANT.regionFull ? KV_TENANT.regionFull + ' · ' : '') + KV_TENANT.site + ' sub-office' },
               { k: 'Coverage from', v: '01 Apr 2019' },
               { k: 'Status', v: 'Active' }
             ]
           : [
               { k: 'IP number', v: value },
               { k: 'Insured person', v: name },
-              { k: 'Dispensary', v: 'ESIC Sri City' },
+              { k: 'Dispensary', v: 'ESIC ' + KV_TENANT.site },
               { k: 'Employer', v: 'OM Manpower Services' },
               { k: 'Status', v: 'Active' }
             ],
@@ -17022,8 +17056,8 @@ function __kvOnReady(fn) {
      may be set to a base64 data-URL (e.g. 'data:image/png;base64,iVBOR…') to
      print a logo image in the header; leave '' for a text-only letterhead. */
   const COMPANY_PROFILE = {
-    name:    'Daikin Air-conditioning India Pvt. Ltd.',   // « company legal name »
-    address: 'Sri City SEZ, Plot No. 00, Chittoor District, Andhra Pradesh 517646, India', // « registered address »
+    name:    KV_TENANT.legalName,                         // « company legal name »
+    address: KV_TENANT.address,                           // « registered address »
     cin:     'U00000AP0000PTC000000',                     // « CIN »
     gst:     '37AAAAA0000A1Z5',                            // « GSTIN »
     phone:   '+91 00000 00000',                            // « contact number »
@@ -19097,7 +19131,7 @@ function __kvOnReady(fn) {
       kvKV('Type', rec.type === 'direct' ? 'Direct employee' : 'Contract worker') +
       kvKV('Designation', rec.designation) +
       kvKV('Department', (rec.employment || {}).dept) +
-      kvKV('Contractor / employer', rec.type === 'direct' ? 'Daikin (direct)' : (((rec.employment || {}).contractor) || ctForWorkerCode(rec.id))) +
+      kvKV('Contractor / employer', rec.type === 'direct' ? KV_TENANT.directEmployer : (((rec.employment || {}).contractor) || ctForWorkerCode(rec.id))) +
       kvKV('Category', rec.category) + kvKV('Gender', rec.gender) + kvKV('Date of birth', rec.dob) +
       kvKV('Mobile', rec.mobile) + kvKV('Emergency contact', rec.emergency) +
       kvKV('Reporting manager', rec.manager ? rec.manager + (rec.managerCode ? ' · ' + rec.managerCode : '') : '—') +
@@ -19503,7 +19537,7 @@ function __kvOnReady(fn) {
       out.push({
         code: r.id, name: r.name, desig: r.designation || r.category || 'Worker', dept: e.dept || '—',
         mgr: r.manager || '—', mgrCode: r.managerCode || '', uan: r.uan || '—', esi: r.esi || '—',
-        lang: r.lang || '—', contractor: (r.type === 'direct') ? 'Daikin (direct)' : (e.contractor || 'Contract'),
+        lang: r.lang || '—', contractor: (r.type === 'direct') ? KV_TENANT.directEmployer : (e.contractor || 'Contract'),
         _kind: 'onboarded', _onboarded: true, _ci: i, _rec: r
       });
     });
@@ -19694,7 +19728,7 @@ function __kvOnReady(fn) {
     const compliance = dims.map(function (d) {
       const vv = (c.subscores || {})[d[0]] || 0; const col = omComplyColor(vv);
       return '<div style="margin:9px 0"><div class="row-between" style="font-size:0.8rem;margin-bottom:3px"><span>' + d[1] + '</span><span class="mono" style="color:' + col + '">' + vv + '/100</span></div><div class="bar"><span style="width:' + vv + '%;background:' + col + '"></span></div></div>';
-    }).join('') + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Estimated statutory exposure (mid-case) ≈ ₹' + expMid + ' L · joint liability with the principal employer (Daikin).</div>';
+    }).join('') + '<div class="note indigo" style="margin-top:12px;font-size:0.74rem">Estimated statutory exposure (mid-case) ≈ ₹' + expMid + ' L · joint liability with the principal employer (' + KV_TENANT.name + ').</div>';
     const wk = ctAllWorkers(c.name);
     const wkRows = wk.length ? wk.map(function (w) {
       const click = w.captureIndex >= 0 ? ' style="cursor:pointer" onclick="obOpenCapture(' + w.captureIndex + ')"' : '';
@@ -20386,7 +20420,7 @@ function __kvOnReady(fn) {
     var rev = x.revocation || {};
     return kv2col(
       kvKV('Worker', kvEsc(x.workerName) + ' · ' + kvEsc(x.workerId)) +
-      kvKV('Employer', kvEsc(x.contractor || (x.type === 'direct' ? 'Daikin (direct)' : '—'))) +
+      kvKV('Employer', kvEsc(x.contractor || (x.type === 'direct' ? KV_TENANT.directEmployer : '—'))) +
       kvKV('Last working day', kvDateShort(x.lastWorkingDay)) +
       kvKV('Exit reason', kvEsc(x.reason)) +
       kvKV('Recorded by', kvEsc(x.createdBy) + ' · ' + kvDateTime(x.createdAt)) +
@@ -20495,7 +20529,7 @@ function __kvOnReady(fn) {
      the principal employer permitting it carries joint liability, so the
      platform refuses the onboarding outright.
 
-     Daikin's commercial "contracted headcount" is a SEPARATE, non-statutory
+     The customer's commercial "contracted headcount" is a SEPARATE, non-statutory
      number. It is tracked in its own field and only ever raises an advisory
      alert — merging the two would produce compliance-labelled evidence that
      does not correspond to a statutory obligation.
@@ -21067,7 +21101,7 @@ function __kvOnReady(fn) {
       '<div class="modal-body">' +
         '<div class="note indigo" style="font-size:0.76rem;margin-bottom:12px">Two different numbers, deliberately kept apart. ' +
           'The <strong>CLRA licensed headcount</strong> is statutory (OSHC Rules 86-90) and is enforced as a hard block on onboarding. ' +
-          'The <strong>commercial contracted headcount</strong> is Daikin\'s supply agreement — advisory only, it never blocks anything.</div>' +
+          'The <strong>commercial contracted headcount</strong> is the customer\'s supply agreement — advisory only, it never blocks anything.</div>' +
         '<div class="card-h-title" style="font-size:0.85rem;margin-bottom:6px">Statutory · CLRA licence</div>' +
         '<div class="g3" style="gap:10px 14px">' +
           '<div class="field"><label class="field-l">Licence number</label><input class="input" id="lic-no" value="' + kvEsc(lic.number || '') + '"></div>' +
@@ -22741,7 +22775,7 @@ function __kvOnReady(fn) {
         return {
           code: r.id, employeeId: r.employeeId || '', name: r.name, category: r.category || 'Unskilled',
           type: r.type || 'contract', department: (r.employment || {}).dept || '',
-          contractor: r.type === 'direct' ? 'Daikin (direct)' : ((r.employment || {}).contractor || ''),
+          contractor: r.type === 'direct' ? KV_TENANT.directEmployer : ((r.employment || {}).contractor || ''),
           baseWage: payBaseFor(r)
         };
       });

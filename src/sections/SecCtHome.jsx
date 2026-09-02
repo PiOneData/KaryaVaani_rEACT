@@ -1,4 +1,6 @@
 /* SecCtHome — converted 1:1 from karya-vaani_v3.html · <section id="sec-ct-home"> */
+import { TENANT, TENANT_SITE } from '../config/tenant.js';
+
 export default function SecCtHome() {
   return (
     <section id="sec-ct-home" className="section">
@@ -215,7 +217,7 @@ export default function SecCtHome() {
               <div>
                 <div className="card-h-title">Your firm record</div>
                 {' '}
-                <div className="card-h-sub">What Daikin Sricity has on file · last refreshed today</div>
+                <div className="card-h-sub">{`What ${TENANT_SITE} has on file · last refreshed today`}</div>
               </div>
             </div>
             {' '}
@@ -242,7 +244,7 @@ export default function SecCtHome() {
           </div>
           {' '}
           {/*  CR-6 · EPF / ESIC payment submission — the agency submits amounts
-               paid per deployed worker; Daikin HR verifies against the challan  */}
+               paid per deployed worker; the customer's HR verifies against the challan  */}
           {' '}
           <div className="card">
             <div className="card-h">
@@ -251,7 +253,7 @@ export default function SecCtHome() {
                 {' '}
                 <div className="card-h-sub">
                   Submit what you paid each month, with the challan and the headcount it covers.
-                  Daikin HR reconciles it against your actual deployed headcount and records the verification.
+                  {TENANT.name} HR reconciles it against your actual deployed headcount and records the verification.
                 </div>
               </div>
             </div>
@@ -266,7 +268,7 @@ export default function SecCtHome() {
               <div>
                 <div className="card-h-title">Compliance documents</div>
                 {' '}
-                <div className="card-h-sub">Upload your statutory documents — visible to Daikin HR, and they drive your compliance score</div>
+                <div className="card-h-sub">{`Upload your statutory documents — visible to ${TENANT.name} HR, and they drive your compliance score`}</div>
               </div>
             </div>
             {' '}
@@ -353,7 +355,7 @@ export default function SecCtHome() {
           </span>
           {' '}
           <div className="emp-chat-pop-h-main">
-            <div className="emp-chat-pop-h-name">Plant HR · Daikin Sricity</div>
+            <div className="emp-chat-pop-h-name">{`Plant HR · ${TENANT_SITE}`}</div>
             {' '}
             <div className="emp-chat-pop-h-sub" id="ct-chat-pop-h-sub">
               — · compliance, challans & audit coordination

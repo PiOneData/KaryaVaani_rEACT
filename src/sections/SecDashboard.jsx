@@ -1,4 +1,6 @@
 /* SecDashboard — converted 1:1 from karya-vaani_v3.html · <section id="sec-dashboard"> */
+import { TENANT_SITE } from '../config/tenant.js';
+
 export default function SecDashboard() {
   return (
     <section id="sec-dashboard" className="section active">
@@ -12,7 +14,7 @@ export default function SecDashboard() {
       {' '}
       <div className="page-h">
         <div className="page-h-left">
-          <div className="page-eyebrow">Daikin Sricity</div>
+          <div className="page-eyebrow">{TENANT_SITE}</div>
           {' '}
           <h1 className="page-title">
             {"Unified Workforce Governance. "}
