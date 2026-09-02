@@ -1,4 +1,6 @@
 /* SecOnboarding — converted 1:1 from karya-vaani_v3.html · <section id="sec-onboarding"> */
+import { TENANT } from '../config/tenant.js';
+
 export default function SecOnboarding() {
   return (
     <section id="sec-onboarding" className="section">
@@ -373,7 +375,7 @@ export default function SecOnboarding() {
               <hr className="div" />
               {' '}
               <div className="tiny muted">
-                Worker record pushes to Daikin HRIS via API handoff. Karya Vaani continues tracking in OHS and Compliance; master record now owned by HRIS.
+                Worker record pushes to {TENANT.name} HRIS via API handoff. Karya Vaani continues tracking in OHS and Compliance; master record now owned by HRIS.
               </div>
             </div>
           </div>
@@ -1293,7 +1295,7 @@ export default function SecOnboarding() {
       </div>
       {' '}
       <div id="ob-docs" className="subpane" style={{ display: "none" }}>
-        {/*  Agency login: the agency's own Daikin-required compliance documents
+        {/*  Agency login: the agency's own customer-required compliance documents
              (rendered by obRenderSharedDocStore); hidden for HR.  */}
         <div id="ob-agency-docs" style={{ display: "none" }} />
         <div className="card" id="ob-empdoc-card">

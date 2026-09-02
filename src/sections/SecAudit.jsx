@@ -1,4 +1,6 @@
 /* SecAudit — converted 1:1 from karya-vaani_v3.html · <section id="sec-audit"> */
+import { TENANT } from '../config/tenant.js';
+
 export default function SecAudit() {
   return (
     <section id="sec-audit" className="section">
@@ -114,7 +116,7 @@ export default function SecAudit() {
               <tr>
                 <td className="mono tiny">11:43:18</td>
                 <td className="t-strong">localisation.review.approved</td>
-                <td>Sato-san (Daikin JP)</td>
+                <td>{`Reviewer (${TENANT.hq})`}</td>
                 <td className="tiny muted">90-day roadmap board pack · JP</td>
                 <td>
                   <span className="mono tiny">d104…8821</span>

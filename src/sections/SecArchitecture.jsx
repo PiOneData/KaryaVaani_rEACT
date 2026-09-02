@@ -1,4 +1,6 @@
 /* SecArchitecture — converted 1:1 from karya-vaani_v3.html · <section id="sec-architecture"> */
+import { TENANT, TENANT_SITE } from '../config/tenant.js';
+
 export default function SecArchitecture() {
   return (
     <section id="sec-architecture" className="section">
@@ -84,7 +86,7 @@ export default function SecArchitecture() {
         <div className="arch-band" style={{ borderTop: "3px solid var(--amber)" }}>
           <div className="arch-band-h">
             <div>
-              <div className="arch-band-title">Customer remediation platform · single-tenant · Daikin Sricity</div>
+              <div className="arch-band-title">{`Customer remediation platform · single-tenant · ${TENANT_SITE}`}</div>
               {' '}
               <div className="tiny muted">
                 Worker PII · document store · audit trail · versioned releases via change management
@@ -160,7 +162,7 @@ export default function SecArchitecture() {
         <div className="arch-band" style={{ borderTop: "3px solid var(--ink-3)" }}>
           <div className="arch-band-h">
             <div>
-              <div className="arch-band-title">Customer enterprise IT — Daikin systems of record</div>
+              <div className="arch-band-title">{`Customer enterprise IT — ${TENANT.name} systems of record`}</div>
               {' '}
               <div className="tiny muted">Karya Vaani's responsibility for intake formally ends here</div>
             </div>

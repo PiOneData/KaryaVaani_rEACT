@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const { readStore, writeStore, initDb, dbPut, dbDel, dbClear } = require('./db');
 const { hashPassword, verifyPassword, DEMO_ACCOUNTS } = require('./auth');
 const { licenceCeilingFor, licenceSetByHR } = require('./licence-policy');
+const { TENANT } = require('./tenant');
 
 const app = express();
 app.use(cors());
@@ -1908,7 +1909,7 @@ app.post('/api/hr-notifications/:id/read', (req, res) => {
 /* ── CR-8 · CLRA licence ceiling ────────────────────────────────────────────
    OSHC Rules 86-90: a contractor licence names a maximum authorised deployment
    headcount. That ceiling is a statutory limit and is enforced as a hard block.
-   Daikin's commercial "contracted headcount" is a SEPARATE, non-statutory
+   The customer's commercial "contracted headcount" is a SEPARATE, non-statutory
    number — it is tracked here too but only ever raises an advisory alert.
    ──────────────────────────────────────────────────────────────────────── */
 function findContractor(store, idOrName) {
@@ -3112,7 +3113,7 @@ app.post('/api/worker-exit', (req, res) => {
     id: newId('exit'),
     workerId: rec.id, workerName: rec.name, workerCode: rec.workerId || rec.id,
     type: rec.type || 'contract',
-    contractor: (rec.employment || {}).contractor || (rec.type === 'direct' ? 'Daikin (direct)' : ''),
+    contractor: (rec.employment || {}).contractor || (rec.type === 'direct' ? TENANT.directEmployer : ''),
     reason: String(p.reason || 'Not stated'),
     note: String(p.note || ''),
     lastWorkingDay: lastDay,
@@ -3315,7 +3316,7 @@ function ensureComplianceDefaults() {
       if (!c.clraLicence || c.clraLicence.maxHeadcount !== pinned) {
         c.clraLicence = Object.assign({
           number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
-          authority: 'Licensing Officer · Sricity, Andhra Pradesh',
+          authority: TENANT.licensingAuthority,
           validTill: (c.clra && c.clra.expiresOn) || ''
         }, c.clraLicence || {}, { maxHeadcount: pinned });
         touched = true;
@@ -3336,7 +3337,7 @@ function ensureComplianceDefaults() {
       const applied = Math.ceil((deployed * factor) / 10) * 10;
       c.clraLicence = Object.assign({
         number: 'CLRA/' + String(c.id || '').replace(/[^A-Z0-9]/gi, '') + '/2026',
-        authority: 'Licensing Officer · Sricity, Andhra Pradesh',
+        authority: TENANT.licensingAuthority,
         validTill: (c.clra && c.clra.expiresOn) || '',
         maxHeadcount: Math.max(deployed + 1, applied)
       }, c.clraLicence || {});

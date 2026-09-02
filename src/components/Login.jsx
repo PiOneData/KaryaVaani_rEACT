@@ -2,6 +2,7 @@
    Three demo roles: HR / Site Manager (full app), Contractor (their firm home),
    Worker / Labourer (their personal home). */
 import { useState } from 'react';
+import { TENANT_LABEL } from '../config/tenant.js';
 
 const api = () => (window.__KV_API_BASE || '');
 
@@ -78,7 +79,7 @@ export default function Login({ onLogin }) {
           <span className="login-mark">Karya Vaani</span>
           <span className="login-tag">Workforce Compliance Assessment</span>
         </div>
-        <div className="login-tenant">Daikin Sricity · AP</div>
+        <div className="login-tenant">{TENANT_LABEL}</div>
 
         {mode === 'login' && (
           <>

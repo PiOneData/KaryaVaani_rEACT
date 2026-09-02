@@ -475,7 +475,7 @@
      "uploaded": "22 Apr 2026 · 10:15",
      "file": "utility_bill_dec2025.jpg",
      "size": "1.4 MB",
-     "subject": "Electricity bill · Sricity address",
+     "subject": "Electricity bill · address proof",
      "notes": "Rejected: bill dated 18 Dec 2025 — older than 90 days. Worker asked to re-upload latest (Mar 2026 or newer).",
      "rejReason": "Bill date 18-Dec-2025 — exceeds 90-day freshness rule per Direct-employee checklist v2026.05.2."
     },
@@ -698,9 +698,9 @@
      "type": "self",
      "status": "done",
      "uploaded": "15 Apr 2026 · 18:28",
-     "file": "daikin_japan_relieving.pdf",
+     "file": "previous_employer_relieving.pdf",
      "size": "1.2 MB",
-     "subject": "Daikin Industries · Osaka · 2010-2024",
+     "subject": "Previous employer · Osaka · 2010-2024",
      "notes": "Internal transfer; group HR confirmed via HQ."
     },
     {
@@ -807,7 +807,7 @@
      "uploaded": "19 Apr 2026 · 14:05",
      "file": "rental_agreement.pdf",
      "size": "1.1 MB",
-     "subject": "Rental agreement · Sricity · valid 2025-2027",
+     "subject": "Rental agreement · valid 2025-2027",
      "notes": "Notarised. Approved."
     },
     {
@@ -2542,7 +2542,7 @@
    "id": "all",
    "kind": "Location",
    "name": "Entire location",
-   "sub": "Daikin Sricity · AP",
+   "sub": "All plant sites",
    "headcount": 2087,
    "ids": [
     "WRK-2207",

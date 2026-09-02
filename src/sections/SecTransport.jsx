@@ -4,6 +4,8 @@
    passenger opens the full tabbed employee detail. Night shift surfaces the
    OSHC Rule-83 women-transport compliance strip, live scan feed and SOS.
    All rendering is driven by the tr* functions in public/legacy/app.js. */
+import { TENANT, TENANT_LABEL } from '../config/tenant.js';
+
 export default function SecTransport() {
   return (
     <section id="sec-transport" className="section">
@@ -43,7 +45,7 @@ export default function SecTransport() {
           <div className="tab-right">
             <div className="ts-kpi"><div className="ts-val" style={{ color: "var(--gk)" }}>2,757</div><div className="ts-lbl">Contract labour · 16 agencies</div></div>
             <div className="ts-sep" />
-            <div className="ts-kpi"><div className="ts-val" style={{ color: "var(--gold)" }}>769</div><div className="ts-lbl">Daikin trainees</div></div>
+            <div className="ts-kpi"><div className="ts-val" style={{ color: "var(--gold)" }}>769</div><div className="ts-lbl">{`${TENANT.name} trainees`}</div></div>
             <div className="ts-sep" />
             <div className="ts-kpi"><div className="ts-val" style={{ color: "var(--rose)" }}>32</div><div className="ts-lbl">♀ Night · OSHC R.83</div></div>
           </div>
@@ -54,7 +56,7 @@ export default function SecTransport() {
           <div className="os-label">
             <div className="os-rule">OSHC Rule 83(c)(d)(f)</div>
             <div className="os-title">Night transport compliance</div>
-            <div className="os-meta">Women · Shift C · Sricity</div>
+            <div className="os-meta">{`Women · Shift C · ${TENANT.site}`}</div>
           </div>
           <div className="os-items">
             <div className="osi osi-ok" id="tr-oshc-consent-box"><div className="osi-dot" /><span className="osi-val" id="tr-oshc-consent">—</span>&nbsp;Consent · R.83</div>
@@ -79,7 +81,7 @@ export default function SecTransport() {
           <div className="routes">
             <div className="routes-hd">
               <span className="rhd-title" id="tr-routes-title">Routes</span>
-              <span className="rhd-count">Daikin Sricity · AP corridor</span>
+              <span className="rhd-count">{`${TENANT_LABEL} corridor`}</span>
               <button className="btn tiny" style={{ marginLeft: "auto" }} onClick={() => { window.trSendScheduleToNewOnboards() }} title="Send the approved transport-schedule template + a voice note in each worker's language to everyone newly onboarded">🚌 Send schedule to newly onboarded</button>
             </div>
             <div className="route-grid" id="tr-route-grid" />
@@ -93,7 +95,7 @@ export default function SecTransport() {
                 <button className="rd-close" onClick={() => { window.trGkCloseRoster() }}>✕</button>
               </div>
               <div className="rd-legend">
-                <div className="rdl"><div className="rdl-swatch" style={{ background: "var(--gk3)" }} />EMP — Daikin direct</div>
+                <div className="rdl"><div className="rdl-swatch" style={{ background: "var(--gk3)" }} />EMP — {TENANT.name} direct</div>
                 <div className="rdl"><div className="rdl-swatch" style={{ background: "var(--amber2)" }} />CTR — Contract labour</div>
                 <div className="rdl"><div className="rdl-swatch" style={{ background: "rgba(176,53,32,.4)" }} />Not boarded</div>
                 <div className="rdl"><div className="rdl-swatch" style={{ background: "rgba(138,80,16,.3)" }} />Pending</div>

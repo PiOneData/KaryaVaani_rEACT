@@ -1,4 +1,6 @@
 /* SecHandoff — converted 1:1 from karya-vaani_v3.html · <section id="sec-handoff"> */
+import { TENANT } from '../config/tenant.js';
+
 export default function SecHandoff() {
   return (
     <section id="sec-handoff" className="section">
@@ -20,7 +22,7 @@ export default function SecHandoff() {
           </h1>
           {' '}
           <p className="page-sub">
-            On successful onboarding, the worker master record pushes to Daikin HRIS, EHS and payroll over signed webhooks. Ongoing events (incidents, ack records, licence states) keep flowing in near-real time. Customer-side reconciliation endpoint available on demand.
+            On successful onboarding, the worker master record pushes to {TENANT.name} HRIS, EHS and payroll over signed webhooks. Ongoing events (incidents, ack records, licence states) keep flowing in near-real time. Customer-side reconciliation endpoint available on demand.
           </p>
         </div>
         {' '}
@@ -66,7 +68,7 @@ export default function SecHandoff() {
       <div className="g23">
         <div className="card">
           <div className="card-h">
-            <div className="card-h-title">Endpoint health · Daikin IT</div>
+            <div className="card-h-title">{`Endpoint health · ${TENANT.name} IT`}</div>
           </div>
           {' '}
           <table className="t">
@@ -106,7 +108,7 @@ export default function SecHandoff() {
                 <td>
                   <span className="mono">/ohs/incidents</span>
                 </td>
-                <td className="t-strong">Daikin EHS</td>
+                <td className="t-strong">{`${TENANT.name} EHS`}</td>
                 <td>22s</td>
                 <td>4h ago</td>
                 <td>
@@ -117,7 +119,7 @@ export default function SecHandoff() {
                 <td>
                   <span className="mono">/contractors/state</span>
                 </td>
-                <td className="t-strong">Daikin EHS</td>
+                <td className="t-strong">{`${TENANT.name} EHS`}</td>
                 <td>26s</td>
                 <td>11h ago</td>
                 <td>
@@ -150,7 +152,7 @@ export default function SecHandoff() {
                 <td>
                   <span className="mono">/reconcile</span>
                 </td>
-                <td className="t-strong">Daikin IT (on-demand)</td>
+                <td className="t-strong">{`${TENANT.name} IT (on-demand)`}</td>
                 <td>—</td>
                 <td>1d ago</td>
                 <td>

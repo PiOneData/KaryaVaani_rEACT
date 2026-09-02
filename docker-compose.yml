@@ -27,6 +27,13 @@ services:
       - "3241:3241"
     environment:
       - PORT=3241
+      # Tenant identity — who this deployment is branded for. Blank names no
+      # client at all. Must match the frontend build args below.
+      - TENANT_NAME=${TENANT_NAME:-}
+      - TENANT_SITE=${TENANT_SITE:-}
+      - TENANT_REGION=${TENANT_REGION:-}
+      - TENANT_REGION_FULL=${TENANT_REGION_FULL:-}
+      - TENANT_LOCATION_CODE=${TENANT_LOCATION_CODE:-PLANT-FG}
       - DATABASE_URL=postgresql://karyavaani:${POSTGRES_PASSWORD:-karyavaani-dev}@postgres:5432/karyavaani
       - MAIL_HOST=smtp.office365.com
       - EMAIL_PORT=587
@@ -106,6 +113,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Vite inlines VITE_* at build time, so rebranding the UI needs a
+      # rebuild (docker compose build frontend), not just a restart.
+      args:
+        VITE_TENANT_NAME: ${TENANT_NAME:-}
+        VITE_TENANT_SITE: ${TENANT_SITE:-}
+        VITE_TENANT_REGION: ${TENANT_REGION:-}
+        VITE_TENANT_REGION_FULL: ${TENANT_REGION_FULL:-}
+        VITE_TENANT_LEGAL_NAME: ${TENANT_LEGAL_NAME:-}
+        VITE_TENANT_ZONE: ${TENANT_ZONE:-}
+        VITE_TENANT_ADDRESS: ${TENANT_ADDRESS:-}
+        VITE_TENANT_LOCATION_CODE: ${TENANT_LOCATION_CODE:-}
+        VITE_TENANT_HQ: ${TENANT_HQ:-}
+        VITE_TENANT_COMPLIANCE_EMAIL: ${TENANT_COMPLIANCE_EMAIL:-}
+        VITE_TENANT_HELPDESK_PHONE: ${TENANT_HELPDESK_PHONE:-}
     image: ghcr.io/pionedata/karyavaani-ui:latest
     container_name: karyavaani-frontend
     ports:

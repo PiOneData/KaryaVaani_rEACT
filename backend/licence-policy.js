@@ -1,5 +1,5 @@
 /**
- * licence-policy.js — CLRA licensed-headcount ceilings that Daikin has fixed by
+ * licence-policy.js — CLRA licensed-headcount ceilings the customer has fixed by
  * policy, rather than leaving to the generic backfill.
  *
  * Where a contractor has no clraLicence on record, both the seed script and the

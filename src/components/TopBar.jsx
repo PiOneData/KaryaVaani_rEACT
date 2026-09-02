@@ -2,6 +2,7 @@
    chip, change-password and logout for the role-based session. */
 import { useState, useEffect } from 'react';
 import AccountModal from './AccountModal.jsx';
+import { TENANT_LABEL } from '../config/tenant.js';
 
 function initials(name) {
   return String(name || '?').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -88,7 +89,7 @@ export default function TopBar({ user, onLogout }) {
           {' '}
           <span className="tb-customer-label">Tenant</span>
           {' '}
-          <span className="tb-customer-name">Daikin Sricity · AP</span>
+          <span className="tb-customer-name">{TENANT_LABEL}</span>
         </div>
         {' '}
         <div className="tb-action">日本語</div>

@@ -44,6 +44,6 @@ const DEMO_ACCOUNTS = [
 /* Fleet operators running the worker buses. Route index i → OPERATORS[i % 4]
    (the frontend uses the identical rule), so each route has one operator and an
    operator owns a fixed set of routes. */
-const TRANSPORT_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'APSRTC Contract Fleet', 'Sricity Logistics'];
+const TRANSPORT_OPERATORS = ['Sri Balaji Travels', 'Kaveri Fleet Services', 'Metro Contract Fleet', 'Corridor Logistics'];
 
 module.exports = { hashPassword, verifyPassword, DEMO_ACCOUNTS, TRANSPORT_OPERATORS };
