@@ -86,7 +86,10 @@ export default function SecArchitecture() {
         <div className="arch-band" style={{ borderTop: "3px solid var(--amber)" }}>
           <div className="arch-band-h">
             <div>
-              <div className="arch-band-title">{`Customer remediation platform · single-tenant · ${TENANT_SITE}`}</div>
+              {/* The band titles pair against "Karya Vaani SaaS · multi-tenant" above,
+                  so the tenant name carries the "customer side" sense on its own —
+                  prefixing "Customer" too reads as a stutter when unbranded. */}
+              <div className="arch-band-title">{`Remediation platform · single-tenant · ${TENANT_SITE}`}</div>
               {' '}
               <div className="tiny muted">
                 Worker PII · document store · audit trail · versioned releases via change management
@@ -162,7 +165,7 @@ export default function SecArchitecture() {
         <div className="arch-band" style={{ borderTop: "3px solid var(--ink-3)" }}>
           <div className="arch-band-h">
             <div>
-              <div className="arch-band-title">{`Customer enterprise IT — ${TENANT.name} systems of record`}</div>
+              <div className="arch-band-title">{`Enterprise IT — ${TENANT.name} systems of record`}</div>
               {' '}
               <div className="tiny muted">Karya Vaani's responsibility for intake formally ends here</div>
             </div>
